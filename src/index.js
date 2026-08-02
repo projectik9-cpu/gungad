@@ -39,9 +39,15 @@ async function startApplication() {
     // 5. Запуск Telegram бота
     logger.info('🤖 Запуск Telegram бота...');
 
-    // Убираем меню команд и кнопку Menu у бота
+    // Меню: кнопка WebApp «Казино» (даёт initData в Mini App)
     await bot.telegram.deleteMyCommands();
-    await bot.telegram.setChatMenuButton({ menuButton: { type: 'default' } });
+    await bot.telegram.setChatMenuButton({
+      menuButton: {
+        type: 'web_app',
+        text: 'Казино',
+        web_app: { url: config.web.webAppUrl },
+      },
+    });
 
     // Запускаем бота
     await bot.launch({

@@ -41,9 +41,23 @@ function getTelegramWebApp(): any | null {
   }
 }
 
-async function waitForInitData(maxMs = 4000): Promise<{ initData: string | null; platform: string | null }> {
+async function waitForInitData(maxMs = 5000): Promise<{ initData: string | null; platform: string | null }> {
   const started = Date.now();
   let platform: string | null = null;
+
+  // Prefer value captured in index.html before React loads
+  try {
+    const early = (window as any).__GG_INIT_DATA;
+    if (early && String(early).length > 10) {
+      return {
+        initData: String(early),
+        platform: (window as any).__GG_TG_PLATFORM || getTelegramWebApp()?.platform || null,
+      };
+    }
+  } catch {
+    // ignore
+  }
+
   while (Date.now() - started < maxMs) {
     const tg = getTelegramWebApp();
     if (tg) {

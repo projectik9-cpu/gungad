@@ -1,0 +1,6 @@
+{
+  "name": "GunGad Casino",
+  "description": "Dark, aggressive, premium crypto casino with 7 playable games, multi-currency support, multi-language localization, and brutal gun-inspired design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

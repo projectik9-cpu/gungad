@@ -1,0 +1,125 @@
+ЧТО ТЕБЕ НАСТРОИТЬ (ОБНОВЛЕНО — Cloud Agent выполнил ТЗ)
+=========================================================
+
+СТАТУС: ✅ Backend реализован, ✅ Supabase RPCs применены, ✅ Vercel задеплоен.
+Осталось: выставить VITE_API_URL в Vercel → URL твоего бота-сервера.
+
+КРИТИЧЕСКИ ВАЖНО — VITE_API_URL
+---------------------------------
+WebApp на Vercel шлёт ставки / auth / heartbeat на бот-сервер (Express /api).
+Бот-сервер должен быть публично доступен (не localhost).
+
+Если бот запущен на VPS:
+  vercel env add VITE_API_URL production
+  → введи: https://твой-домен-или-ip:3000
+
+Если используешь ngrok для теста:
+  ngrok http 3000
+  vercel env add VITE_API_URL production
+  → введи: https://xxx.ngrok.io
+
+После добавления — redeploy:
+  cd gungad-casino && npx vercel --prod --yes
+
+ЧТО ТЕБЕ НАСТРОИТЬ ПОСЛЕ ОСНОВЫ БД (GunGad)
+==========================================
+
+Коротко: код-основу уже заложили. Дальше ты даёшь ключи/доступ,
+а умная модель (cloud) дописывает логику по файлу CLOUD_AGENT_TZ.md.
+
+
+1) SUPABASE — ключи
+-------------------
+Проект уже есть: nndebjrieyxqjnwkslhn
+Ссылка: https://supabase.com/dashboard/project/nndebjrieyxqjnwkslhn
+
+Открой: Project Settings → API и скопируй:
+
+  A) Project URL
+     → уже примерно такой: https://nndebjrieyxqjnwkslhn.supabase.co
+
+  B) anon / publishable key  (публичный)
+     → в файл gungad-casino/.env.local :
+       VITE_SUPABASE_URL=https://nndebjrieyxqjnwkslhn.supabase.co
+       VITE_SUPABASE_ANON_KEY=сюда_anon_ключ
+
+  C) service_role key  (СЕКРЕТНЫЙ — никому не светить, не в фронт!)
+     → в корневой .env бота:
+       SUPABASE_URL=https://nndebjrieyxqjnwkslhn.supabase.co
+       SUPABASE_ANON_KEY=сюда_anon_ключ
+       SUPABASE_SERVICE_ROLE_KEY=сюда_service_role
+
+Шаблоны лежат в:
+  - .env.example
+  - gungad-casino/.env.example
+
+
+2) VERCEL — переменные для сайта
+--------------------------------
+Проект webapp → Settings → Environment Variables → Production:
+
+  VITE_SUPABASE_URL = https://nndebjrieyxqjnwkslhn.supabase.co
+  VITE_SUPABASE_ANON_KEY = тот же anon ключ
+
+После добавления — Redeploy (или попроси агента задеплоить снова).
+
+Сайт сейчас: https://webapp-rosy-psi-26.vercel.app
+
+
+3) TELEGRAM БОТ
+---------------
+В корневом .env проверь:
+
+  BOT_TOKEN=...
+  WEB_APP_URL=https://webapp-rosy-psi-26.vercel.app
+  SUPABASE_SERVICE_ROLE_KEY=...   ← обязательно для записи в БД
+
+Перезапусти бота после правок .env:
+  pm2 restart gungad-casino-bot
+  (или как у тебя обычно: npm start / nodemon)
+
+
+4) ЧТО СКАЗАТЬ CLOUD / УМНОЙ МОДЕЛИ
+-----------------------------------
+Дай ей файл:
+
+  CLOUD_AGENT_TZ.md
+
+Там: что уже сделано, что реализовать, в каком порядке, что нельзя ломать.
+
+Можно коротко написать:
+  «Реализуй ТЗ из CLOUD_AGENT_TZ.md. Основа Supabase уже применена.
+   Ключи я положил в .env / Vercel.»
+
+
+5) ПРОВЕРКА «ВСЁ ОКЁ»
+-------------------
+После того как модель допишет логику:
+
+  [ ] Открыл бота → «Открыть казино» → сайт открывается
+  [ ] Баланс не сбрасывается после обновления страницы
+  [ ] Ставка реально меняет баланс
+  [ ] Онлайн-число живое (не рандом из воздуха)
+  [ ] (если делали Stars) пополнение звёздами падает на баланс
+
+
+6) ВАЖНЫЕ ПРЕДУПРЕЖДЕНИЯ
+-----------------------
+- service_role НЕ клади в Vercel как VITE_* и не кидай во фронт.
+- Старые таблицы users/withdrawals в том же Supabase — чужие/старые данные,
+  не проси удалять их.
+- В старых таблицах RLS выключен (риск). Когда казино поедет —
+  попроси модель/секьюрити это закрыть.
+
+
+7) ГДЕ ЧТО ЛЕЖИТ
+----------------
+CLOUD_AGENT_TZ.md     ← ТЗ для cloud-агента
+OWNER_SETUP.txt       ← этот файл, для тебя
+supabase/HANDOFF.txt  ← короткий тех. хэндофф
+supabase/migrations/  ← SQL основы
+gungad-casino/        ← фронт казино
+src/                  ← телеграм-бот
+
+
+Если что-то не ясно — сначала ключи (п.1–3), потом отдавай CLOUD_AGENT_TZ.md модели.

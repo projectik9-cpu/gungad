@@ -1,0 +1,43 @@
+GUNGAD SUPABASE FOUNDATION — handoff for next (smarter) agent
+==============================================================
+
+STATUS: Foundation APPLIED to live Supabase project nndebjrieyxqjnwkslhn
+URL: https://nndebjrieyxqjnwkslhn.supabase.co
+Region: eu-central-1
+
+WHAT WAS DONE
+- Migration applied: supabase/migrations/20260802230000_gungad_foundation.sql
+- New tables (gg_*): profiles, wallets, ledger, bets, star_payments, star_ledger, presence, casino_stats
+- RPCs: gg_ensure_profile, gg_heartbeat (service_role only)
+- Views: v_online_players_count (anon SELECT), v_gg_player_public
+- Money unit: USD cents (bigint). Stars: integer.
+- Clients: gungad-casino/src/lib/supabase.ts (anon), src/database/supabase.js (bot)
+- Types: gungad-casino/src/types/database.ts
+- Env templates: .env.example (+ gungad-casino/.env.example)
+- Packages: @supabase/supabase-js installed in bot + webapp
+
+EXISTING LEGACY TABLES (DO NOT DROP)
+users (4344 rows, telegram user_id PK, float balance — BAD for money),
+promocodes, used_promocodes, withdrawals, withdrawal_messages, sponsor_tasks,
+banned_users, casino_balances (empty), casino_games (empty/dice-shaped),
+casino_withdrawals, paid_subscriptions, op_service_settings, bot_settings
+
+CRITICAL SECURITY
+- Legacy tables have RLS DISABLED (anon can read/write if key leaks).
+- New gg_* have RLS ENABLED but no user policies yet — only service_role works for writes.
+- Add SUPABASE_SERVICE_ROLE_KEY to bot .env (Dashboard → Settings → API). Never put it in Vite/frontend.
+
+NEXT IMPLEMENTATION ORDER (save credits — do in this order)
+1. Put SERVICE_ROLE key in bot .env; smoke-test ensureGgProfile(telegramUser)
+2. Telegram WebApp: validate initData → ensure profile → return wallet
+3. Atomic settle_bet RPC (FOR UPDATE wallet, insert ledger+bet, idempotency_key)
+4. Stars: createInvoiceLink / successful_payment → gg_star_payments → credit wallet
+5. Frontend: replace localStorage balance + fake onlineCount with gg_wallets + v_online_players_count
+6. Presence heartbeat every 30s via API (not anon direct writes until policies exist)
+7. RLS policies once auth JWT carries telegram_id / profile_id
+8. Optional: migrate legacy users.balance → gg_wallets.balance_cents
+
+SMOKE TESTS
+- SELECT * FROM v_online_players_count;
+- SELECT gg_ensure_profile(123456789, 'test', 'Test', null, 'ru');
+- SELECT * FROM gg_wallets WHERE profile_id = <returned uuid>;

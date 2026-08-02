@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd gungad-casino && npm install && npm run build",
+  "outputDirectory": "gungad-casino/dist",
+  "installCommand": null,
+  "devCommand": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

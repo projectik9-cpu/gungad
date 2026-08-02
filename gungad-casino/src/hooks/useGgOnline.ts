@@ -8,7 +8,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { fetchOnlinePlayersCount } from '../lib/supabase';
 import type { GgGameId } from '../types/database';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://webapp-rosy-psi-26.vercel.app';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
 const HEARTBEAT_INTERVAL = 30_000; // 30 seconds
 const ONLINE_POLL_INTERVAL = 30_000;
 

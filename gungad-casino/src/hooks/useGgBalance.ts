@@ -8,7 +8,7 @@ import { GgSessionData } from './useGgSession';
 import type { GgGameId } from '../types/database';
 import { usdToCents, centsToUsd } from '../types/database';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://webapp-rosy-psi-26.vercel.app';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
 
 export interface SettleBetParams {
   game_id: GgGameId;

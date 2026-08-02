@@ -218,6 +218,7 @@ export default function App() {
         onOpenProvablyFair={() => setProvablyFairOpen(true)}
         onRefillDemo={handleRefillDemo}
         activeTab={activeTab}
+        sessionStatus={status}
         onSelectTab={(tKey) => {
           if (tKey === 'games') { setActiveGameId(null); setActiveTab('games'); }
           else if (tKey === 'crash') { handleSelectGame('crash'); }

@@ -32,15 +32,35 @@ export interface UseGgSessionResult {
   updateBalance: (newCents: number) => void;
 }
 
-function getTelegramInitData(): string | null {
+function getTelegramWebApp(): any | null {
   if (typeof window === 'undefined') return null;
   try {
-    const tg = (window as any).Telegram?.WebApp;
-    if (tg?.initData) return tg.initData;
+    return (window as any).Telegram?.WebApp ?? null;
   } catch {
-    // ignore
+    return null;
   }
-  return null;
+}
+
+/** Wait briefly — Telegram sometimes injects initData a tick after script load */
+async function waitForInitData(maxMs = 2500): Promise<string | null> {
+  const started = Date.now();
+  while (Date.now() - started < maxMs) {
+    const tg = getTelegramWebApp();
+    if (tg) {
+      try {
+        tg.ready?.();
+        tg.expand?.();
+      } catch {
+        // ignore
+      }
+      if (tg.initData && String(tg.initData).length > 0) {
+        return String(tg.initData);
+      }
+    }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  const tg = getTelegramWebApp();
+  return tg?.initData ? String(tg.initData) : null;
 }
 
 export function useGgSession(): UseGgSessionResult {
@@ -70,33 +90,37 @@ export function useGgSession(): UseGgSessionResult {
   }, []);
 
   useEffect(() => {
-    const initData = getTelegramInitData();
+    let cancelled = false;
 
-    if (!initData) {
-      // Demo mode — no Telegram context
-      setStatus('demo');
-      return;
-    }
+    (async () => {
+      const initData = await waitForInitData();
+      if (cancelled) return;
 
-    // Authenticate with backend
-    fetch(`${API_BASE}/api/auth`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData }),
-    })
-      .then(res => {
+      if (!initData) {
+        // Demo mode — no Telegram context (opened outside the bot)
+        setStatus('demo');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData }),
+        });
         if (!res.ok) throw new Error(`auth ${res.status}`);
-        return res.json();
-      })
-      .then((data: GgSessionData & { ok: boolean }) => {
+        const data = await res.json();
         if (!data.ok) throw new Error('auth rejected');
+        if (cancelled) return;
         setSession(data);
         setStatus('live');
-      })
-      .catch(err => {
+      } catch (err) {
         console.warn('[ggSession] auth failed, falling back to demo:', err);
-        setStatus('demo');
-      });
+        if (!cancelled) setStatus('demo');
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
   return { session, status, refreshWallet, updateBalance };

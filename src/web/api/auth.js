@@ -77,10 +77,22 @@ router.post('/', async (req, res) => {
 
     // Fetch wallet + profile data
     const sb = getSupabaseAdmin();
-    const { data, error } = await sb.rpc('gg_get_wallet', { p_profile_id: profileId });
+    let { data, error } = await sb.rpc('gg_get_wallet', { p_profile_id: profileId });
     if (error) {
       logger.error('[auth] gg_get_wallet error', error);
       return res.status(500).json({ error: 'Failed to fetch wallet' });
+    }
+
+    // Starting credits for brand-new wallets (empty → +$1000)
+    if ((data?.balance_cents ?? 0) === 0 && (data?.total_wagered_cents ?? 0) === 0) {
+      const refill = await sb.rpc('gg_demo_refill', {
+        p_profile_id: profileId,
+        p_amount_cents: 100000,
+      });
+      if (!refill.error) {
+        const again = await sb.rpc('gg_get_wallet', { p_profile_id: profileId });
+        if (!again.error && again.data) data = again.data;
+      }
     }
 
     return res.json({

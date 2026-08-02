@@ -26,9 +26,9 @@ export type SessionStatus = 'loading' | 'demo' | 'live' | 'error';
 export interface UseGgSessionResult {
   session: GgSessionData | null;
   status: SessionStatus;
-  /** Refresh wallet from server */
+  /** Why demo/error — for UI badge tooltip */
+  statusDetail: string | null;
   refreshWallet: () => Promise<void>;
-  /** Update balance locally (optimistic) then re-fetch */
   updateBalance: (newCents: number) => void;
 }
 
@@ -41,31 +41,35 @@ function getTelegramWebApp(): any | null {
   }
 }
 
-/** Wait briefly — Telegram sometimes injects initData a tick after script load */
-async function waitForInitData(maxMs = 2500): Promise<string | null> {
+async function waitForInitData(maxMs = 4000): Promise<{ initData: string | null; platform: string | null }> {
   const started = Date.now();
+  let platform: string | null = null;
   while (Date.now() - started < maxMs) {
     const tg = getTelegramWebApp();
     if (tg) {
       try {
         tg.ready?.();
         tg.expand?.();
+        platform = tg.platform ?? null;
       } catch {
         // ignore
       }
-      if (tg.initData && String(tg.initData).length > 0) {
-        return String(tg.initData);
+      if (tg.initData && String(tg.initData).length > 10) {
+        return { initData: String(tg.initData), platform };
       }
     }
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 100));
   }
   const tg = getTelegramWebApp();
-  return tg?.initData ? String(tg.initData) : null;
+  platform = tg?.platform ?? null;
+  const initData = tg?.initData && String(tg.initData).length > 10 ? String(tg.initData) : null;
+  return { initData, platform };
 }
 
 export function useGgSession(): UseGgSessionResult {
   const [session, setSession] = useState<GgSessionData | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
+  const [statusDetail, setStatusDetail] = useState<string | null>(null);
 
   const fetchWallet = useCallback(async (profileId: string) => {
     try {
@@ -73,10 +77,10 @@ export function useGgSession(): UseGgSessionResult {
       if (!res.ok) return;
       const json = await res.json();
       if (json.ok && json.wallet) {
-        setSession(prev => prev ? { ...prev, ...json.wallet } : null);
+        setSession((prev) => (prev ? { ...prev, ...json.wallet } : null));
       }
     } catch {
-      // silently fail — keep last known state
+      // keep last known state
     }
   }, []);
 
@@ -86,19 +90,38 @@ export function useGgSession(): UseGgSessionResult {
   }, [session?.profile_id, fetchWallet]);
 
   const updateBalance = useCallback((newCents: number) => {
-    setSession(prev => prev ? { ...prev, balance_cents: newCents } : null);
+    setSession((prev) => (prev ? { ...prev, balance_cents: newCents } : null));
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const initData = await waitForInitData();
+      // Diagnose API reachability first
+      try {
+        const ping = await fetch(`${API_BASE}/api/auth/ping`);
+        const pingJson = await ping.json().catch(() => ({}));
+        console.info('[ggSession] api ping', API_BASE, pingJson);
+        if (!pingJson.has_bot_token) {
+          console.warn('[ggSession] Railway BOT_TOKEN missing');
+        }
+      } catch (e) {
+        console.warn('[ggSession] api unreachable', API_BASE, e);
+        if (!cancelled) {
+          setStatus('demo');
+          setStatusDetail('api↓');
+        }
+        return;
+      }
+
+      const { initData, platform } = await waitForInitData();
       if (cancelled) return;
 
+      console.info('[ggSession] tg', { platform, hasInitData: Boolean(initData), len: initData?.length ?? 0 });
+
       if (!initData) {
-        // Demo mode — no Telegram context (opened outside the bot)
         setStatus('demo');
+        setStatusDetail(getTelegramWebApp() ? 'no-init' : 'no-tg');
         return;
       }
 
@@ -108,20 +131,32 @@ export function useGgSession(): UseGgSessionResult {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ initData }),
         });
-        if (!res.ok) throw new Error(`auth ${res.status}`);
-        const data = await res.json();
-        if (!data.ok) throw new Error('auth rejected');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          console.warn('[ggSession] auth failed', res.status, data);
+          if (!cancelled) {
+            setStatus('demo');
+            setStatusDetail(data.code || `auth${res.status}`);
+          }
+          return;
+        }
         if (cancelled) return;
         setSession(data);
         setStatus('live');
+        setStatusDetail(null);
       } catch (err) {
-        console.warn('[ggSession] auth failed, falling back to demo:', err);
-        if (!cancelled) setStatus('demo');
+        console.warn('[ggSession] auth network error', err);
+        if (!cancelled) {
+          setStatus('demo');
+          setStatusDetail('net');
+        }
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  return { session, status, refreshWallet, updateBalance };
+  return { session, status, statusDetail, refreshWallet, updateBalance };
 }

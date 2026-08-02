@@ -27,6 +27,8 @@ interface HeaderProps {
   onSelectTab: (tab: string) => void;
   /** live | demo | loading — shown in header so mobile Telegram sees mode */
   sessionStatus?: 'live' | 'demo' | 'loading' | 'error';
+  /** Short reason when DEMO (no-tg / auth403 / …) */
+  sessionDetail?: string | null;
 }
 
 const LANG_CODES: Record<Language, string> = {
@@ -49,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onSelectTab,
   sessionStatus = 'demo',
+  sessionDetail = null,
 }) => {
   const [langOpen, setLangOpen] = useState(false);
   const [currOpen, setCurrOpen] = useState(false);
@@ -116,16 +119,26 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <span
-            className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider border ${
+            className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider border max-w-[7.5rem] truncate ${
               sessionStatus === 'live'
                 ? 'text-emerald-400 border-emerald-700/60 bg-emerald-950/40'
                 : sessionStatus === 'loading'
                   ? 'text-zinc-400 border-zinc-700 bg-zinc-900/60'
                   : 'text-amber-400 border-amber-700/50 bg-amber-950/30'
             }`}
-            title={sessionStatus === 'live' ? 'Connected to server' : 'Demo / offline mode'}
+            title={
+              sessionStatus === 'live'
+                ? 'Connected to server'
+                : `Demo / offline${sessionDetail ? `: ${sessionDetail}` : ''}`
+            }
           >
-            {sessionStatus === 'live' ? 'LIVE' : sessionStatus === 'loading' ? '…' : 'DEMO'}
+            {sessionStatus === 'live'
+              ? 'LIVE'
+              : sessionStatus === 'loading'
+                ? '…'
+                : sessionDetail
+                  ? `DEMO·${sessionDetail}`
+                  : 'DEMO'}
           </span>
           <button
             onClick={() => { soundFx.playClick(); onRefillDemo(); }}

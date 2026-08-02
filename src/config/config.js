@@ -11,8 +11,9 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const config = {
   // Telegram Bot
   telegram: {
-    botToken: process.env.BOT_TOKEN,
-    webhookDomain: process.env.WEBHOOK_DOMAIN || '',
+    // trim — Railway/env иногда добавляет \n в конце токена → ломает HMAC initData
+    botToken: (process.env.BOT_TOKEN || '').trim(),
+    webhookDomain: (process.env.WEBHOOK_DOMAIN || '').trim(),
     useWebhook: process.env.USE_WEBHOOK === 'true',
   },
 
@@ -35,9 +36,9 @@ const config = {
 
   // Supabase (primary for GunGad gg_* tables)
   supabase: {
-    url: process.env.SUPABASE_URL || 'https://nndebjrieyxqjnwkslhn.supabase.co',
-    anonKey: process.env.SUPABASE_ANON_KEY || '',
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    url: (process.env.SUPABASE_URL || 'https://nndebjrieyxqjnwkslhn.supabase.co').trim(),
+    anonKey: (process.env.SUPABASE_ANON_KEY || '').trim(),
+    serviceRoleKey: (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(),
   },
 
   // Redis

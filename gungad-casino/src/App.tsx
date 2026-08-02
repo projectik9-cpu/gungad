@@ -66,7 +66,7 @@ function buildUserProfile(
 
 export default function App() {
   // ─── Server session & wallet ─────────────────────────────────────────────
-  const { session, status, refreshWallet, updateBalance } = useGgSession();
+  const { session, status, statusDetail, refreshWallet, updateBalance } = useGgSession();
   const isLive = status === 'live';
 
   // Local balance_cents state (kept in sync with server via hooks)
@@ -219,6 +219,7 @@ export default function App() {
         onRefillDemo={handleRefillDemo}
         activeTab={activeTab}
         sessionStatus={status}
+        sessionDetail={statusDetail}
         onSelectTab={(tKey) => {
           if (tKey === 'games') { setActiveGameId(null); setActiveTab('games'); }
           else if (tKey === 'crash') { handleSelectGame('crash'); }

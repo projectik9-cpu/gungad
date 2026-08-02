@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Currency, Language, UserProfile, BetHistoryItem, GameId } from './types';
 import { Header } from './components/Header';
 import { GamesGrid } from './components/GamesGrid';
@@ -19,43 +19,42 @@ import { DRAWN_USER_AVATAR } from './utils/avatar';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { centsToUsd, usdToCents } from './types/database';
 
-// Supabase hooks
 import { useGgSession } from './hooks/useGgSession';
 import { useGgBalance } from './hooks/useGgBalance';
 import { useGgOnline } from './hooks/useGgOnline';
 
-// Stable session ID for this browser tab
 const SESSION_ID = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-// Demo fallback profile when not in Telegram
-const DEMO_BALANCE_CENTS = 250000; // $2500
+/** Credits granted when user opts into demo mode */
+const DEMO_START_CENTS = 100000; // $1000
+
+type PlayMode = 'real' | 'demo';
 
 function buildUserProfile(
   session: import('./hooks/useGgSession').GgSessionData | null,
-  isLive: boolean,
+  useLiveProfile: boolean,
   balanceCents: number,
 ): UserProfile {
-  if (isLive && session) {
+  if (useLiveProfile && session) {
     return {
-      username:       session.username ?? session.first_name ?? 'Player',
-      avatar:         DRAWN_USER_AVATAR,
-      balanceUSD:     centsToUsd(balanceCents),
-      vipLevel:       session.vip_level,
-      vipXp:          session.vip_xp,
-      vipMaxXp:       Math.round(1000 * Math.pow(1.8, session.vip_level - 1)),
+      username:        session.username ?? session.first_name ?? 'Player',
+      avatar:          DRAWN_USER_AVATAR,
+      balanceUSD:      centsToUsd(balanceCents),
+      vipLevel:        session.vip_level,
+      vipXp:           session.vip_xp,
+      vipMaxXp:        Math.round(1000 * Math.pow(1.8, session.vip_level - 1)),
       totalWageredUSD: centsToUsd(session.total_wagered_cents),
       totalProfitUSD:  centsToUsd(session.total_won_cents - session.total_wagered_cents),
-      totalBetsCount:  0, // populated from bet history later
+      totalBetsCount:  0,
       totalWinsCount:  0,
     };
   }
-  // Demo
   return {
-    username:        'Operative_X',
+    username:        session?.username ?? session?.first_name ?? 'Operative_X',
     avatar:          DRAWN_USER_AVATAR,
     balanceUSD:      centsToUsd(balanceCents),
-    vipLevel:        1,
-    vipXp:           0,
+    vipLevel:        session?.vip_level ?? 1,
+    vipXp:           session?.vip_xp ?? 0,
     vipMaxXp:        1000,
     totalWageredUSD: 0,
     totalProfitUSD:  0,
@@ -65,102 +64,110 @@ function buildUserProfile(
 }
 
 export default function App() {
-  // ─── Server session & wallet ─────────────────────────────────────────────
-  const { session, status, statusDetail, refreshWallet, updateBalance } = useGgSession();
+  const { session, status, updateBalance } = useGgSession();
   const isLive = status === 'live';
 
-  // Local balance_cents state (kept in sync with server via hooks)
-  const [balanceCents, setBalanceCents] = useState<number>(() => {
-    if (isLive && session) return session.balance_cents;
-    // Demo fallback from localStorage
-    const saved = localStorage.getItem('gungad_balance_cents');
-    return saved ? parseInt(saved) : DEMO_BALANCE_CENTS;
+  const [playMode, setPlayMode] = useState<PlayMode>(() =>
+    localStorage.getItem('gungad_play_mode') === 'demo' ? 'demo' : 'real',
+  );
+
+  // Real wallet (server) — default 0, never auto-demo
+  const [balanceCents, setBalanceCents] = useState(0);
+
+  // Separate demo wallet
+  const [demoBalanceCents, setDemoBalanceCents] = useState(() => {
+    const saved = localStorage.getItem('gungad_demo_balance_cents');
+    if (saved != null && !Number.isNaN(parseInt(saved, 10))) return parseInt(saved, 10);
+    return DEMO_START_CENTS;
   });
 
-  // Sync balanceCents when session first loads
+  // Clear legacy auto-demo localStorage key once
   useEffect(() => {
-    if (isLive && session) {
+    localStorage.removeItem('gungad_balance_cents');
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('gungad_play_mode', playMode);
+  }, [playMode]);
+
+  useEffect(() => {
+    localStorage.setItem('gungad_demo_balance_cents', String(demoBalanceCents));
+  }, [demoBalanceCents]);
+
+  // Sync real balance from server when live and in real mode
+  useEffect(() => {
+    if (isLive && session && playMode === 'real') {
       setBalanceCents(session.balance_cents);
     }
-  }, [isLive, session?.balance_cents]);
+  }, [isLive, session?.balance_cents, playMode]);
+
+  const displayBalanceCents = playMode === 'demo' ? demoBalanceCents : balanceCents;
 
   const handleBalanceUpdate = useCallback((newCents: number) => {
-    setBalanceCents(Math.max(0, newCents));
-    updateBalance(Math.max(0, newCents));
-    if (!isLive) {
-      localStorage.setItem('gungad_balance_cents', String(Math.max(0, newCents)));
+    const next = Math.max(0, newCents);
+    if (playMode === 'demo') {
+      setDemoBalanceCents(next);
+      return;
     }
-  }, [isLive, updateBalance]);
+    setBalanceCents(next);
+    updateBalance(next);
+  }, [playMode, updateBalance]);
 
-  // ─── Bet settle ──────────────────────────────────────────────────────────
-  const { settleBet, refillDemo } = useGgBalance(session, status, handleBalanceUpdate);
+  const { settleBet, refillDemo } = useGgBalance(
+    session,
+    status,
+    handleBalanceUpdate,
+    { playMode, balanceCents: displayBalanceCents },
+  );
 
-  // ─── Derived UserProfile for UI components ───────────────────────────────
   const [extraStats, setExtraStats] = useState({ betsCount: 0, winsCount: 0 });
+  const useLiveProfile = isLive && playMode === 'real';
   const user: UserProfile = useMemo(() => {
-    const profile = buildUserProfile(session, isLive, balanceCents);
+    const profile = buildUserProfile(session, useLiveProfile, displayBalanceCents);
     return {
       ...profile,
       totalBetsCount: extraStats.betsCount,
       totalWinsCount: extraStats.winsCount,
     };
-  }, [session, isLive, balanceCents, extraStats]);
+  }, [session, useLiveProfile, displayBalanceCents, extraStats]);
 
-  // ─── Settings (stored in localStorage, UI-only) ──────────────────────────
   const [currency, setCurrency] = useState<Currency>(() =>
-    (localStorage.getItem('gungad_currency') as Currency) || 'USD'
+    (localStorage.getItem('gungad_currency') as Currency) || 'USD',
   );
   const [lang, setLang] = useState<Language>(() =>
-    (localStorage.getItem('gungad_lang') as Language) || 'ru'
+    (localStorage.getItem('gungad_lang') as Language) || 'ru',
   );
 
   useEffect(() => { localStorage.setItem('gungad_currency', currency); }, [currency]);
   useEffect(() => { localStorage.setItem('gungad_lang', lang); }, [lang]);
 
-  // ─── Navigation ──────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab]   = useState<string>('games');
+  const [activeTab, setActiveTab] = useState<string>('games');
   const [activeGameId, setActiveGameId] = useState<GameId | null>(null);
-
-  // ─── Bet history (local for this session + pulled from DB) ───────────────
   const [betHistory, setBetHistory] = useState<BetHistoryItem[]>([]);
-
-  // ─── Modals ──────────────────────────────────────────────────────────────
-  const [depositOpen, setDepositOpen]           = useState(false);
-  const [profileOpen, setProfileOpen]           = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [provablyFairOpen, setProvablyFairOpen] = useState(false);
 
-  // ─── Online counter ───────────────────────────────────────────────────────
   const onlineCount = useGgOnline(
     session?.profile_id ?? null,
     SESSION_ID,
     activeGameId,
-    isLive,
+    isLive && playMode === 'real',
   );
 
-  // ─── Handlers ─────────────────────────────────────────────────────────────
-
-  /**
-   * Called by every game component when a round ends.
-   * Sends to server (live) or updates demo balance.
-   */
   const handleUpdateBalance = useCallback((newBalanceUSD: number) => {
     handleBalanceUpdate(usdToCents(newBalanceUSD));
   }, [handleBalanceUpdate]);
 
   const handleAddBetHistory = useCallback((item: BetHistoryItem) => {
     setBetHistory(prev => [item, ...prev.slice(0, 49)]);
-
-    // Update local extra stats
     setExtraStats(prev => ({
       betsCount: prev.betsCount + 1,
       winsCount: item.win ? prev.winsCount + 1 : prev.winsCount,
     }));
 
-    // In live mode: fire settle API
-    if (isLive && session?.profile_id) {
-      const betCents    = usdToCents(item.betAmountUSD);
-      const payoutCents = usdToCents(item.payoutUSD);
-
+    // Real money settle only when live + real play mode
+    if (playMode === 'real' && isLive && session?.profile_id) {
       settleBet({
         game_id:     item.gameId,
         betUSD:      item.betAmountUSD,
@@ -171,19 +178,32 @@ export default function App() {
         client_seed: item.clientSeed,
         server_seed_hash: item.serverSeedHash,
       }).then(res => {
-        if (res.ok) {
-          // Server confirmed balance — sync
-          handleBalanceUpdate(res.balance_cents);
-        }
+        if (res.ok) handleBalanceUpdate(res.balance_cents);
       });
     }
-  }, [isLive, session?.profile_id, settleBet, handleBalanceUpdate]);
+  }, [playMode, isLive, session?.profile_id, settleBet, handleBalanceUpdate]);
 
   const handleRefillDemo = useCallback(async () => {
+    if (playMode !== 'demo') return;
     soundFx.playWin();
     const newCents = await refillDemo();
-    setBalanceCents(newCents);
-  }, [refillDemo]);
+    setDemoBalanceCents(newCents);
+  }, [playMode, refillDemo]);
+
+  const handleToggleDemo = useCallback(() => {
+    soundFx.playClick();
+    setPlayMode(prev => {
+      if (prev === 'demo') {
+        // Exit demo → restore real balance
+        if (isLive && session) setBalanceCents(session.balance_cents);
+        else setBalanceCents(0);
+        return 'real';
+      }
+      // Enter demo — ensure starting credits if empty
+      setDemoBalanceCents(cur => (cur > 0 ? cur : DEMO_START_CENTS));
+      return 'demo';
+    });
+  }, [isLive, session]);
 
   const handleSelectGame = useCallback((gameId: GameId) => {
     soundFx.playClick();
@@ -192,7 +212,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  // ─── Common game props ────────────────────────────────────────────────────
   const gameProps = useMemo(() => ({
     user,
     currency,
@@ -201,7 +220,6 @@ export default function App() {
     onAddHistory:    handleAddBetHistory,
   }), [user, currency, lang, handleUpdateBalance, handleAddBetHistory]);
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div
       className="min-h-screen bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw]"
@@ -215,31 +233,27 @@ export default function App() {
         onLangChange={setLang}
         onOpenDeposit={() => setDepositOpen(true)}
         onOpenProfile={() => setProfileOpen(true)}
-        onOpenProvablyFair={() => setProvablyFairOpen(true)}
-        onRefillDemo={handleRefillDemo}
-        activeTab={activeTab}
+        playMode={playMode}
+        onToggleDemo={handleToggleDemo}
         sessionStatus={status}
-        sessionDetail={statusDetail}
         onSelectTab={(tKey) => {
           if (tKey === 'games') { setActiveGameId(null); setActiveTab('games'); }
           else if (tKey === 'crash') { handleSelectGame('crash'); }
         }}
       />
 
-      {/* Десктопная раскладка: sidebar слева + content справа */}
       <div className="flex-1 flex">
-        {/* Боковое меню — только на больших экранах */}
         <aside className="hidden lg:flex flex-col gap-2 w-48 shrink-0 border-r border-zinc-900 bg-[#09090b] px-3 py-5 sticky top-14 self-start h-[calc(100vh-56px)] overflow-y-auto">
           <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider px-2 mb-1">{t('allGames', lang)}</span>
           {[
-            { id: 'games',    label: t('allGames',     lang) },
-            { id: 'crash',    label: t('crashName',    lang) },
-            { id: 'roulette', label: t('rouletteName', lang) },
-            { id: 'blackjack',label: t('blackjackName',lang) },
-            { id: 'coinflip', label: t('coinflipName', lang) },
-            { id: 'dice',     label: t('diceName',     lang) },
-            { id: 'mines',    label: t('minesName',    lang) },
-            { id: 'plinko',   label: t('plinkoName',   lang) },
+            { id: 'games',     label: t('allGames',      lang) },
+            { id: 'crash',     label: t('crashName',     lang) },
+            { id: 'roulette',  label: t('rouletteName',  lang) },
+            { id: 'blackjack', label: t('blackjackName', lang) },
+            { id: 'coinflip',  label: t('coinflipName',  lang) },
+            { id: 'dice',      label: t('diceName',      lang) },
+            { id: 'mines',     label: t('minesName',     lang) },
+            { id: 'plinko',    label: t('plinkoName',    lang) },
           ].map(item => (
             <button
               key={item.id}
@@ -258,40 +272,33 @@ export default function App() {
             </button>
           ))}
 
-          {/* Live / Demo badge */}
           <div className="mt-auto px-2 pb-2">
-            {isLive ? (
+            {playMode === 'demo' ? (
+              <span className="text-[10px] font-mono text-amber-500">DEMO</span>
+            ) : isLive ? (
               <span className="text-[10px] font-mono text-emerald-500 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 LIVE
               </span>
-            ) : (
-              <span className="text-[10px] font-mono text-zinc-600">DEMO</span>
-            )}
+            ) : null}
           </div>
         </aside>
 
-        {/* Main Content */}
         <main className="flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 py-5 flex flex-col gap-5">
-
-          {/* Hero Banner */}
           {activeTab === 'games' && !activeGameId && (
             <div className="relative bg-[#0e0e13] border border-rose-900/40 rounded-2xl px-6 py-8 overflow-hidden shadow-xl flex flex-col items-center justify-center text-center gap-4">
               <div className="absolute inset-0 bg-[radial-gradient(#e11d48_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.07] pointer-events-none" />
               <RevolverLogo size="lg" />
-              {/* Online counter — real or fake */}
               <div className="flex items-center gap-1.5 text-sm font-mono font-bold text-zinc-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#22c55e] animate-pulse" />
                 {onlineCount}
               </div>
-              {/* Session status indicator on mobile */}
               {status === 'loading' && (
                 <span className="text-[10px] text-zinc-600 animate-pulse">Подключение…</span>
               )}
             </div>
           )}
 
-          {/* Back button — внутри игры */}
           {activeTab === 'game' && activeGameId && (
             <div className="flex items-center justify-between">
               <button
@@ -308,10 +315,8 @@ export default function App() {
             </div>
           )}
 
-          {/* Games Grid */}
           {activeTab === 'games' && <GamesGrid onSelectGame={handleSelectGame} lang={lang} />}
 
-          {/* Game Views */}
           {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'roulette'  && <RouletteGame  {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'blackjack' && <BlackjackGame {...gameProps} />}
@@ -322,7 +327,6 @@ export default function App() {
         </main>
       </div>
 
-      {/* Footer */}
       <footer className="border-t border-rose-900/30 bg-[#09090b] py-6 text-zinc-500 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -345,6 +349,7 @@ export default function App() {
         lang={lang}
         onRefillDemo={handleRefillDemo}
         onUpdateBalance={handleUpdateBalance}
+        playMode={playMode}
       />
       <ProfileModal
         isOpen={profileOpen}

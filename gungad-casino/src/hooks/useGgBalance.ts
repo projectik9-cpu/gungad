@@ -1,7 +1,7 @@
 /**
  * useGgBalance — wraps balance mutations (bet settle, refill, refetch).
- * All money mutations go through the server-side API → gg_settle_bet RPC.
- * Client NEVER computes the final balance directly.
+ * Real money goes through the server API → gg_settle_bet RPC.
+ * Demo mode is local-only (opt-in via playMode).
  */
 import { useCallback, useRef } from 'react';
 import { GgSessionData } from './useGgSession';
@@ -12,9 +12,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.r
 
 export interface SettleBetParams {
   game_id: GgGameId;
-  /** Bet amount in USD (will be converted to cents) */
   betUSD: number;
-  /** Payout in USD (0 = loss; >0 = win amount including stake) */
   payoutUSD: number;
   multiplier: number;
   status: 'won' | 'lost' | 'push' | 'cashed_out';
@@ -30,6 +28,12 @@ export interface SettleBetResult {
   error?: string;
 }
 
+export interface GgBalanceOpts {
+  playMode: 'real' | 'demo';
+  /** Current displayed balance (demo or real) for local settle math */
+  balanceCents: number;
+}
+
 let _idempotencyCounter = 0;
 function newIdempotencyKey(gameId: string): string {
   return `${gameId}_${Date.now()}_${++_idempotencyCounter}_${Math.random().toString(36).slice(2, 8)}`;
@@ -39,56 +43,57 @@ export function useGgBalance(
   session: GgSessionData | null,
   status: 'loading' | 'demo' | 'live' | 'error',
   onBalanceUpdate: (newCents: number) => void,
+  opts: GgBalanceOpts,
 ) {
-  // Track pending bets to prevent double submit
   const pendingRef = useRef(false);
+  const { playMode, balanceCents } = opts;
 
-  /** Settle a bet through the server. Returns new balance_cents. */
   const settleBet = useCallback(async (params: SettleBetParams): Promise<SettleBetResult> => {
-    if (status !== 'live' || !session?.profile_id) {
-      // Demo mode — compute balance client-side (localStorage only, no DB)
-      const betCents   = usdToCents(params.betUSD);
+    const useServer = playMode === 'real' && status === 'live' && Boolean(session?.profile_id);
+
+    if (!useServer) {
+      const betCents = usdToCents(params.betUSD);
       const payoutCents = usdToCents(params.payoutUSD);
-      const newCents   = (session?.balance_cents ?? 250000) - betCents + payoutCents;
-      onBalanceUpdate(Math.max(0, newCents));
-      return { ok: true, balance_cents: Math.max(0, newCents) };
+      const newCents = balanceCents - betCents + payoutCents;
+      const next = Math.max(0, newCents);
+      onBalanceUpdate(next);
+      return { ok: true, balance_cents: next };
     }
 
     if (pendingRef.current) {
-      return { ok: false, balance_cents: session.balance_cents, error: 'Bet already in progress' };
+      return { ok: false, balance_cents: session!.balance_cents, error: 'Bet already in progress' };
     }
 
     pendingRef.current = true;
     try {
-      const betCents    = usdToCents(params.betUSD);
+      const betCents = usdToCents(params.betUSD);
       const payoutCents = usdToCents(params.payoutUSD);
 
       const body = {
-        profile_id:        session.profile_id,
-        game_id:           params.game_id,
-        bet_cents:         betCents,
-        payout_cents:      payoutCents,
-        multiplier:        params.multiplier,
-        status:            params.status,
-        result:            params.result ?? {},
-        idempotency_key:   newIdempotencyKey(params.game_id),
-        client_seed:       params.client_seed ?? null,
-        server_seed_hash:  params.server_seed_hash ?? null,
+        profile_id: session!.profile_id,
+        game_id: params.game_id,
+        bet_cents: betCents,
+        payout_cents: payoutCents,
+        multiplier: params.multiplier,
+        status: params.status,
+        result: params.result ?? {},
+        idempotency_key: newIdempotencyKey(params.game_id),
+        client_seed: params.client_seed ?? null,
+        server_seed_hash: params.server_seed_hash ?? null,
       };
 
-      const res  = await fetch(`${API_BASE}/api/bet`, {
-        method:  'POST',
+      const res = await fetch(`${API_BASE}/api/bet`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
+        body: JSON.stringify(body),
       });
 
       const json = await res.json();
 
       if (!res.ok || !json.ok) {
-        return { ok: false, balance_cents: session.balance_cents, error: json.error ?? 'Bet failed' };
+        return { ok: false, balance_cents: session!.balance_cents, error: json.error ?? 'Bet failed' };
       }
 
-      // Optimistic update with server-confirmed balance
       onBalanceUpdate(json.balance_cents);
       return { ok: true, balance_cents: json.balance_cents, bet_id: json.bet_id };
     } catch (err) {
@@ -97,33 +102,17 @@ export function useGgBalance(
     } finally {
       pendingRef.current = false;
     }
-  }, [session, status, onBalanceUpdate]);
+  }, [session, status, onBalanceUpdate, playMode, balanceCents]);
 
-  /** Demo refill — only in live mode: calls /api/wallet/refill */
+  /** Demo-only local refill (+$1000). Never credits the live wallet. */
   const refillDemo = useCallback(async (): Promise<number> => {
-    if (status !== 'live' || !session?.profile_id) {
-      // Pure demo
-      const newCents = (session?.balance_cents ?? 0) + 100000;
-      onBalanceUpdate(newCents);
-      return newCents;
+    if (playMode !== 'demo') {
+      return balanceCents;
     }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/wallet/refill`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ profile_id: session.profile_id }),
-      });
-      const json = await res.json();
-      if (json.ok && json.balance_cents != null) {
-        onBalanceUpdate(json.balance_cents);
-        return json.balance_cents;
-      }
-    } catch (err) {
-      console.error('[ggBalance] refillDemo error:', err);
-    }
-    return session?.balance_cents ?? 0;
-  }, [session, status, onBalanceUpdate]);
+    const newCents = balanceCents + 100000;
+    onBalanceUpdate(newCents);
+    return newCents;
+  }, [playMode, balanceCents, onBalanceUpdate]);
 
   return { settleBet, refillDemo };
 }

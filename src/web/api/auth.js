@@ -119,17 +119,7 @@ router.post('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch wallet', code: 'wallet_failed' });
     }
 
-    // Starting credits for brand-new wallets (empty → +$1000)
-    if ((data?.balance_cents ?? 0) === 0 && (data?.total_wagered_cents ?? 0) === 0) {
-      const refill = await sb.rpc('gg_demo_refill', {
-        p_profile_id: profileId,
-        p_amount_cents: 100000,
-      });
-      if (!refill.error) {
-        const again = await sb.rpc('gg_get_wallet', { p_profile_id: profileId });
-        if (!again.error && again.data) data = again.data;
-      }
-    }
+    // New wallets start at 0 — no auto demo credits (user opts into demo in the Mini App)
 
     logger.info(`[auth] ok telegram_id=${tgUser.id} profile=${profileId} balance=${data?.balance_cents}`);
     return res.json({

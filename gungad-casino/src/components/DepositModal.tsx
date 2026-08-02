@@ -13,6 +13,7 @@ interface DepositModalProps {
   lang: any;
   onRefillDemo: () => void;
   onUpdateBalance: (newBalance: number) => void;
+  playMode?: 'real' | 'demo';
 }
 
 export const DepositModal: React.FC<DepositModalProps> = ({
@@ -23,6 +24,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   lang,
   onRefillDemo,
   onUpdateBalance,
+  playMode = 'real',
 }) => {
   const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
   const [selectedCoin, setSelectedCoin] = useState<'USDT' | 'BTC' | 'ETH' | 'SOL'>('USDT');
@@ -113,23 +115,25 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         {/* Deposit Tab Content */}
         {tab === 'deposit' ? (
           <div className="flex flex-col gap-4">
-            {/* Quick Demo Refill Button */}
-            <div className="bg-rose-950/40 border border-rose-900/60 p-4 rounded-xl flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-rose-300 block">{t('demoBalance', lang)}</span>
-                <span className="text-xs text-zinc-400">{t('refillDemoSub', lang)}</span>
+            {/* Demo refill — only when user opted into demo mode */}
+            {playMode === 'demo' && (
+              <div className="bg-rose-950/40 border border-rose-900/60 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-rose-300 block">{t('demoBalance', lang)}</span>
+                  <span className="text-xs text-zinc-400">{t('refillDemoSub', lang)}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    soundFx.playClick();
+                    onRefillDemo();
+                  }}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  {t('refillDemoBtn', lang)}
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  soundFx.playClick();
-                  onRefillDemo();
-                }}
-                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                {t('refillDemoBtn', lang)}
-              </button>
-            </div>
+            )}
 
             {/* Crypto Coin Selection */}
             <div className="flex flex-col gap-2">

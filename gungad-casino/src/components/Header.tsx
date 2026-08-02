@@ -5,13 +5,7 @@ import { CURRENCIES, formatCurrency } from '../utils/currencies';
 import { RevolverLogo } from './RevolverLogo';
 import { SettingsMenu } from './SettingsMenu';
 import { soundFx } from '../utils/sound';
-import {
-  Wallet,
-  Plus,
-  ChevronDown,
-  ShieldCheck,
-  RefreshCw,
-} from 'lucide-react';
+import { Wallet, ChevronDown } from 'lucide-react';
 
 interface HeaderProps {
   user: UserProfile;
@@ -21,14 +15,11 @@ interface HeaderProps {
   onLangChange: (l: Language) => void;
   onOpenDeposit: () => void;
   onOpenProfile: () => void;
-  onOpenProvablyFair: () => void;
-  onRefillDemo: () => void;
-  activeTab: string;
   onSelectTab: (tab: string) => void;
-  /** live | demo | loading — shown in header so mobile Telegram sees mode */
+  playMode: 'real' | 'demo';
+  onToggleDemo: () => void;
+  /** Auth session status (live connection) */
   sessionStatus?: 'live' | 'demo' | 'loading' | 'error';
-  /** Short reason when DEMO (no-tg / auth403 / …) */
-  sessionDetail?: string | null;
 }
 
 const LANG_CODES: Record<Language, string> = {
@@ -46,12 +37,10 @@ export const Header: React.FC<HeaderProps> = ({
   onLangChange,
   onOpenDeposit,
   onOpenProfile,
-  onOpenProvablyFair,
-  onRefillDemo,
-  activeTab,
   onSelectTab,
-  sessionStatus = 'demo',
-  sessionDetail = null,
+  playMode,
+  onToggleDemo,
+  sessionStatus = 'loading',
 }) => {
   const [langOpen, setLangOpen] = useState(false);
   const [currOpen, setCurrOpen] = useState(false);
@@ -70,86 +59,45 @@ export const Header: React.FC<HeaderProps> = ({
 
   const unlock = () => soundFx.unlockAndStartMusic();
 
+  const showDemoBadge = playMode === 'demo';
+  const showLiveBadge = playMode === 'real' && sessionStatus === 'live';
+
   return (
     <header
       ref={headerRef}
       className="sticky top-0 z-[200] bg-[#0a0a0d]/98 backdrop-blur-xl border-b border-rose-900/30"
       onPointerDown={unlock}
     >
-      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-2 flex items-center justify-between gap-1.5 sm:gap-3 min-w-0">
-        <div className="flex items-center gap-3 shrink-0 min-w-0">
+      <div className="w-full max-w-7xl mx-auto pl-1 pr-2 sm:pl-2 sm:pr-4 py-2 flex items-center justify-between gap-1.5 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0 min-w-0">
+          <SettingsMenu lang={lang} playMode={playMode} onToggleDemo={onToggleDemo} />
           <div className="sm:hidden">
             <RevolverLogo size="sm" onClick={() => onSelectTab('games')} />
           </div>
           <div className="hidden sm:block">
             <RevolverLogo size="md" onClick={() => onSelectTab('games')} />
           </div>
-
-          <nav className="hidden md:flex items-center gap-1.5">
-            <button
-              onClick={() => { soundFx.playClick(); onSelectTab('games'); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all ${
-                activeTab === 'games'
-                  ? 'bg-rose-950/80 text-white border border-rose-600/50'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
-              }`}
-            >
-              {t('allGames', lang)}
-            </button>
-            <button
-              onClick={() => { soundFx.playClick(); onSelectTab('crash'); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-                activeTab === 'crash'
-                  ? 'bg-rose-950/80 text-white border border-rose-600/50'
-                  : 'text-rose-400 hover:text-rose-300 hover:bg-rose-950/40'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-              {t('crashName', lang)}
-            </button>
-            <button
-              onClick={() => { soundFx.playClick(); onOpenProvablyFair(); }}
-              className="px-3 py-1.5 rounded-xl text-xs font-display font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all flex items-center gap-1.5"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              {t('provablyFair', lang)}
-            </button>
-          </nav>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <span
-            className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider border max-w-[7.5rem] truncate ${
-              sessionStatus === 'live'
-                ? 'text-emerald-400 border-emerald-700/60 bg-emerald-950/40'
-                : sessionStatus === 'loading'
-                  ? 'text-zinc-400 border-zinc-700 bg-zinc-900/60'
-                  : 'text-amber-400 border-amber-700/50 bg-amber-950/30'
-            }`}
-            title={
-              sessionStatus === 'live'
-                ? 'Connected to server'
-                : `Demo / offline${sessionDetail ? `: ${sessionDetail}` : ''}`
-            }
-          >
-            {sessionStatus === 'live'
-              ? 'LIVE'
-              : sessionStatus === 'loading'
-                ? '…'
-                : sessionDetail
-                  ? `DEMO·${sessionDetail}`
-                  : 'DEMO'}
-          </span>
-          <button
-            onClick={() => { soundFx.playClick(); onRefillDemo(); }}
-            title={t('refillDemo', lang)}
-            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs font-bold text-zinc-300 rounded-xl"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-rose-500" />
-            <span>+$1k</span>
-          </button>
+          {showDemoBadge && (
+            <span
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider border text-amber-400 border-amber-700/50 bg-amber-950/30"
+              title={t('demoMode', lang)}
+            >
+              DEMO
+            </span>
+          )}
+          {showLiveBadge && (
+            <span
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider border text-emerald-400 border-emerald-700/60 bg-emerald-950/40"
+              title="Connected to server"
+            >
+              LIVE
+            </span>
+          )}
 
-          <div className="relative">
+          <div className="relative flex items-center gap-1">
             <button
               onClick={() => { soundFx.playClick(); setCurrOpen(!currOpen); setLangOpen(false); }}
               className="flex items-center gap-1 sm:gap-1.5 bg-[#121217] border border-rose-900/40 px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl"
@@ -160,6 +108,15 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
               <ChevronDown className="w-2.5 h-2.5 text-zinc-500 shrink-0" />
             </button>
+
+            {playMode === 'real' && (
+              <button
+                onClick={() => { soundFx.playClick(); onOpenDeposit(); }}
+                className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wide bg-gradient-to-r from-rose-600 to-rose-700 text-white whitespace-nowrap"
+              >
+                {t('deposit', lang)}
+              </button>
+            )}
 
             {currOpen && (
               <div className="absolute right-0 top-full mt-2 w-44 bg-[#111116] border border-zinc-800 rounded-2xl shadow-2xl p-1.5 z-[300]">
@@ -179,14 +136,6 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-
-          <button
-            onClick={() => { soundFx.playClick(); onOpenDeposit(); }}
-            className="flex items-center justify-center w-7 h-7 sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg sm:rounded-xl shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline ml-1 text-xs font-bold uppercase">{t('deposit', lang)}</span>
-          </button>
 
           <div className="relative">
             <button
@@ -213,8 +162,6 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-
-          <SettingsMenu lang={lang} />
 
           <button
             onClick={() => { soundFx.playClick(); onOpenProfile(); }}

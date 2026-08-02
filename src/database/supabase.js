@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import config from '../config/config.js';
 import logger from '../utils/logger.js';
 
@@ -7,9 +8,11 @@ import logger from '../utils/logger.js';
  * Prefer SUPABASE_SERVICE_ROLE_KEY (bypasses RLS). Never expose to frontend.
  */
 let client = null;
+let initError = null;
 
 export function getSupabaseAdmin() {
   if (client) return client;
+  if (initError) return null;
 
   const url = config.supabase.url;
   const key = config.supabase.serviceRoleKey || config.supabase.anonKey;
@@ -19,10 +22,44 @@ export function getSupabaseAdmin() {
     return null;
   }
 
-  client = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  try {
+    // Node < 22 has no native WebSocket; supabase-js realtime requires `ws`
+    client = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      realtime: { transport: ws },
+    });
+  } catch (err) {
+    initError = err;
+    logger.error(`[supabase] createClient failed: ${err?.message || err}`);
+    return null;
+  }
   return client;
+}
+
+/** Diagnostic info for /api/auth/ping (no secrets) */
+export function getSupabaseDiag() {
+  const service = config.supabase.serviceRoleKey || '';
+  const anon = config.supabase.anonKey || '';
+  const key = service || anon;
+  return {
+    has_url: Boolean(config.supabase.url),
+    has_service_role: Boolean(service),
+    has_anon: Boolean(anon),
+    service_len: service.length,
+    service_kind: service.startsWith('eyJ')
+      ? 'jwt'
+      : service.startsWith('sb_secret')
+        ? 'sb_secret'
+        : service.startsWith('sb_publishable')
+          ? 'sb_publishable'
+          : service
+            ? 'other'
+            : 'missing',
+    client_ok: Boolean(getSupabaseAdmin()),
+    init_error: initError ? String(initError.message || initError).slice(0, 160) : null,
+    using_key: service ? 'service_role' : anon ? 'anon' : 'none',
+    key_len: key.length,
+  };
 }
 
 /** Upsert Telegram user into gg_profiles + empty wallet */
@@ -39,7 +76,7 @@ export async function ensureGgProfile(telegramUser) {
   });
 
   if (error) {
-    logger.error('gg_ensure_profile failed', error);
+    logger.error(`[supabase] gg_ensure_profile failed: ${error.message}`);
     return null;
   }
   return data;

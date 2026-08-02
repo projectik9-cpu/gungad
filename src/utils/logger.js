@@ -56,14 +56,12 @@ const logger = winston.createLogger({
   ],
 });
 
-// В режиме разработки выводим в консоль
-if (config.app.environment === 'development') {
-  logger.add(
-    new winston.transports.Console({
-      format: consoleFormat,
-    })
-  );
-}
+// Always log to stdout (Railway / Docker only see console, not file transports)
+logger.add(
+  new winston.transports.Console({
+    format: config.app.environment === 'development' ? consoleFormat : logFormat,
+  })
+);
 
 // Вспомогательные методы
 logger.logBotStart = () => {

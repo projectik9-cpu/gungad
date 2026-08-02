@@ -5,7 +5,7 @@
  */
 import crypto from 'crypto';
 import express from 'express';
-import { getSupabaseAdmin, ensureGgProfile } from '../../database/supabase.js';
+import { getSupabaseAdmin, ensureGgProfile, getSupabaseDiag } from '../../database/supabase.js';
 import config from '../../config/config.js';
 import logger from '../../utils/logger.js';
 
@@ -54,14 +54,14 @@ function validateInitData(initDataRaw) {
     const a = Buffer.from(expectedHash, 'utf8');
     const b = Buffer.from(hash, 'utf8');
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-      logger.warn('[auth] hash mismatch tokenLen=%d checkLen=%d', botToken.length, checkString.length);
+      logger.warn(`[auth] hash mismatch tokenLen=${botToken.length} checkLen=${checkString.length}`);
       return { error: 'hash_mismatch' };
     }
 
     const authDate = parseInt(params.get('auth_date') || '0', 10);
     if (Date.now() / 1000 - authDate > 86400) {
       // 24h soft reject — Telegram can keep WebApp open a while
-      logger.warn('[auth] initData old, auth_date=%d', authDate);
+      logger.warn(`[auth] initData old, auth_date=${authDate}`);
     }
 
     const userRaw = params.get('user');
@@ -70,7 +70,7 @@ function validateInitData(initDataRaw) {
     if (!user?.id) return { error: 'user_id_missing' };
     return { user };
   } catch (e) {
-    logger.warn('[auth] validateInitData error', e.message);
+    logger.warn(`[auth] validateInitData error: ${e?.message || e}`);
     return { error: 'validate_exception' };
   }
 }
@@ -83,7 +83,7 @@ router.get('/ping', (req, res) => {
     has_bot_token: Boolean(token),
     token_len: token.length,
     token_suffix: token ? token.slice(-6) : null,
-    has_supabase: Boolean(config.supabase.serviceRoleKey || config.supabase.anonKey),
+    supabase: getSupabaseDiag(),
   });
 });
 
@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
 
     let { data, error } = await sb.rpc('gg_get_wallet', { p_profile_id: profileId });
     if (error) {
-      logger.error('[auth] gg_get_wallet error', error);
+      logger.error(`[auth] gg_get_wallet error: ${error.message}`);
       return res.status(500).json({ error: 'Failed to fetch wallet', code: 'wallet_failed' });
     }
 
@@ -131,7 +131,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    logger.info('[auth] ok telegram_id=%s profile=%s balance=%s', tgUser.id, profileId, data?.balance_cents);
+    logger.info(`[auth] ok telegram_id=${tgUser.id} profile=${profileId} balance=${data?.balance_cents}`);
     return res.json({
       ok: true,
       profile_id: profileId,
@@ -146,8 +146,10 @@ router.post('/', async (req, res) => {
       total_lost_cents: data?.total_lost_cents ?? 0,
     });
   } catch (err) {
-    logger.error('[auth] Unexpected error', err);
-    res.status(500).json({ error: 'Internal server error', code: 'internal' });
+    const detail = String(err?.message || err).slice(0, 160);
+    logger.error(`[auth] Unexpected error: ${detail}`);
+    console.error('[auth] Unexpected error', err);
+    res.status(500).json({ error: 'Internal server error', code: 'internal', detail });
   }
 });
 

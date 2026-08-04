@@ -15,6 +15,8 @@ interface HeaderProps {
   onLangChange: (l: Language) => void;
   onOpenDeposit: () => void;
   onOpenProfile: () => void;
+  /** Close any open modals (deposit/profile/etc.) */
+  onCloseModals?: () => void;
   onSelectTab: (tab: string) => void;
   playMode: 'real' | 'demo';
   onToggleDemo: () => void;
@@ -40,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLangChange,
   onOpenDeposit,
   onOpenProfile,
+  onCloseModals,
   onSelectTab,
   playMode,
   onToggleDemo,
@@ -70,6 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
   const goHome = () => {
     soundFx.unlockAndStartMusic();
     soundFx.playClick();
+    onCloseModals?.();
     onSelectTab('games');
   };
 
@@ -87,10 +91,10 @@ export const Header: React.FC<HeaderProps> = ({
               <SettingsMenu lang={lang} playMode={playMode} onToggleDemo={onToggleDemo} />
             </div>
             <div className="sm:hidden">
-              <RevolverLogo size="sm" onClick={() => { soundFx.playClick(); onSelectTab('games'); }} />
+              <RevolverLogo size="sm" onClick={() => { soundFx.playClick(); onCloseModals?.(); onSelectTab('games'); }} />
             </div>
             <div className="hidden sm:block">
-              <RevolverLogo size="md" onClick={() => { soundFx.playClick(); onSelectTab('games'); }} />
+              <RevolverLogo size="md" onClick={() => { soundFx.playClick(); onCloseModals?.(); onSelectTab('games'); }} />
             </div>
           </div>
 

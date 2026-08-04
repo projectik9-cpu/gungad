@@ -243,6 +243,7 @@ export default function App() {
         onLangChange={setLang}
         onOpenDeposit={openDeposit}
         onOpenProfile={openProfile}
+        onCloseModals={closeAllModals}
         playMode={playMode}
         onToggleDemo={handleToggleDemo}
         sessionStatus={status}

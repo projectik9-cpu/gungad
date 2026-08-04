@@ -157,14 +157,14 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
           >
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black border-4 border-rose-600 flex flex-col items-center justify-center p-4 backface-hidden shadow-inner">
               <Target className="w-16 h-16 text-rose-500 drop-shadow-[0_0_10px_rgba(225,29,72,0.8)]" />
-              <span className="font-display font-black text-white uppercase text-xs tracking-widest mt-2">GUNHEAD</span>
+              <span className="font-display font-black text-white uppercase text-xs tracking-widest mt-2">{t('heads', lang)}</span>
             </div>
             <div
               className="absolute inset-0 rounded-full bg-gradient-to-br from-rose-950 via-zinc-900 to-black border-4 border-rose-600 flex flex-col items-center justify-center p-4 backface-hidden shadow-inner"
               style={{ transform: 'rotateY(180deg)' }}
             >
               <Skull className="w-16 h-16 text-rose-400 drop-shadow-[0_0_10px_rgba(225,29,72,0.8)]" />
-              <span className="font-display font-black text-rose-400 uppercase text-xs tracking-widest mt-2">SKULLTAIL</span>
+              <span className="font-display font-black text-rose-400 uppercase text-xs tracking-widest mt-2">{t('tails', lang)}</span>
             </div>
           </div>
 

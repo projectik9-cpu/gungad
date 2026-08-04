@@ -332,8 +332,8 @@ export const translations = {
     dealerWins: 'Дилер выиграл',
 
     // Coin Flip
-    heads: 'ТУРА',
-    tails: 'ТЕРІС',
+    heads: 'ОРЁЛ',
+    tails: 'РЕШКА',
     flipping: 'Подбрасываем...',
 
     // Dice
@@ -543,8 +543,8 @@ export const translations = {
     dealerWins: 'Дилер виграв',
 
     // Coin Flip
-    heads: 'ТУРА',
-    tails: 'ТЕРІС',
+    heads: 'ОРЕЛ',
+    tails: 'РЕШКА',
     flipping: 'Підкидаємо...',
 
     // Dice
@@ -754,8 +754,8 @@ export const translations = {
     dealerWins: 'Дилер жеңді',
 
     // Coin Flip
-    heads: 'ТУРА',
-    tails: 'ТЕРІС',
+    heads: 'БАС',
+    tails: 'ЖАЗУ',
     flipping: 'Лақтырылуда...',
 
     // Dice

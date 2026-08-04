@@ -60,6 +60,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     setGameState('waiting');
     setMultiplier(1.0);
     multiplierRef.current = 1.0;
+    cashedOutRef.current = false;
     setCountdown(5);
     setHasBet(false);
 
@@ -78,6 +79,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const runRound = () => {
     const cp = generateCrashPoint();
     setCrashPoint(cp);
+    cashedOutRef.current = false;
     setGameState('running');
 
     let current = 1.0;
@@ -89,26 +91,33 @@ export const CrashGame: React.FC<CrashGameProps> = ({
       multiplierRef.current = current;
       setMultiplier(current);
 
-      // auto cashout
+      // auto cashout — only if player hasn't already cashed out
       const acVal = parseFloat(autoCashout);
-      if (!isNaN(acVal) && acVal > 1.01 && current >= acVal && current < cp) {
+      if (!cashedOutRef.current && !isNaN(acVal) && acVal > 1.01 && current >= acVal && current < cp) {
         doWin(current);
-        return;
+        // Don't return — rocket keeps flying
       }
 
       if (current >= cp) {
         soundFx.playExplosion();
-        soundFx.playLoss();
-        setGameState('crashed');
         setHistory(prev => [cp, ...prev.slice(0, 9)]);
-        if (hasBetRef.current) {
-          onAddHistory({
-            id: String(Date.now()), gameId: 'crash', gameName: t('crashName', lang),
-            timestamp: new Date(), betAmountUSD: betRef.current,
-            multiplier: 0, payoutUSD: 0, win: false, currency,
-          });
+        if (!cashedOutRef.current) {
+          // Player lost
+          soundFx.playLoss();
+          setGameState('crashed');
+          if (hasBetRef.current) {
+            onAddHistory({
+              id: String(Date.now()), gameId: 'crash', gameName: t('crashName', lang),
+              timestamp: new Date(), betAmountUSD: betRef.current,
+              multiplier: 0, payoutUSD: 0, win: false, currency,
+            });
+          }
+        } else {
+          // Player had already cashed out — show crash point briefly then restart
+          setGameState('crashed');
         }
-        setTimeout(startCountdown, 2000);
+        cashedOutRef.current = false;
+        setTimeout(startCountdown, 2500);
         return;
       }
 
@@ -120,11 +129,13 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   // refs для доступа в closure
   const hasBetRef = useRef(false);
   const betRef = useRef(10);
+  const cashedOutRef = useRef(false); // player already cashed out this round
   useEffect(() => { hasBetRef.current = hasBet; }, [hasBet]);
   useEffect(() => { betRef.current = betAmountUSD; }, [betAmountUSD]);
 
   const doWin = (winMult: number) => {
-    if (animRef.current) cancelAnimationFrame(animRef.current);
+    // DON'T cancel animation — rocket keeps flying until actual crash point
+    cashedOutRef.current = true;
     setCashedMultiplier(winMult);
     setGameState('cashed_out');
     const payoutUSD = betRef.current * winMult;
@@ -136,7 +147,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
       timestamp: new Date(), betAmountUSD: betRef.current,
       multiplier: winMult, payoutUSD, win: true, currency,
     });
-    setTimeout(startCountdown, 2000);
+    // Round ends naturally when tick() reaches crashPoint
   };
 
   const handlePlaceBet = () => {
@@ -265,6 +276,8 @@ export const CrashGame: React.FC<CrashGameProps> = ({
                   {t('cashedOutAt', lang)} {cashedMultiplier.toFixed(2)}x
                 </span>
                 <p className="text-emerald-300 font-bold text-lg mt-2">+{formatCurrency(betAmountUSD * cashedMultiplier, currency)}</p>
+                {/* Show rocket still flying */}
+                <p className="text-zinc-500 font-mono text-sm mt-1">{multiplier.toFixed(2)}x ↗</p>
               </div>
             )}
           </div>

@@ -17,6 +17,8 @@ interface HeaderProps {
   onOpenProfile: () => void;
   /** Close any open modals (deposit/profile/etc.) */
   onCloseModals?: () => void;
+  /** Which modal is currently open — used to highlight bottom nav button */
+  activeModal?: 'deposit' | 'profile' | null;
   onSelectTab: (tab: string) => void;
   playMode: 'real' | 'demo';
   onToggleDemo: () => void;
@@ -43,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDeposit,
   onOpenProfile,
   onCloseModals,
+  activeModal = null,
   onSelectTab,
   playMode,
   onToggleDemo,
@@ -68,7 +71,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   const showDemoBadge = playMode === 'demo';
   const showLiveBadge = playMode === 'real' && sessionStatus === 'live';
-  const onHome = activeTab === 'games' && !activeGameId;
+  // Bottom nav highlight: "home" is active only when no modal and on games tab
+  const onHome = activeTab === 'games' && !activeGameId && !activeModal;
+  const onDeposit = activeModal === 'deposit';
+  const onProfile = activeModal === 'profile';
 
   const goHome = () => {
     soundFx.unlockAndStartMusic();
@@ -230,7 +236,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => { soundFx.unlockAndStartMusic(); soundFx.playClick(); onOpenDeposit(); }}
-            className={`${navBtnCls} text-zinc-400`}
+            className={`${navBtnCls} ${onDeposit ? 'text-rose-400' : 'text-zinc-400'}`}
           >
             <CircleDollarSign className="w-5 h-5" />
             <span className="text-[10px] font-semibold leading-none">{t('deposit', lang)}</span>
@@ -240,7 +246,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => { soundFx.unlockAndStartMusic(); soundFx.playClick(); onOpenProfile(); }}
-            className={`${navBtnCls} text-zinc-400`}
+            className={`${navBtnCls} ${onProfile ? 'text-rose-400' : 'text-zinc-400'}`}
           >
             <UserRound className="w-5 h-5" />
             <span className="text-[10px] font-semibold leading-none">{t('profile', lang)}</span>

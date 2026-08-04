@@ -16,6 +16,32 @@ import { RevolverLogo } from './components/RevolverLogo';
 import { t } from './translations';
 import { soundFx } from './utils/sound';
 import { DRAWN_USER_AVATAR } from './utils/avatar';
+
+/** Compute effective VIP level and intra-level XP from total accumulated XP */
+function computeVipLevel(totalXp: number): { level: number; xpInLevel: number; maxXpInLevel: number } {
+  let level = 1;
+  let cumulative = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const cap = Math.round(1000 * Math.pow(1.8, level - 1));
+    if (cumulative + cap > totalXp) {
+      return { level, xpInLevel: totalXp - cumulative, maxXpInLevel: cap };
+    }
+    cumulative += cap;
+    level++;
+    if (level > 50) break; // safety
+  }
+  return { level, xpInLevel: 0, maxXpInLevel: Math.round(1000 * Math.pow(1.8, level - 1)) };
+}
+
+/** Try to get Telegram user photo URL */
+function getTgPhotoUrl(): string | null {
+  try {
+    return (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.photo_url ?? null;
+  } catch {
+    return null;
+  }
+}
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { centsToUsd, usdToCents } from './types/database';
 
@@ -35,14 +61,19 @@ function buildUserProfile(
   useLiveProfile: boolean,
   balanceCents: number,
 ): UserProfile {
+  const tgPhoto = getTgPhotoUrl();
+  const avatar = tgPhoto ?? DRAWN_USER_AVATAR;
+
   if (useLiveProfile && session) {
+    // Server may lag behind leveling — compute correct level from XP
+    const { level, xpInLevel, maxXpInLevel } = computeVipLevel(session.vip_xp);
     return {
       username:        session.username ?? session.first_name ?? 'Player',
-      avatar:          DRAWN_USER_AVATAR,
+      avatar,
       balanceUSD:      centsToUsd(balanceCents),
-      vipLevel:        session.vip_level,
-      vipXp:           session.vip_xp,
-      vipMaxXp:        Math.round(1000 * Math.pow(1.8, session.vip_level - 1)),
+      vipLevel:        level,
+      vipXp:           xpInLevel,
+      vipMaxXp:        maxXpInLevel,
       totalWageredUSD: centsToUsd(session.total_wagered_cents),
       totalProfitUSD:  centsToUsd(session.total_won_cents - session.total_wagered_cents),
       totalBetsCount:  0,
@@ -51,7 +82,7 @@ function buildUserProfile(
   }
   return {
     username:        session?.username ?? session?.first_name ?? 'Operative_X',
-    avatar:          DRAWN_USER_AVATAR,
+    avatar,
     balanceUSD:      centsToUsd(balanceCents),
     vipLevel:        session?.vip_level ?? 1,
     vipXp:           session?.vip_xp ?? 0,
@@ -244,6 +275,7 @@ export default function App() {
         onOpenDeposit={openDeposit}
         onOpenProfile={openProfile}
         onCloseModals={closeAllModals}
+        activeModal={depositOpen ? 'deposit' : profileOpen ? 'profile' : null}
         playMode={playMode}
         onToggleDemo={handleToggleDemo}
         sessionStatus={status}

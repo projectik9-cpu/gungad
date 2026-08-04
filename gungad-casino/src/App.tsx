@@ -148,6 +148,16 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [provablyFairOpen, setProvablyFairOpen] = useState(false);
 
+  // Close all modals helper — prevents stacking
+  const closeAllModals = () => {
+    setDepositOpen(false);
+    setProfileOpen(false);
+    setProvablyFairOpen(false);
+  };
+  const openDeposit = () => { closeAllModals(); setDepositOpen(true); };
+  const openProfile = () => { closeAllModals(); setProfileOpen(true); };
+  const openProvablyFair = () => { closeAllModals(); setProvablyFairOpen(true); };
+
   const onlineCount = useGgOnline(
     session?.profile_id ?? null,
     SESSION_ID,
@@ -231,8 +241,8 @@ export default function App() {
         onCurrencyChange={setCurrency}
         lang={lang}
         onLangChange={setLang}
-        onOpenDeposit={() => setDepositOpen(true)}
-        onOpenProfile={() => setProfileOpen(true)}
+        onOpenDeposit={openDeposit}
+        onOpenProfile={openProfile}
         playMode={playMode}
         onToggleDemo={handleToggleDemo}
         sessionStatus={status}
@@ -274,16 +284,11 @@ export default function App() {
             </button>
           ))}
 
-          <div className="mt-auto px-2 pb-2">
-            {playMode === 'demo' ? (
+          {playMode === 'demo' && (
+            <div className="mt-auto px-2 pb-2">
               <span className="text-[10px] font-mono text-amber-500">DEMO</span>
-            ) : isLive ? (
-              <span className="text-[10px] font-mono text-emerald-500 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                LIVE
-              </span>
-            ) : null}
-          </div>
+            </div>
+          )}
         </aside>
 
         <main className="flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 py-5 flex flex-col gap-5">
@@ -336,9 +341,9 @@ export default function App() {
             <span className="border-l border-zinc-800 pl-3">{t('footerCopyright', lang)}</span>
           </div>
           <div className="flex items-center gap-6">
-            <button onClick={() => setProvablyFairOpen(true)} className="hover:text-white transition-colors">{t('provablyFair', lang)}</button>
-            <button onClick={() => setDepositOpen(true)} className="hover:text-white transition-colors">{t('deposit', lang)}</button>
-            <button onClick={() => setProfileOpen(true)} className="hover:text-white transition-colors">{t('profile', lang)}</button>
+            <button onClick={openProvablyFair} className="hover:text-white transition-colors">{t('provablyFair', lang)}</button>
+            <button onClick={openDeposit} className="hover:text-white transition-colors">{t('deposit', lang)}</button>
+            <button onClick={openProfile} className="hover:text-white transition-colors">{t('profile', lang)}</button>
           </div>
         </div>
       </footer>

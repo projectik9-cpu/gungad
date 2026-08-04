@@ -49,23 +49,39 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   label,
 }) => {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [entered, setEntered] = useState(false);
   const [panel, setPanel] = useState<'root' | 'settings'>('root');
   const [soundMuted, setSoundMuted] = useState(soundFx.getMuted());
   const [musicMuted, setMusicMuted] = useState(soundFx.getMusicMuted());
   const [volume, setVolume] = useState(soundFx.getVolume());
   const [musicVolume, setMusicVolume] = useState(soundFx.getMusicVolume());
 
+  // Enter / exit animation: keep portal mounted until slide-out finishes
   useEffect(() => {
     if (open) {
+      setMounted(true);
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-      setPanel('root');
+      const id = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setEntered(true));
+      });
+      return () => cancelAnimationFrame(id);
     }
+
+    setEntered(false);
+    const timer = window.setTimeout(() => {
+      setMounted(false);
+      setPanel('root');
+      document.body.style.overflow = '';
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [open]);
+
+  useEffect(() => {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, []);
 
   // Escape closes drawer
   useEffect(() => {
@@ -112,18 +128,24 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
   // Portal to body — nav has backdrop-filter which breaks position:fixed
   const drawer =
-    open &&
+    mounted &&
     createPortal(
       <div className="fixed inset-0 z-[500] flex" role="dialog" aria-modal="true">
         <button
           type="button"
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm border-0 cursor-default"
+          className={`absolute inset-0 border-0 cursor-default transition-opacity ease-out ${
+            entered ? 'opacity-100 bg-black/60 backdrop-blur-sm' : 'opacity-0 bg-black/0'
+          }`}
+          style={{ transitionDuration: '280ms' }}
           aria-label="Close"
           onClick={closeDrawer}
         />
 
         <div
-          className="relative flex flex-col w-[80vw] max-w-xs h-full bg-[#0f0f14] border-r border-zinc-800 shadow-2xl overflow-y-auto"
+          className={`relative flex flex-col w-[80vw] max-w-xs h-full bg-[#0f0f14] border-r border-zinc-800 shadow-2xl overflow-y-auto will-change-transform transition-transform ease-out ${
+            entered ? 'translate-x-0' : '-translate-x-full'
+          }`}
+          style={{ transitionDuration: '280ms', transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-800/60 shrink-0">

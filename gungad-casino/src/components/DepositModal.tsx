@@ -205,7 +205,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     if (!isReal || withdrawSubmitting) return;
     soundFx.playClick();
     setWithdrawError(null);
-    if (!Number.isFinite(withdrawAmountUSD) || withdrawAmountUSD < 1) {
+    if (!Number.isFinite(withdrawAmountUSD) || withdrawAmountUSD < 7) {
       setWithdrawError(t('withdrawMinNote', lang));
       return;
     }
@@ -557,7 +557,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 <label className="text-xs font-bold text-zinc-400 uppercase">{t('amountUSD', lang)}</label>
                 <input
                   type="number"
-                  min={1}
+                  min={7}
                   value={withdrawAmountUSD}
                   onChange={(e) => setWithdrawAmountUSD(parseFloat(e.target.value) || 0)}
                   className={inputCls}
@@ -578,7 +578,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
               <button
                 onClick={handleWithdraw}
-                disabled={!isReal || withdrawSubmitting || withdrawAmountUSD < 1 || withdrawAmountUSD > user.balanceUSD || !withdrawAddress}
+                disabled={!isReal || withdrawSubmitting || withdrawAmountUSD < 7 || withdrawAmountUSD > user.balanceUSD || !withdrawAddress}
                 className="w-full py-3 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.5)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {withdrawSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}

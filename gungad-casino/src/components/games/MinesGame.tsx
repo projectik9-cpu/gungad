@@ -5,7 +5,7 @@ import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
-import { Bomb, Diamond, ShieldCheck } from 'lucide-react';
+import { Bomb, Diamond } from 'lucide-react';
 
 interface MinesGameProps {
   user: UserProfile;
@@ -142,53 +142,19 @@ export const MinesGame: React.FC<MinesGameProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* 5x5 Grid Field */}
-      <div className="lg:col-span-8 flex flex-col gap-4">
-        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-6 min-h-[380px] flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow">
-          {/* Grid View */}
-          <div className="grid grid-cols-5 gap-2.5 w-full max-w-md aspect-square">
-            {grid.map((tile, i) => (
-              <button
-                key={i}
-                onClick={() => handleTileClick(i)}
-                disabled={gameState !== 'playing' || tile.revealed}
-                className={`w-full h-full rounded-xl border flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md ${
-                  !tile.revealed
-                    ? 'bg-zinc-900 border-zinc-800 hover:border-rose-600/70 hover:bg-zinc-800 hover:shadow-[0_0_15px_rgba(225,29,72,0.3)]'
-                    : tile.isMine
-                    ? 'bg-rose-950 border-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.8)]'
-                    : 'bg-emerald-950/80 border-emerald-600/70 shadow-[0_0_20px_rgba(16,185,129,0.5)]'
-                }`}
-              >
-                {tile.revealed ? (
-                  tile.isMine ? (
-                    <Bomb className="w-7 h-7 text-rose-500 animate-bounce" />
-                  ) : (
-                    <Diamond className="w-7 h-7 text-emerald-400 animate-pulse" />
-                  )
-                ) : (
-                  <div className="w-3 h-3 rounded-full bg-zinc-800" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Control Panel */}
-      <div className="lg:col-span-4 flex flex-col gap-4">
-        {/* Mines count Selector */}
-        <div className="bg-[#111115] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-2">
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+      {/* Controls first on mobile */}
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
+        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2.5 flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
             <span>{t('minesCount', lang)}</span>
-            <span className="text-rose-400 font-mono font-bold text-sm">{t('minesCountShort', lang, { n: minesCount })}</span>
+            <span className="text-rose-400 font-mono font-bold text-xs">{t('minesCountShort', lang, { n: minesCount })}</span>
           </label>
           <select
             value={minesCount}
             onChange={(e) => setMinesCount(parseInt(e.target.value))}
             disabled={gameState === 'playing'}
-            className="w-full bg-[#0a0a0d] border border-zinc-800 text-white font-mono font-bold text-sm rounded-xl px-3 py-2.5 outline-none focus:border-rose-600 cursor-pointer"
+            className="w-full bg-[#0a0a0d] border border-zinc-800 text-white font-mono font-bold text-sm rounded-xl px-3 py-2 outline-none focus:border-rose-600 cursor-pointer"
           >
             {[1, 2, 3, 5, 8, 10, 15, 20, 24].map((cnt) => (
               <option key={cnt} value={cnt}>
@@ -216,7 +182,41 @@ export const MinesGame: React.FC<MinesGameProps> = ({
           onAction={gameState === 'playing' ? () => handleCashout() : handleStartGame}
           actionDisabled={gameState === 'playing' ? gemsRevealed === 0 : betAmountUSD > user.balanceUSD}
           actionColor={gameState === 'playing' ? 'green' : 'red'}
+          compact
         />
+      </div>
+
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2">
+        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow mx-auto w-full"
+          style={{ maxWidth: 360 }}
+        >
+          <div className="grid grid-cols-5 gap-1.5 w-full aspect-square max-h-[min(42vh,340px)]">
+            {grid.map((tile, i) => (
+              <button
+                key={i}
+                onClick={() => handleTileClick(i)}
+                disabled={gameState !== 'playing' || tile.revealed}
+                className={`w-full h-full rounded-lg border flex items-center justify-center transition-all duration-200 transform active:scale-95 shadow-md ${
+                  !tile.revealed
+                    ? 'bg-zinc-900 border-zinc-800 hover:border-rose-600/70 hover:bg-zinc-800'
+                    : tile.isMine
+                    ? 'bg-rose-950 border-rose-600 shadow-[0_0_12px_rgba(244,63,94,0.7)]'
+                    : 'bg-emerald-950/80 border-emerald-600/70 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+                }`}
+              >
+                {tile.revealed ? (
+                  tile.isMine ? (
+                    <Bomb className="w-5 h-5 text-rose-500" />
+                  ) : (
+                    <Diamond className="w-5 h-5 text-emerald-400" />
+                  )
+                ) : (
+                  <div className="w-2 h-2 rounded-full bg-zinc-800" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

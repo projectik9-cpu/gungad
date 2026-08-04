@@ -22,7 +22,7 @@ export function setWithdrawBot(bot) { _bot = bot; }
 
 const VALID_ASSETS = ['TON', 'USDT'];
 const ERROR_MESSAGES = {
-  MIN_WITHDRAW: 'Минимальный вывод — $1',
+  MIN_WITHDRAW: 'Минимальный вывод — $7',
   BAD_ADDRESS: 'Некорректный адрес кошелька',
   WALLET_NOT_FOUND: 'Кошелёк не найден',
   WAGER_REQUIRED: 'Нужно сыграть хотя бы одну ставку перед выводом',
@@ -37,8 +37,8 @@ router.post('/request', async (req, res) => {
       return res.status(400).json({ error: 'profile_id required' });
     }
     const amountUsd = Number(amount_usd);
-    if (!Number.isFinite(amountUsd) || amountUsd < 1) {
-      return res.status(400).json({ error: 'Минимальный вывод — $1', code: 'MIN_WITHDRAW' });
+    if (!Number.isFinite(amountUsd) || amountUsd < 7) {
+      return res.status(400).json({ error: 'Минимальный вывод — $7', code: 'MIN_WITHDRAW' });
     }
     const upperAsset = String(asset).toUpperCase();
     if (!VALID_ASSETS.includes(upperAsset)) {

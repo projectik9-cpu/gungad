@@ -240,8 +240,8 @@ DECLARE
   v_id uuid;
   v_available bigint;
 BEGIN
-  IF p_amount_cents < 100 THEN
-    RAISE EXCEPTION 'MIN_WITHDRAW';   -- $1 minimum
+  IF p_amount_cents < 700 THEN
+    RAISE EXCEPTION 'MIN_WITHDRAW';   -- $7 minimum
   END IF;
   IF p_address IS NULL OR length(trim(p_address)) < 10 THEN
     RAISE EXCEPTION 'BAD_ADDRESS';

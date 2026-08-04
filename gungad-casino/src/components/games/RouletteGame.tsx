@@ -194,26 +194,41 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      <div className="lg:col-span-8 flex flex-col gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+      {/* Bet + spin first on mobile */}
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
+        <BetControls
+          betAmountUSD={betAmountUSD}
+          onBetAmountChangeUSD={setBetAmountUSD}
+          userBalanceUSD={user.balanceUSD}
+          currency={currency}
+          lang={lang}
+          disabled={isSpinning}
+          lastBetUSD={lastBetUSD}
+          actionButtonLabel={isSpinning ? t('spinning', lang) : `${t('spinWheel', lang)} (${formatCurrency(totalBetUSD, currency)})`}
+          onAction={handleSpin}
+          actionDisabled={isSpinning || placedBets.length === 0 || totalBetUSD > user.balanceUSD}
+          compact
+        />
+      </div>
+
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2.5">
         {/* История */}
-        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2.5 flex items-center gap-2 overflow-x-auto">
-          <span className="text-xs font-bold text-zinc-500 uppercase shrink-0">{t('lastNumbers', lang)}:</span>
+        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2 flex items-center gap-1.5 overflow-x-auto">
+          <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">{t('lastNumbers', lang)}:</span>
           {history.map((num, idx) => (
-            <span key={idx} className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${colorClass(num)}`}>{num}</span>
+            <span key={idx} className={`w-6 h-6 rounded-md flex items-center justify-center font-mono font-bold text-[10px] shrink-0 ${colorClass(num)}`}>{num}</span>
           ))}
         </div>
 
-        {/* Wheel */}
-        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-4 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow min-h-[300px]">
-          {/* Pointer */}
-          <div className="absolute top-3 z-20 left-1/2 -translate-x-1/2">
-            <div className="w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[14px] border-t-rose-600 drop-shadow-[0_0_8px_rgba(225,29,72,0.9)]" />
+        {/* Wheel — компактнее */}
+        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-2 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow">
+          <div className="absolute top-2 z-20 left-1/2 -translate-x-1/2">
+            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-rose-600 drop-shadow-[0_0_8px_rgba(225,29,72,0.9)]" />
           </div>
 
-          {/* Wheel SVG with numbers */}
           <div
-            className="w-56 h-56 md:w-72 md:h-72 rounded-full border-4 border-zinc-800 relative shadow-[0_0_50px_rgba(0,0,0,0.9)] transition-transform duration-[4000ms] ease-out"
+            className="w-40 h-40 sm:w-52 sm:h-52 rounded-full border-4 border-zinc-800 relative shadow-[0_0_40px_rgba(0,0,0,0.9)] transition-transform duration-[4000ms] ease-out"
             style={{ transform: `rotate(${wheelRotation}deg)` }}
           >
             <svg viewBox="0 0 200 200" className="w-full h-full rounded-full">
@@ -255,10 +270,9 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
             </svg>
           </div>
 
-          {/* Центральный дисплей чисел во время вращения */}
           {showNumbers && spinDisplay !== null && (
             <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center font-display font-black text-2xl shadow-2xl border-4 ${
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-display font-black text-xl shadow-2xl border-4 ${
                 spinDisplay === 0 ? 'bg-emerald-600 border-emerald-400 text-white'
                 : RED_NUMBERS.includes(spinDisplay) ? 'bg-rose-600 border-rose-400 text-white'
                 : 'bg-zinc-900 border-zinc-600 text-white'
@@ -268,10 +282,9 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
             </div>
           )}
 
-          {/* Winning badge */}
           {winningNumber !== null && !isSpinning && (
-            <div className="absolute z-30 bottom-4 left-1/2 -translate-x-1/2 bg-zinc-950/90 border-2 border-rose-500 rounded-2xl px-6 py-2 shadow-2xl text-center">
-              <span className={`font-display font-black text-3xl ${
+            <div className="absolute z-30 bottom-2 left-1/2 -translate-x-1/2 bg-zinc-950/90 border-2 border-rose-500 rounded-xl px-4 py-1 shadow-2xl text-center">
+              <span className={`font-display font-black text-2xl ${
                 RED_NUMBERS.includes(winningNumber) ? 'text-rose-500'
                 : winningNumber === 0 ? 'text-emerald-400' : 'text-zinc-200'
               }`}>{winningNumber}</span>
@@ -279,23 +292,20 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
           )}
         </div>
 
-        {/* Betting Board */}
-        <div className="bg-[#111115] border border-zinc-800 rounded-2xl p-3 flex flex-col gap-3">
-          {/* Лимит ставок */}
+        {/* Betting Board — компактнее */}
+        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-zinc-400 uppercase">{t('selectBets', lang)} ({placedBets.length}/{MAX_BETS})</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase">{t('selectBets', lang)} ({placedBets.length}/{MAX_BETS})</span>
             {placedBets.length > 0 && (
-              <button onClick={clearBets} className="text-xs text-rose-400 hover:text-rose-300 font-bold">{t('clearBets', lang)}</button>
+              <button onClick={clearBets} className="text-[10px] text-rose-400 hover:text-rose-300 font-bold">{t('clearBets', lang)}</button>
             )}
           </div>
 
-          {/* Числа 1-36 */}
           <div className="grid grid-cols-12 gap-0.5">
-            {/* 0 */}
             <button
               onClick={() => addBet(0)}
               disabled={isSpinning}
-              className={`col-span-12 py-1 rounded text-xs font-bold font-mono transition-all ${
+              className={`col-span-12 py-1 rounded text-[10px] font-bold font-mono transition-all ${
                 placedBets.find(b => b.type === 0) ? 'bg-emerald-600 text-white ring-1 ring-emerald-400' : 'bg-emerald-900/60 text-emerald-400 hover:bg-emerald-700'
               } ${placedBets.length >= MAX_BETS && !placedBets.find(b => b.type === 0) ? 'opacity-40 cursor-not-allowed' : ''}`}
             >0</button>
@@ -305,7 +315,7 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
                 key={num}
                 onClick={() => addBet(num)}
                 disabled={isSpinning}
-                className={`aspect-square flex items-center justify-center rounded text-[10px] font-bold font-mono transition-all ${
+                className={`aspect-square flex items-center justify-center rounded text-[9px] font-bold font-mono transition-all ${
                   placedBets.find(b => b.type === num)
                     ? RED_NUMBERS.includes(num)
                       ? 'bg-rose-500 text-white ring-1 ring-white'
@@ -318,8 +328,7 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
             ))}
           </div>
 
-          {/* Внешние ставки */}
-          <div className="grid grid-cols-3 gap-1 text-[10px] font-bold">
+          <div className="grid grid-cols-3 gap-1 text-[9px] font-bold">
             {([
               ['red','black','zero'],
               ['even','odd',''],
@@ -333,7 +342,7 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
                     key={ci}
                     onClick={() => addBet(type)}
                     disabled={isSpinning}
-                    className={`py-1.5 px-1 rounded border text-center transition-all truncate ${
+                    className={`py-1 px-1 rounded border text-center transition-all truncate ${
                       placedBets.find(b => b.type === type)
                         ? 'bg-rose-600/40 border-rose-500 text-rose-200 ring-1 ring-rose-400'
                         : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
@@ -346,11 +355,10 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
             ))}
           </div>
 
-          {/* Активные ставки */}
           {placedBets.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {placedBets.map((b, i) => (
-                <div key={i} className="flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-0.5 text-[10px]">
+                <div key={i} className="flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg px-1.5 py-0.5 text-[10px]">
                   <span className="text-zinc-200 font-bold">{betLabel(b.type)}</span>
                   <span className="text-rose-400 font-mono">{formatCurrency(b.amountUSD, currency)}</span>
                   <button onClick={() => removeBet(b.type)} className="text-zinc-500 hover:text-red-400 ml-0.5 font-bold">×</button>
@@ -359,21 +367,6 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
             </div>
           )}
         </div>
-      </div>
-
-      <div className="lg:col-span-4 flex flex-col gap-4">
-        <BetControls
-          betAmountUSD={betAmountUSD}
-          onBetAmountChangeUSD={setBetAmountUSD}
-          userBalanceUSD={user.balanceUSD}
-          currency={currency}
-          lang={lang}
-          disabled={isSpinning}
-          lastBetUSD={lastBetUSD}
-          actionButtonLabel={isSpinning ? t('spinning', lang) : `${t('spinWheel', lang)} (${formatCurrency(totalBetUSD, currency)})`}
-          onAction={handleSpin}
-          actionDisabled={isSpinning || placedBets.length === 0 || totalBetUSD > user.balanceUSD}
-        />
       </div>
     </div>
   );

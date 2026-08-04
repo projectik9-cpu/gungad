@@ -24,6 +24,8 @@ interface BetControlsProps {
     onClick: () => void;
     disabled?: boolean;
   };
+  /** Tighter padding for mobile game layouts */
+  compact?: boolean;
 }
 
 export const BetControls: React.FC<BetControlsProps> = ({
@@ -41,6 +43,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
   actionDisabled = false,
   actionColor = 'red',
   secondaryAction,
+  compact = false,
 }) => {
   const currentCurrencyConfig = CURRENCIES[currency];
   const displayAmount = convertUSDToCurrency(betAmountUSD, currency);
@@ -91,9 +94,11 @@ export const BetControls: React.FC<BetControlsProps> = ({
       : 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.5)] border-amber-500/50';
 
   return (
-    <div className="bg-[#111115] border border-rose-900/30 rounded-2xl p-4 md:p-5 shadow-2xl flex flex-col gap-4">
+    <div className={`bg-[#111115] border border-rose-900/30 rounded-2xl shadow-2xl flex flex-col ${
+      compact ? 'p-3 gap-2.5' : 'p-4 md:p-5 gap-4'
+    }`}>
       {/* Label and Quick presets */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+      <div className="flex flex-row items-center justify-between gap-2">
         <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
           <Zap className="w-3.5 h-3.5 text-rose-500" />
           {t('betAmount', lang)} ({currentCurrencyConfig.symbol})
@@ -111,7 +116,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
       </div>
 
       {/* Input + Multiplier buttons */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col gap-2">
         <div className="relative flex-1">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">
             {currentCurrencyConfig.symbol}
@@ -123,7 +128,9 @@ export const BetControls: React.FC<BetControlsProps> = ({
             onChange={handleInputChange}
             disabled={disabled}
             placeholder="0.00"
-            className="w-full bg-[#0a0a0d] border border-zinc-800 focus:border-rose-600 focus:ring-1 focus:ring-rose-600 text-white font-mono font-bold text-lg rounded-xl pl-9 pr-3 py-2.5 outline-none transition-all disabled:opacity-50"
+            className={`w-full bg-[#0a0a0d] border border-zinc-800 focus:border-rose-600 focus:ring-1 focus:ring-rose-600 text-white font-mono font-bold rounded-xl pl-9 pr-3 outline-none transition-all disabled:opacity-50 ${
+              compact ? 'text-base py-2' : 'text-lg py-2.5'
+            }`}
           />
         </div>
 
@@ -132,35 +139,35 @@ export const BetControls: React.FC<BetControlsProps> = ({
           <button
             onClick={handleMin}
             disabled={disabled}
-            className="px-2.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="px-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
             {t('min', lang)}
           </button>
           <button
             onClick={handleHalf}
             disabled={disabled}
-            className="px-2.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="px-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
             {t('half', lang)}
           </button>
           <button
             onClick={handleDouble}
             disabled={disabled}
-            className="px-2.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="px-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
             {t('double', lang)}
           </button>
           <button
             onClick={handle5X}
             disabled={disabled}
-            className="px-2.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="px-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-bold text-zinc-300 hover:text-white rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
             {t('fiveX', lang)}
           </button>
           <button
             onClick={handleMax}
             disabled={disabled}
-            className="px-2.5 py-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/40 text-xs font-bold text-rose-400 hover:text-rose-200 rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="px-2 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/40 text-[11px] font-bold text-rose-400 hover:text-rose-200 rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
             {t('max', lang)}
           </button>
@@ -177,7 +184,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
                 secondaryAction.onClick();
               }}
               disabled={secondaryAction.disabled}
-              className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-display font-bold text-sm tracking-wide rounded-xl border border-zinc-700 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="flex-1 py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-display font-bold text-sm tracking-wide rounded-xl border border-zinc-700 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {secondaryAction.label}
             </button>
@@ -189,7 +196,9 @@ export const BetControls: React.FC<BetControlsProps> = ({
               onAction();
             }}
             disabled={actionDisabled}
-            className={`w-full py-3.5 px-6 font-display font-black text-base tracking-wider uppercase rounded-xl border transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${buttonStyle}`}
+            className={`w-full font-display font-black tracking-wider uppercase rounded-xl border transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+              compact ? 'py-2.5 px-4 text-sm' : 'py-3.5 px-6 text-base'
+            } ${buttonStyle}`}
           >
             {actionButtonLabel}
           </button>

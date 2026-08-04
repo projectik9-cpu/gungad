@@ -329,7 +329,9 @@ export default function App() {
           )}
         </aside>
 
-        <main className="flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 py-5 flex flex-col gap-5">
+        <main className={`flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 flex flex-col ${
+          activeTab === 'game' ? 'py-2 sm:py-3 gap-2 sm:gap-3' : 'py-5 gap-5'
+        }`}>
           {activeTab === 'games' && !activeGameId && (
             <div className="relative bg-[#0e0e13] border border-rose-900/40 rounded-2xl px-6 py-8 overflow-hidden shadow-xl flex flex-col items-center justify-center text-center gap-4">
               <div className="absolute inset-0 bg-[radial-gradient(#e11d48_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.07] pointer-events-none" />
@@ -345,16 +347,16 @@ export default function App() {
           )}
 
           {activeTab === 'game' && activeGameId && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 shrink-0">
               <button
                 onClick={() => { soundFx.playClick(); setActiveTab('games'); setActiveGameId(null); }}
-                className="px-4 py-2 bg-[#121217] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs font-display font-bold uppercase rounded-xl flex items-center gap-2 transition-all"
+                className="px-3 py-1.5 bg-[#121217] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[11px] font-display font-bold uppercase rounded-lg flex items-center gap-1.5 transition-all"
               >
-                <ArrowLeft className="w-4 h-4 text-rose-500" />
+                <ArrowLeft className="w-3.5 h-3.5 text-rose-500" />
                 <span>{t('allGames', lang)}</span>
               </button>
-              <span className="text-xs font-bold font-mono text-zinc-400 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span className="text-[10px] font-bold font-mono text-zinc-500 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                 {t('provablyFair', lang)}
               </span>
             </div>
@@ -372,6 +374,7 @@ export default function App() {
         </main>
       </div>
 
+      {activeTab !== 'game' && (
       <footer className="border-t border-rose-900/30 bg-[#09090b] py-6 text-zinc-500 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -385,6 +388,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      )}
 
       <DepositModal
         isOpen={depositOpen}

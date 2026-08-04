@@ -144,87 +144,18 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-      <div className="lg:col-span-8 flex flex-col gap-3">
-        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl overflow-hidden shadow-2xl red-border-glow w-full"
-          style={{ aspectRatio: '1 / 1.05', maxHeight: 520 }}
-        >
-          {/* Пирамида пегов — абсолютное позиционирование с фиксированным шагом */}
-          <div className="absolute inset-0 z-10 pointer-events-none">
-            {pegRows.map((count, rowIdx) =>
-              Array.from({ length: count }).map((_, pegIdx) => (
-                <div
-                  key={`${rowIdx}-${pegIdx}`}
-                  className="absolute w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-zinc-300 shadow-[0_0_5px_rgba(255,255,255,0.4)]"
-                  style={{
-                    left: `${getPegX(rowIdx, pegIdx)}%`,
-                    top: `${getRowY(rowIdx)}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                />
-              ))
-            )}
-          </div>
-
-          {/* Мячик */}
-          {ballPos && (
-            <div
-              className="absolute w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-rose-500 border border-white shadow-[0_0_12px_rgba(225,29,72,1)] z-20"
-              style={{
-                left: `${ballPos.x}%`,
-                top: `${ballPos.y}%`,
-                transform: 'translate(-50%, -50%)',
-                transition: 'left 100ms linear, top 100ms linear',
-              }}
-            />
-          )}
-
-          {/* Корзины множителей — выровнены под основание пирамиды */}
-          <div
-            className="absolute bottom-1 z-10 flex"
-            style={{
-              left: `${boardCenter - (pegStep * (bottomPegs - 1)) / 2 - pegStep / 2}%`,
-              width: `${pegStep * bottomPegs}%`,
-            }}
-          >
-            {buckets.map((m, idx) => (
-              <div
-                key={idx}
-                className={`flex-1 mx-px h-8 sm:h-9 flex items-center justify-center font-mono font-bold text-[9px] sm:text-[10px] rounded-t-md transition-all ${
-                  hitBucket === idx
-                    ? 'bg-yellow-400 text-black scale-105'
-                    : m >= 10
-                    ? 'bg-rose-600 text-white'
-                    : m >= 2
-                    ? 'bg-rose-800/80 text-rose-200'
-                    : m >= 1
-                    ? 'bg-zinc-700 text-zinc-200'
-                    : 'bg-zinc-900 text-zinc-500'
-                }`}
-              >
-                {m}x
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {lastMultiplier !== null && (
-          <div className="text-center font-display font-black text-2xl text-rose-400">
-            {lastMultiplier}x
-          </div>
-        )}
-      </div>
-
-      <div className="lg:col-span-4 flex flex-col gap-4">
-        <div className="bg-[#111115] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-2">
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{t('riskLevel', lang)}</label>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+      {/* Controls first on mobile so bet is visible without scrolling */}
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
+        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2.5 flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{t('riskLevel', lang)}</label>
           <div className="grid grid-cols-3 gap-1.5">
             {(['low', 'medium', 'high'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => { soundFx.playClick(); setRisk(r); }}
                 disabled={isDropping}
-                className={`py-2 text-xs font-bold rounded-lg border transition-all ${
+                className={`py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
                   risk === r
                     ? r === 'low' ? 'bg-emerald-950 border-emerald-600 text-emerald-400'
                     : r === 'medium' ? 'bg-amber-950 border-amber-600 text-amber-400'
@@ -249,7 +180,76 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
           actionButtonLabel={isDropping ? '...' : t('dropBall', lang)}
           onAction={handleDrop}
           actionDisabled={isDropping || betAmountUSD > user.balanceUSD}
+          compact
         />
+      </div>
+
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2">
+        <div
+          className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl overflow-hidden shadow-2xl red-border-glow w-full mx-auto"
+          style={{ aspectRatio: '1 / 1', maxHeight: 'min(42vh, 360px)', maxWidth: 420 }}
+        >
+          <div className="absolute inset-0 z-10 pointer-events-none">
+            {pegRows.map((count, rowIdx) =>
+              Array.from({ length: count }).map((_, pegIdx) => (
+                <div
+                  key={`${rowIdx}-${pegIdx}`}
+                  className="absolute w-1.5 h-1.5 rounded-full bg-zinc-300 shadow-[0_0_5px_rgba(255,255,255,0.4)]"
+                  style={{
+                    left: `${getPegX(rowIdx, pegIdx)}%`,
+                    top: `${getRowY(rowIdx)}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                />
+              ))
+            )}
+          </div>
+
+          {ballPos && (
+            <div
+              className="absolute w-3 h-3 rounded-full bg-rose-500 border border-white shadow-[0_0_12px_rgba(225,29,72,1)] z-20"
+              style={{
+                left: `${ballPos.x}%`,
+                top: `${ballPos.y}%`,
+                transform: 'translate(-50%, -50%)',
+                transition: 'left 100ms linear, top 100ms linear',
+              }}
+            />
+          )}
+
+          <div
+            className="absolute bottom-1 z-10 flex"
+            style={{
+              left: `${boardCenter - (pegStep * (bottomPegs - 1)) / 2 - pegStep / 2}%`,
+              width: `${pegStep * bottomPegs}%`,
+            }}
+          >
+            {buckets.map((m, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 mx-px h-7 flex items-center justify-center font-mono font-bold text-[9px] rounded-t-md transition-all ${
+                  hitBucket === idx
+                    ? 'bg-yellow-400 text-black scale-105'
+                    : m >= 10
+                    ? 'bg-rose-600 text-white'
+                    : m >= 2
+                    ? 'bg-rose-800/80 text-rose-200'
+                    : m >= 1
+                    ? 'bg-zinc-700 text-zinc-200'
+                    : 'bg-zinc-900 text-zinc-500'
+                }`}
+              >
+                {m}x
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {lastMultiplier !== null && (
+          <div className="text-center font-display font-black text-xl text-rose-400">
+            {lastMultiplier}x
+          </div>
+        )}
       </div>
     </div>
   );

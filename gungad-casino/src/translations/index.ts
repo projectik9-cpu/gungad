@@ -248,6 +248,19 @@ export const translations = {
     supportSent: 'Message sent! We will reply to you in Telegram.',
     errorGeneric: 'Something went wrong. Try again.',
     realModeOnly: 'Available in real mode only. Exit demo mode in the menu.',
+
+    // Age / legal gate
+    ageGateTitle: 'Are you 21 or older?',
+    ageGateSubtitle: 'Access to GunGad Casino is only for adults 21+. Confirm your age and accept the legal terms.',
+    ageGateAddictionWarn: 'Gambling may cause addiction. Follow responsible gambling principles. Play only with money you can afford to lose.',
+    ageGateCheckAge: 'Yes — I am 21 years of age or older, fully legally capable, and not barred from gambling.',
+    ageGateCheckTerms: 'I have read and accept the Terms of Use and Privacy Policy, and I understand I play at my own risk.',
+    ageGateReadTerms: 'Terms of Use',
+    ageGateReadPrivacy: 'Privacy Policy',
+    ageGateOpenDoc: 'Read',
+    ageGateCloseDoc: 'Close',
+    ageGateEnter: 'Enter casino',
+    ageGateTelegramNote: 'Telegram is not the operator of this casino and is not responsible for games, balances, or payouts. You must also follow Telegram rules.',
   },
   ru: {
     // Header & Nav
@@ -487,6 +500,19 @@ export const translations = {
     supportSent: 'Сообщение отправлено! Мы ответим вам в Telegram.',
     errorGeneric: 'Что-то пошло не так. Попробуйте ещё раз.',
     realModeOnly: 'Доступно только в реальном режиме. Выйдите из демо в меню.',
+
+    // Возрастной / правовой гейт
+    ageGateTitle: 'Вам есть 21 год?',
+    ageGateSubtitle: 'Доступ в GunGad Casino только для лиц старше 21 года. Подтвердите возраст и согласие с правилами.',
+    ageGateAddictionWarn: 'Участие в азартных играх может вызвать игровую зависимость. Соблюдайте правила ответственной игры. Играйте только на те деньги, которые можете позволить себе потерять.',
+    ageGateCheckAge: 'Да — мне исполнился 21 год, я полностью дееспособен(на) и мне не запрещено участвовать в азартных играх.',
+    ageGateCheckTerms: 'Я ознакомился(ась) и принимаю Пользовательское соглашение и Политику конфиденциальности, понимаю риски и играю на свой страх и риск.',
+    ageGateReadTerms: 'Пользовательское соглашение',
+    ageGateReadPrivacy: 'Политика конфиденциальности',
+    ageGateOpenDoc: 'Ознакомиться',
+    ageGateCloseDoc: 'Закрыть',
+    ageGateEnter: 'Войти в казино',
+    ageGateTelegramNote: 'Telegram не является оператором этого казино и не отвечает за игры, балансы и выплаты. Вы также обязаны соблюдать правила Telegram.',
   },
   uk: {
     // Header & Nav
@@ -726,6 +752,19 @@ export const translations = {
     supportSent: 'Повідомлення надіслано! Ми відповімо вам у Telegram.',
     errorGeneric: 'Щось пішло не так. Спробуйте ще раз.',
     realModeOnly: 'Доступно лише в реальному режимі. Вийдіть із демо в меню.',
+
+    // Віковий / правовий гейт
+    ageGateTitle: 'Вам є 21 рік?',
+    ageGateSubtitle: 'Доступ до GunGad Casino лише для осіб старше 21 року. Підтвердіть вік і згоду з правилами.',
+    ageGateAddictionWarn: 'Участь в азартних іграх може викликати ігрову залежність. Дотримуйтеся правил (принципів) відповідальної гри. Грайте лише на ті гроші, які можете дозволити собі втратити.',
+    ageGateCheckAge: 'Так — мені виповнився 21 рік, я повністю дієздатний(а) і мені не заборонено брати участь в азартних іграх.',
+    ageGateCheckTerms: 'Я ознайомився(лась) і приймаю Угоду користувача та Політику конфіденційності, розумію ризики і граю на власний страх і ризик.',
+    ageGateReadTerms: 'Угода користувача',
+    ageGateReadPrivacy: 'Політика конфіденційності',
+    ageGateOpenDoc: 'Ознайомитися',
+    ageGateCloseDoc: 'Закрити',
+    ageGateEnter: 'Увійти в казино',
+    ageGateTelegramNote: 'Telegram не є оператором цього казино і не відповідає за ігри, баланси та виплати. Ви також зобов’язані дотримуватися правил Telegram.',
   },
   kk: {
     // Header & Nav
@@ -965,6 +1004,19 @@ export const translations = {
     supportSent: 'Хабарлама жіберілді! Біз сізге Telegram-да жауап береміз.',
     errorGeneric: 'Бірдеңе дұрыс болмады. Қайталап көріңіз.',
     realModeOnly: 'Тек нақты режимде қолжетімді. Мәзірден демодан шығыңыз.',
+
+    // Жас / құқықтық қақпа
+    ageGateTitle: 'Сізге 21 жас толды ма?',
+    ageGateSubtitle: 'GunGad Casino-ға кіру тек 21 жастан асқандарға. Жасыңызды және ережелерге келісіміңізді растаңыз.',
+    ageGateAddictionWarn: 'Құмар ойындарға қатысу ойынға тәуелділікті тудыруы мүмкін. Жауапты ойын қағидаларын сақтаңыз. Тек жоғалтуға болатын ақшаға ойнаңыз.',
+    ageGateCheckAge: 'Иә — маған 21 жас толды, мен толық әрекетке қабілеттімін және құмар ойындарға қатысу маған тыйым салынбаған.',
+    ageGateCheckTerms: 'Мен Пайдаланушы келісімі мен Құпиялылық саясатын оқып, қабылдаймын, тәуекелдерді түсінемін және өз жауапкершілігімде ойнаймын.',
+    ageGateReadTerms: 'Пайдаланушы келісімі',
+    ageGateReadPrivacy: 'Құпиялылық саясаты',
+    ageGateOpenDoc: 'Танысу',
+    ageGateCloseDoc: 'Жабу',
+    ageGateEnter: 'Казиноға кіру',
+    ageGateTelegramNote: 'Telegram бұл казиноның операторы емес және ойындар, баланс пен төлемдер үшін жауап бермейді. Telegram ережелерін де сақтауыңыз керек.',
   },
 };
 

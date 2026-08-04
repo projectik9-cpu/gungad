@@ -13,10 +13,12 @@ import { DepositModal } from './components/DepositModal';
 import { SupportModal } from './components/SupportModal';
 import { ProfileModal } from './components/ProfileModal';
 import { ProvablyFairModal } from './components/ProvablyFairModal';
+import { AgeGate } from './components/AgeGate';
 import { RevolverLogo } from './components/RevolverLogo';
 import { t } from './translations';
 import { soundFx } from './utils/sound';
 import { DRAWN_USER_AVATAR } from './utils/avatar';
+import { readLegalAcceptance } from './legal/legalContent';
 
 /** Compute effective VIP level and intra-level XP from total accumulated XP */
 function computeVipLevel(totalXp: number): { level: number; xpInLevel: number; maxXpInLevel: number } {
@@ -171,6 +173,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>(() =>
     (localStorage.getItem('gungad_lang') as Language) || 'ru',
   );
+  const [legalOk, setLegalOk] = useState(() => Boolean(readLegalAcceptance()));
 
   useEffect(() => { localStorage.setItem('gungad_currency', currency); }, [currency]);
   useEffect(() => { localStorage.setItem('gungad_lang', lang); }, [lang]);
@@ -268,9 +271,11 @@ export default function App() {
   }), [user, currency, lang, handleUpdateBalance, handleAddBetHistory]);
 
   return (
+    <>
     <div
-      className="min-h-screen bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw] pb-[4.5rem] md:pb-0"
-      onPointerDown={() => soundFx.unlockAndStartMusic()}
+      className={`min-h-screen bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw] pb-[4.5rem] md:pb-0${!legalOk ? ' pointer-events-none select-none' : ''}`}
+      onPointerDown={() => { if (legalOk) soundFx.unlockAndStartMusic(); }}
+      aria-hidden={!legalOk}
     >
       <Header
         key={`hdr-${ratesVersion}`}
@@ -425,5 +430,9 @@ export default function App() {
         profileId={session?.profile_id ?? null}
       />
     </div>
+    {!legalOk && (
+      <AgeGate lang={lang} onAccepted={() => setLegalOk(true)} />
+    )}
+    </>
   );
 }

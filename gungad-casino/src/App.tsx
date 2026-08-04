@@ -10,6 +10,7 @@ import { DiceGame } from './components/games/DiceGame';
 import { MinesGame } from './components/games/MinesGame';
 import { PlinkoGame } from './components/games/PlinkoGame';
 import { DepositModal } from './components/DepositModal';
+import { SupportModal } from './components/SupportModal';
 import { ProfileModal } from './components/ProfileModal';
 import { ProvablyFairModal } from './components/ProvablyFairModal';
 import { RevolverLogo } from './components/RevolverLogo';
@@ -178,16 +179,19 @@ export default function App() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [provablyFairOpen, setProvablyFairOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   // Close all modals helper — prevents stacking
   const closeAllModals = () => {
     setDepositOpen(false);
     setProfileOpen(false);
     setProvablyFairOpen(false);
+    setSupportOpen(false);
   };
   const openDeposit = () => { closeAllModals(); setDepositOpen(true); };
   const openProfile = () => { closeAllModals(); setProfileOpen(true); };
   const openProvablyFair = () => { closeAllModals(); setProvablyFairOpen(true); };
+  const openSupport = () => { closeAllModals(); setSupportOpen(true); };
 
   const onlineCount = useGgOnline(
     session?.profile_id ?? null,
@@ -278,6 +282,7 @@ export default function App() {
         activeModal={depositOpen ? 'deposit' : profileOpen ? 'profile' : null}
         playMode={playMode}
         onToggleDemo={handleToggleDemo}
+        onOpenSupport={openSupport}
         sessionStatus={status}
         activeTab={activeTab}
         activeGameId={activeGameId}
@@ -390,6 +395,7 @@ export default function App() {
         onRefillDemo={handleRefillDemo}
         onUpdateBalance={handleUpdateBalance}
         playMode={playMode}
+        profileId={session?.profile_id ?? null}
       />
       <ProfileModal
         isOpen={profileOpen}
@@ -404,6 +410,12 @@ export default function App() {
         isOpen={provablyFairOpen}
         onClose={() => setProvablyFairOpen(false)}
         lang={lang}
+      />
+      <SupportModal
+        isOpen={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        lang={lang}
+        profileId={session?.profile_id ?? null}
       />
     </div>
   );

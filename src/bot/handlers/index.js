@@ -1,5 +1,6 @@
 import { startHandler } from './startHandler.js';
 import { preCheckoutHandler, successfulPaymentHandler } from './starsHandler.js';
+import { registerAdminHandlers } from './adminHandler.js';
 import { openCasinoKeyboard } from '../keyboards.js';
 import logger from '../../utils/logger.js';
 
@@ -17,6 +18,9 @@ export function registerHandlers(bot) {
     }
     return next();
   });
+
+  // Админ: подтверждение / отклонение выводов (должно быть ДО catch-all)
+  registerAdminHandlers(bot);
 
   // Любые старые callback'и меню → снова только кнопка казино
   bot.action(/.*/, async (ctx) => {

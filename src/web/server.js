@@ -8,8 +8,12 @@ import betRouter from './api/bet.js';
 import heartbeatRouter from './api/heartbeat.js';
 import walletRouter from './api/wallet.js';
 import starsRouter, { setBot as setStarsBot } from './api/stars.js';
+import depositCryptoBotRouter from './api/depositCryptoBot.js';
+import depositTonRouter from './api/depositTon.js';
+import withdrawRouter, { setWithdrawBot } from './api/withdraw.js';
+import supportRouter, { setSupportBot } from './api/support.js';
 
-export { setStarsBot };
+export { setStarsBot, setWithdrawBot, setSupportBot };
 
 const app = express();
 
@@ -180,6 +184,10 @@ app.use('/api/bet',       betRouter);
 app.use('/api/heartbeat', heartbeatRouter);
 app.use('/api/wallet',    walletRouter);
 app.use('/api/stars',     starsRouter);
+app.use('/api/deposit/cryptobot', depositCryptoBotRouter);
+app.use('/api/deposit/ton',       depositTonRouter);
+app.use('/api/withdraw',  withdrawRouter);
+app.use('/api/support',   supportRouter);
 
 // Обработка 404
 app.use((req, res) => {

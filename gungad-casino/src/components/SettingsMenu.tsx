@@ -23,6 +23,8 @@ interface SettingsMenuProps {
   lang: Language;
   playMode: 'real' | 'demo';
   onToggleDemo: () => void;
+  /** Open in-app support modal (fallback: t.me link) */
+  onOpenSupport?: () => void;
   /** Bottom-nav trigger style */
   navItem?: boolean;
   label?: string;
@@ -45,6 +47,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   lang,
   playMode,
   onToggleDemo,
+  onOpenSupport,
   navItem = false,
   label,
 }) => {
@@ -182,7 +185,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 type="button"
                 onClick={() => {
                   soundFx.playClick();
-                  openSupport();
+                  if (onOpenSupport) {
+                    onOpenSupport();
+                  } else {
+                    openSupport();
+                  }
                   closeDrawer();
                 }}
                 className="flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-sm font-semibold text-zinc-200 hover:bg-zinc-800/70 active:bg-zinc-800 transition-colors"

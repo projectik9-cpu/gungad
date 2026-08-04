@@ -22,6 +22,7 @@ interface HeaderProps {
   onSelectTab: (tab: string) => void;
   playMode: 'real' | 'demo';
   onToggleDemo: () => void;
+  onOpenSupport?: () => void;
   sessionStatus?: 'live' | 'demo' | 'loading' | 'error';
   activeTab?: string;
   activeGameId?: string | null;
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectTab,
   playMode,
   onToggleDemo,
+  onOpenSupport,
   sessionStatus = 'loading',
   activeTab = 'games',
   activeGameId = null,
@@ -94,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Left: menu (desktop) + logo */}
           <div className="flex items-center gap-1.5 shrink-0 min-w-0">
             <div className="hidden md:block">
-              <SettingsMenu lang={lang} playMode={playMode} onToggleDemo={onToggleDemo} />
+              <SettingsMenu lang={lang} playMode={playMode} onToggleDemo={onToggleDemo} onOpenSupport={onOpenSupport} />
             </div>
             <div className="sm:hidden">
               <RevolverLogo size="sm" onClick={() => { soundFx.playClick(); onCloseModals?.(); onSelectTab('games'); }} />
@@ -218,6 +220,7 @@ export const Header: React.FC<HeaderProps> = ({
             lang={lang}
             playMode={playMode}
             onToggleDemo={onToggleDemo}
+            onOpenSupport={onOpenSupport}
             navItem
             label={t('menu', lang)}
           />

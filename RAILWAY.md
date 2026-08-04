@@ -22,7 +22,19 @@ NODE_ENV=production
 JWT_SECRET=любой_длинный_секрет
 ENCRYPTION_KEY=любой_ключ_минимум_32_символа
 LOG_LEVEL=info
+ADMIN_IDS=твой_telegram_id,ещё_админ
+
+# Payments
+CRYPTOBOT_API_TOKEN=токен_из_CryptoBot_Crypto_Pay
+TON_RECEIVING_ADDRESS=UQD...адрес_холодного_кошелька
+TONCENTER_API_KEY=ключ_с_toncenter.com
 ```
+
+После добавления payment-переменных: **Redeploy** сервиса.
+
+Crypto Bot webhook URL:
+`https://gungad-production.up.railway.app/api/deposit/cryptobot/webhook`
+(в @CryptoBot → Crypto Pay → Webhooks)
 
 `PORT` Railway выставит сам — не трогай.
 

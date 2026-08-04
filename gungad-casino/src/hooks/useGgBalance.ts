@@ -3,7 +3,7 @@
  * Real money goes through the server API → gg_settle_bet RPC.
  * Demo mode is local-only (opt-in via playMode).
  */
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { GgSessionData } from './useGgSession';
 import type { GgGameId } from '../types/database';
 import { usdToCents, centsToUsd } from '../types/database';
@@ -45,13 +45,13 @@ export function useGgBalance(
   onBalanceUpdate: (newCents: number) => void,
   opts: GgBalanceOpts,
 ) {
-  const pendingRef = useRef(false);
   const { playMode, balanceCents } = opts;
 
   const settleBet = useCallback(async (params: SettleBetParams): Promise<SettleBetResult> => {
     const useServer = playMode === 'real' && status === 'live' && Boolean(session?.profile_id);
 
     if (!useServer) {
+      // Demo — local only, no server call
       const betCents = usdToCents(params.betUSD);
       const payoutCents = usdToCents(params.payoutUSD);
       const newCents = balanceCents - betCents + payoutCents;
@@ -60,26 +60,19 @@ export function useGgBalance(
       return { ok: true, balance_cents: next };
     }
 
-    if (pendingRef.current) {
-      return { ok: false, balance_cents: session!.balance_cents, error: 'Bet already in progress' };
-    }
-
-    pendingRef.current = true;
+    // Real mode — always hit server (idempotency key prevents double-settle)
     try {
-      const betCents = usdToCents(params.betUSD);
-      const payoutCents = usdToCents(params.payoutUSD);
-
       const body = {
-        profile_id: session!.profile_id,
-        game_id: params.game_id,
-        bet_cents: betCents,
-        payout_cents: payoutCents,
-        multiplier: params.multiplier,
-        status: params.status,
-        result: params.result ?? {},
-        idempotency_key: newIdempotencyKey(params.game_id),
-        client_seed: params.client_seed ?? null,
-        server_seed_hash: params.server_seed_hash ?? null,
+        profile_id:        session!.profile_id,
+        game_id:           params.game_id,
+        bet_cents:         usdToCents(params.betUSD),
+        payout_cents:      usdToCents(params.payoutUSD),
+        multiplier:        params.multiplier,
+        status:            params.status,
+        result:            params.result ?? {},
+        idempotency_key:   newIdempotencyKey(params.game_id),
+        client_seed:       params.client_seed ?? null,
+        server_seed_hash:  params.server_seed_hash ?? null,
       };
 
       const res = await fetch(`${API_BASE}/api/bet`, {
@@ -88,19 +81,19 @@ export function useGgBalance(
         body: JSON.stringify(body),
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
 
       if (!res.ok || !json.ok) {
+        console.warn('[ggBalance] settleBet failed:', json.error, res.status);
         return { ok: false, balance_cents: session!.balance_cents, error: json.error ?? 'Bet failed' };
       }
 
+      // Server is source of truth — update balance from server response
       onBalanceUpdate(json.balance_cents);
       return { ok: true, balance_cents: json.balance_cents, bet_id: json.bet_id };
     } catch (err) {
-      console.error('[ggBalance] settleBet error:', err);
+      console.error('[ggBalance] settleBet network error:', err);
       return { ok: false, balance_cents: session?.balance_cents ?? 0, error: 'Network error' };
-    } finally {
-      pendingRef.current = false;
     }
   }, [session, status, onBalanceUpdate, playMode, balanceCents]);
 

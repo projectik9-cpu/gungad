@@ -398,6 +398,7 @@ export default function App() {
         currency={currency}
         lang={lang}
         history={betHistory}
+        profileId={session?.profile_id ?? null}
       />
       <ProvablyFairModal
         isOpen={provablyFairOpen}

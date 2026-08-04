@@ -1,9 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../types';
 import { t } from '../translations';
 import { formatCurrency } from '../utils/currencies';
 import { soundFx } from '../utils/sound';
-import { X, Award, Crown, ShieldAlert, Trophy, Crosshair, History } from 'lucide-react';
+import { X, Award, Crown, ShieldAlert, Trophy, Crosshair, History, Loader2 } from 'lucide-react';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
+
+const GAME_NAMES: Record<string, string> = {
+  crash: 'Gun Краш', roulette: 'Рулетка', blackjack: 'Блэкджек',
+  coinflip: 'Gun Монетка', dice: 'Кости', mines: 'Мины', plinko: 'Плинко',
+};
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -12,6 +19,8 @@ interface ProfileModalProps {
   currency: Currency;
   lang: any;
   history: BetHistoryItem[];
+  /** Real profile_id for fetching server-side bet history */
+  profileId?: string | null;
 }
 
 const VIP_RANK_KEYS = ['vipRank1', 'vipRank2', 'vipRank3', 'vipRank4', 'vipRank5', 'vipRank6'] as const;
@@ -23,8 +32,39 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   currency,
   lang,
   history,
+  profileId,
 }) => {
+  const [serverHistory, setServerHistory] = useState<BetHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !profileId) return;
+    setLoadingHistory(true);
+    fetch(`${API_BASE}/api/wallet/history?profile_id=${profileId}&limit=30`)
+      .then(r => r.json())
+      .then(json => {
+        if (json.ok && Array.isArray(json.bets)) {
+          const mapped: BetHistoryItem[] = json.bets.map((b: any) => ({
+            id: b.id,
+            gameId: b.game_id,
+            gameName: GAME_NAMES[b.game_id] ?? b.game_id,
+            timestamp: new Date(b.created_at),
+            betAmountUSD: (b.bet_cents ?? 0) / 100,
+            multiplier: Number(b.multiplier ?? 0),
+            payoutUSD: (b.payout_cents ?? 0) / 100,
+            win: (b.payout_cents ?? 0) > 0,
+            currency,
+          }));
+          setServerHistory(mapped);
+        }
+      })
+      .catch(() => {/* keep local */})
+      .finally(() => setLoadingHistory(false));
+  }, [isOpen, profileId, currency]);
+
   if (!isOpen) return null;
+
+  const displayHistory = serverHistory.length > 0 ? serverHistory : history;
 
   const vipKey = VIP_RANK_KEYS[Math.min(VIP_RANK_KEYS.length - 1, user.vipLevel - 1)];
   const vipName = t(vipKey, lang);
@@ -122,13 +162,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             {t('history', lang)}
           </span>
 
-          {history.length === 0 ? (
+          {loadingHistory ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="w-5 h-5 text-rose-500 animate-spin" />
+            </div>
+          ) : displayHistory.length === 0 ? (
             <p className="text-xs text-zinc-500 italic p-4 text-center bg-[#121217] rounded-xl border border-zinc-800">
               {t('noHistory', lang)}
             </p>
           ) : (
             <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-              {history.map((item) => (
+              {displayHistory.map((item) => (
                 <div
                   key={item.id}
                   className="bg-[#121217] border border-zinc-800/80 rounded-xl p-2.5 flex items-center justify-between text-xs"

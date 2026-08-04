@@ -49,6 +49,7 @@ import { centsToUsd, usdToCents } from './types/database';
 import { useGgSession } from './hooks/useGgSession';
 import { useGgBalance } from './hooks/useGgBalance';
 import { useGgOnline } from './hooks/useGgOnline';
+import { useLiveRates } from './hooks/useLiveRates';
 
 const SESSION_ID = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -97,6 +98,7 @@ function buildUserProfile(
 
 export default function App() {
   const { session, status, updateBalance } = useGgSession();
+  const { version: ratesVersion } = useLiveRates();
   const isLive = status === 'live';
 
   const [playMode, setPlayMode] = useState<PlayMode>(() =>
@@ -271,6 +273,7 @@ export default function App() {
       onPointerDown={() => soundFx.unlockAndStartMusic()}
     >
       <Header
+        key={`hdr-${ratesVersion}`}
         user={user}
         currency={currency}
         onCurrencyChange={setCurrency}

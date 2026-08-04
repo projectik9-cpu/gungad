@@ -57,26 +57,39 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!open) return;
     const onDoc = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
         setPanel('root');
       }
     };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
+    // click (not mousedown) — avoids race that eats the toggle click
+    document.addEventListener('click', onDoc);
+    return () => document.removeEventListener('click', onDoc);
+  }, [open]);
 
   const close = () => {
     setOpen(false);
     setPanel('root');
   };
 
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    soundFx.unlockAndStartMusic();
+    soundFx.playClick();
+    setOpen((v) => {
+      if (v) setPanel('root');
+      return !v;
+    });
+  };
+
   const menuPanel = open && (
     <div
-      className={`absolute left-0 w-64 bg-[#111116] border border-zinc-800 rounded-2xl shadow-2xl p-2 z-[300] flex flex-col gap-1 ${
+      className={`absolute ${navItem ? 'left-1/2 -translate-x-1/2' : 'left-0'} w-64 bg-[#111116] border border-zinc-800 rounded-2xl shadow-2xl p-2 z-[300] flex flex-col gap-1 ${
         dropUp ? 'bottom-full mb-2' : 'top-full mt-2'
       }`}
+      onClick={(e) => e.stopPropagation()}
     >
       {panel === 'root' && (
         <>
@@ -233,38 +246,26 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   );
 
   return (
-    <div className="relative" ref={ref}>
+    <div className={navItem ? 'relative w-full' : 'relative'} ref={ref}>
       {navItem ? (
         <button
-          onClick={() => {
-            soundFx.unlockAndStartMusic();
-            soundFx.playClick();
-            setOpen((v) => {
-              if (v) setPanel('root');
-              return !v;
-            });
-          }}
-          className={`flex flex-col items-center justify-center gap-0.5 min-w-0 flex-1 py-1 ${
+          type="button"
+          onClick={toggle}
+          className={`flex w-full flex-col items-center justify-center gap-0.5 min-h-[52px] touch-manipulation select-none ${
             open ? 'text-rose-400' : 'text-zinc-400'
           }`}
           aria-label={t('menu', lang)}
         >
           <Menu className="w-5 h-5" />
-          <span className="text-[10px] font-semibold truncate max-w-full px-0.5">
+          <span className="text-[10px] font-semibold leading-none">
             {label ?? t('menu', lang)}
           </span>
         </button>
       ) : (
         <button
-          onClick={() => {
-            soundFx.unlockAndStartMusic();
-            soundFx.playClick();
-            setOpen((v) => {
-              if (v) setPanel('root');
-              return !v;
-            });
-          }}
-          className="flex items-center justify-center w-8 h-8 bg-transparent text-zinc-300 hover:text-white shrink-0"
+          type="button"
+          onClick={toggle}
+          className="flex items-center justify-center w-8 h-8 bg-transparent text-zinc-300 hover:text-white shrink-0 touch-manipulation"
           aria-label={t('menu', lang)}
           title={t('menu', lang)}
         >

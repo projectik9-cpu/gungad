@@ -2,6 +2,7 @@ import bot from './bot/bot.js';
 import { registerHandlers } from './bot/handlers/index.js';
 import { startWebServer, setStarsBot, setWithdrawBot, setSupportBot } from './web/server.js';
 import { startTonMonitor } from './services/tonMonitor.js';
+import { startCryptoBotReconcile } from './services/cryptoBotReconcile.js';
 import { testConnection, syncDatabase } from './database/database.js';
 import logger from './utils/logger.js';
 import config from './config/config.js';
@@ -41,6 +42,8 @@ async function startApplication() {
 
     // 5.1 TON-монитор депозитов (memo scheme)
     startTonMonitor();
+    // 5.2 Crypto Bot — поллинг оплаченных инвойсов (вебхук может быть выключен)
+    startCryptoBotReconcile();
 
     // 5. Запуск Telegram бота
     logger.info('🤖 Запуск Telegram бота...');

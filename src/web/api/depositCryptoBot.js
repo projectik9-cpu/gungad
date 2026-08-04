@@ -121,14 +121,16 @@ router.post('/webhook', async (req, res) => {
   try {
     if (!API_TOKEN) return res.status(503).json({ error: 'not configured' });
 
-    // Signature: HMAC-SHA256(body) with key SHA256(api_token)
+    // Signature: HMAC-SHA256 of raw JSON body with key SHA256(api_token)
     const sig = req.headers['crypto-pay-api-signature'];
     const secret = crypto.createHash('sha256').update(API_TOKEN).digest();
-    const checkString = JSON.stringify(req.body);
+    const checkString = typeof req.rawBody === 'string' && req.rawBody.length
+      ? req.rawBody
+      : JSON.stringify(req.body);
     const hmac = crypto.createHmac('sha256', secret).update(checkString).digest('hex');
 
     if (!sig || hmac !== sig) {
-      logger.warn('[cryptobot/webhook] bad signature');
+      logger.warn(`[cryptobot/webhook] bad signature (got=${String(sig).slice(0, 12)}…)`);
       return res.status(403).json({ error: 'bad signature' });
     }
 
@@ -172,6 +174,36 @@ router.post('/webhook', async (req, res) => {
     return res.json({ ok: true });
   } catch (err) {
     logger.error(`[cryptobot/webhook] ${err?.message || err}`);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Status (for Mini App polling) ------------------------------------------
+router.get('/status', async (req, res) => {
+  try {
+    const { deposit_id } = req.query;
+    if (!deposit_id) return res.status(400).json({ error: 'deposit_id required' });
+
+    const sb = getSupabaseAdmin();
+    if (!sb) return res.status(500).json({ error: 'Supabase not configured' });
+
+    const { data, error } = await sb
+      .from('gg_deposit_requests')
+      .select('id, status, amount_usd_cents, profile_id')
+      .eq('id', deposit_id)
+      .maybeSingle();
+
+    if (error || !data) return res.status(404).json({ error: 'not found' });
+
+    let balance_cents;
+    if (data.status === 'completed') {
+      const { data: w } = await sb.rpc('gg_get_wallet', { p_profile_id: data.profile_id });
+      balance_cents = w?.balance_cents;
+    }
+
+    return res.json({ ok: true, status: data.status, amount_usd_cents: data.amount_usd_cents, balance_cents });
+  } catch (err) {
+    logger.error(`[cryptobot/status] ${err?.message || err}`);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

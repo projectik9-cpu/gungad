@@ -79,6 +79,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [depositAmount, setDepositAmount] = useState<number>(10);
   const [creating, setCreating] = useState(false);
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+  const [cryptoDepositId, setCryptoDepositId] = useState<string | null>(null);
   const [tonInvoice, setTonInvoice] = useState<TonInvoice | null>(null);
   const [depositDone, setDepositDone] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -95,13 +96,20 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
   const pollRef = useRef<number | null>(null);
 
-  // Poll TON deposit status while modal open
+  // Poll deposit status (TON or Crypto Bot) while modal open
   useEffect(() => {
-    if (!isOpen || !tonInvoice || depositDone) return;
+    const depositId = tonInvoice?.deposit_id || cryptoDepositId;
+    const statusPath = tonInvoice
+      ? `/api/deposit/ton/status?deposit_id=${depositId}`
+      : cryptoDepositId
+        ? `/api/deposit/cryptobot/status?deposit_id=${depositId}`
+        : null;
+
+    if (!isOpen || !statusPath || depositDone) return;
 
     const poll = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/deposit/ton/status?deposit_id=${tonInvoice.deposit_id}`);
+        const res = await fetch(`${API_BASE}${statusPath}`);
         const json = await res.json();
         if (json.ok && json.status === 'completed') {
           setDepositDone(true);
@@ -115,11 +123,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       }
     };
 
-    pollRef.current = window.setInterval(poll, 10_000);
+    poll();
+    pollRef.current = window.setInterval(poll, 8_000);
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
-  }, [isOpen, tonInvoice, depositDone, onUpdateBalance]);
+  }, [isOpen, tonInvoice, cryptoDepositId, depositDone, onUpdateBalance]);
 
   if (!isOpen) return null;
 
@@ -134,6 +143,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
   const resetDepositFlow = () => {
     setInvoiceUrl(null);
+    setCryptoDepositId(null);
     setTonInvoice(null);
     setDepositDone(false);
     setError(null);
@@ -157,6 +167,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || 'fail');
       setInvoiceUrl(json.invoice_url);
+      setCryptoDepositId(json.deposit_id);
       openTgLink(json.invoice_url);
     } catch {
       setError(t('errorGeneric', lang));
@@ -399,14 +410,24 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     </div>
                   </div>
 
-                  {invoiceUrl ? (
-                    <button
-                      onClick={() => { soundFx.playClick(); openTgLink(invoiceUrl); }}
-                      className="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 text-white font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(2,132,199,0.4)] transition-all flex items-center justify-center gap-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      {t('openInvoice', lang)}
-                    </button>
+                  {depositDone ? (
+                    <div className="p-4 bg-emerald-950 border border-emerald-600 text-emerald-300 text-sm font-bold rounded-xl text-center">
+                      ✅ {t('depositCredited', lang)}
+                    </div>
+                  ) : invoiceUrl ? (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => { soundFx.playClick(); openTgLink(invoiceUrl); }}
+                        className="w-full py-3 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 text-white font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(2,132,199,0.4)] transition-all flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        {t('openInvoice', lang)}
+                      </button>
+                      <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 font-mono">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        {t('waitingPayment', lang)}
+                      </div>
+                    </div>
                   ) : (
                     <button
                       onClick={handleCreateCryptoBot}

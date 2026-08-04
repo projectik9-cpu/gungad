@@ -28,8 +28,12 @@ app.use(cors({
   credentials: true,
 }));
 
-// Парсинг JSON
-app.use(express.json());
+// Парсинг JSON + сохраняем raw body для Crypto Bot webhook signature
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Логирование запросов

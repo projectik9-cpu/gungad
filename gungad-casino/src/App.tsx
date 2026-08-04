@@ -222,7 +222,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw]"
+      className="min-h-screen bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw] pb-[4.5rem] md:pb-0"
       onPointerDown={() => soundFx.unlockAndStartMusic()}
     >
       <Header
@@ -236,6 +236,8 @@ export default function App() {
         playMode={playMode}
         onToggleDemo={handleToggleDemo}
         sessionStatus={status}
+        activeTab={activeTab}
+        activeGameId={activeGameId}
         onSelectTab={(tKey) => {
           if (tKey === 'games') { setActiveGameId(null); setActiveTab('games'); }
           else if (tKey === 'crash') { handleSelectGame('crash'); }

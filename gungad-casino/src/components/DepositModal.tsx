@@ -239,31 +239,35 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     'w-full bg-[#121217] border border-zinc-800 focus:border-rose-600 text-white font-mono text-base font-bold rounded-xl px-3 py-2.5 outline-none';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[350] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+      onClick={onClose}
+    >
       <div
-        className="relative w-full sm:max-w-lg bg-[#0e0e12] border border-rose-900/50 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col text-zinc-100 max-h-[min(92dvh,860px)] overflow-hidden"
+        className="relative w-full sm:max-w-lg bg-[#0e0e12] border border-rose-900/50 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col text-zinc-100 max-h-[min(85dvh,720px)] md:max-h-[min(90dvh,760px)] mb-[4.5rem] md:mb-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-rose-500" />
-            <h3 className="font-display font-black text-lg uppercase tracking-wider text-white">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldCheck className="w-5 h-5 text-rose-500 shrink-0" />
+            <h3 className="font-display font-black text-base sm:text-lg uppercase tracking-wider text-white truncate">
               {t('tacticalCashier', lang)}
             </h3>
           </div>
           <button
+            type="button"
             onClick={() => {
               soundFx.playClick();
               onClose();
             }}
-            className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white"
+            className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white shrink-0 touch-manipulation"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 flex flex-col gap-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
           {/* Tab Switcher */}
           <div className="grid grid-cols-2 gap-2 bg-[#14141a] p-1 rounded-xl border border-zinc-800">
             <button

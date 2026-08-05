@@ -16,7 +16,7 @@ export interface LanguageConfig {
   flag: string;
 }
 
-export type GameId = 'crash' | 'roulette' | 'blackjack' | 'coinflip' | 'dice' | 'mines' | 'plinko';
+export type GameId = 'crash' | 'roulette' | 'blackjack' | 'coinflip' | 'dice' | 'mines' | 'plinko' | 'slots';
 
 export interface GameInfo {
   id: GameId;

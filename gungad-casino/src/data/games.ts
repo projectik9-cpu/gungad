@@ -78,4 +78,15 @@ export const GAMES: GameInfo[] = [
     maxBetUSD: 1000,
     descriptionKey: 'plinkoDesc',
   },
+  {
+    id: 'slots',
+    name: 'Crimson Cascade',
+    category: 'arcade',
+    image: '/games/slots-crimson.jpg',
+    badge: 'badgeHot',
+    rtp: '98.0%',
+    minBetUSD: 0.1,
+    maxBetUSD: 1000,
+    descriptionKey: 'slotsDesc',
+  },
 ];

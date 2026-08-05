@@ -5,7 +5,8 @@ export type GgGameId =
   | 'coinflip'
   | 'dice'
   | 'mines'
-  | 'plinko';
+  | 'plinko'
+  | 'slots';
 
 export type GgLedgerKind =
   | 'deposit'

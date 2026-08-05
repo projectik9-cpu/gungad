@@ -17,7 +17,7 @@ import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
-const VALID_GAMES = ['crash', 'roulette', 'blackjack', 'coinflip', 'dice', 'mines', 'plinko'];
+const VALID_GAMES = ['crash', 'roulette', 'blackjack', 'coinflip', 'dice', 'mines', 'plinko', 'slots'];
 const VALID_STATUSES = ['won', 'lost', 'push', 'cashed_out'];
 
 // Basic sanity — bet limits in cents ($0.01 to $10,000)

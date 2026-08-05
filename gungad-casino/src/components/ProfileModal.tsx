@@ -10,6 +10,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.r
 const GAME_NAMES: Record<string, string> = {
   crash: 'Gun Краш', roulette: 'Рулетка', blackjack: 'Блэкджек',
   coinflip: 'Gun Монетка', dice: 'Кости', mines: 'Мины', plinko: 'Плинко',
+  slots: 'Crimson Cascade',
 };
 
 interface ProfileModalProps {

@@ -64,6 +64,11 @@ export const translations = {
     minesDesc: 'Uncover diamond safezones on a 5x5 minefield. Multipliers compound per tile!',
     plinkoName: 'Plinko Drop',
     plinkoDesc: 'Drop high-velocity balls down peg obstacles into extreme multiplier pockets.',
+    slotsName: 'Crimson Cascade',
+    slotsDesc: 'Cluster pays cascade slot. Land 4 scatters for free spins with multiplier bombs.',
+    slotsSpin: 'Spin',
+    slotsSpinning: 'Spinning...',
+    slotsHint: '5+ matching symbols in a cluster pay. Cascades tumble until wins stop. 4+ scatters trigger free spins.',
 
     // Common Game Controls
     betAmount: 'Bet Amount',
@@ -318,6 +323,11 @@ export const translations = {
     minesDesc: 'Открывай безопасные ячейки на поле 5x5. Множитель растет с каждым шагом!',
     plinkoName: 'Плинко Дроп',
     plinkoDesc: 'Запускай шары по колышкам в секторы с коэффициентами.',
+    slotsName: 'Crimson Cascade',
+    slotsDesc: 'Каскадный слот с кластерами. 4 скаттера — фриспины с бомбами-множителями.',
+    slotsSpin: 'Крутить',
+    slotsSpinning: 'Крутим...',
+    slotsHint: 'Кластер из 5+ одинаковых символов выигрывает. Каскады падают, пока есть выигрыши. 4+ скаттера — фриспины.',
 
     // Common Game Controls
     betAmount: 'Сумма ставки',
@@ -570,6 +580,11 @@ export const translations = {
     minesDesc: 'Відкривай безпечні осередки на полі 5x5. Множник зростає з кожним кроком!',
     plinkoName: 'Плінко Дроп',
     plinkoDesc: 'Запускай кулі по кілочках у сектори з коефіцієнтами.',
+    slotsName: 'Crimson Cascade',
+    slotsDesc: 'Каскадний слот із кластерами. 4 скатери — фріспіни з бомбами-множниками.',
+    slotsSpin: 'Крутити',
+    slotsSpinning: 'Крутимо...',
+    slotsHint: 'Кластер із 5+ однакових символів виграє. Каскади падають, поки є виграші. 4+ скатери — фріспіни.',
 
     // Common Game Controls
     betAmount: 'Сума ставки',
@@ -822,6 +837,11 @@ export const translations = {
     minesDesc: '5x5 өрісінде қауіпсіз ұяшықтарды аш. Коэффициент сайын өседі!',
     plinkoName: 'Плинко Дроп',
     plinkoDesc: 'Шарларды экстрим коэффициенттері бар секторларға жібер.',
+    slotsName: 'Crimson Cascade',
+    slotsDesc: 'Кластерлі каскад слот. 4 скаттер — мультипликатор бомбалары бар тегін айналдырулар.',
+    slotsSpin: 'Айналдыру',
+    slotsSpinning: 'Айналуда...',
+    slotsHint: '5+ бірдей символ кластері ұтады. Каскадтар ұтыс тоқтағанша түседі. 4+ скаттер — тегін айналдырулар.',
 
     // Common Game Controls
     betAmount: 'Бәс сомасы',

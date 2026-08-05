@@ -9,6 +9,7 @@ import { CoinFlipGame } from './components/games/CoinFlipGame';
 import { DiceGame } from './components/games/DiceGame';
 import { MinesGame } from './components/games/MinesGame';
 import { PlinkoGame } from './components/games/PlinkoGame';
+import { SlotsGame } from './components/games/SlotsGame';
 import { DepositModal } from './components/DepositModal';
 import { SupportModal } from './components/SupportModal';
 import { ProfileModal } from './components/ProfileModal';
@@ -312,6 +313,7 @@ export default function App() {
             { id: 'dice',      label: t('diceName',      lang) },
             { id: 'mines',     label: t('minesName',     lang) },
             { id: 'plinko',    label: t('plinkoName',    lang) },
+            { id: 'slots',     label: t('slotsName',     lang) },
           ].map(item => (
             <button
               key={item.id}
@@ -379,6 +381,7 @@ export default function App() {
           {activeTab === 'game' && activeGameId === 'dice'      && <DiceGame      {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'mines'     && <MinesGame     {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'plinko'    && <PlinkoGame    {...gameProps} />}
+          {activeTab === 'game' && activeGameId === 'slots'     && <SlotsGame     {...gameProps} />}
         </main>
       </div>
 

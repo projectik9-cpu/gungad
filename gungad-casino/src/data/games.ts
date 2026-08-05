@@ -81,10 +81,10 @@ export const GAMES: GameInfo[] = [
   {
     id: 'slots',
     name: 'Crimson Cascade',
-    category: 'arcade',
+    category: 'slots',
     image: '/games/slots-crimson.jpg',
-    badge: 'badgeHot',
-    rtp: '98.0%',
+    badge: 'badge100x',
+    rtp: '96.0%',
     minBetUSD: 0.1,
     maxBetUSD: 1000,
     descriptionKey: 'slotsDesc',

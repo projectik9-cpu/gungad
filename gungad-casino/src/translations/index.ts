@@ -48,6 +48,8 @@ export const translations = {
     cardsCategory: 'Cards',
     instantCategory: 'Instant',
     arcadeCategory: 'Arcade',
+    slotsCategory: 'Slots',
+    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Crash',
@@ -322,6 +324,8 @@ export const translations = {
     cardsCategory: 'Карты',
     instantCategory: 'Быстрые',
     arcadeCategory: 'Аркады',
+    slotsCategory: 'Слоты',
+    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Краш',
@@ -594,6 +598,8 @@ export const translations = {
     cardsCategory: 'Карти',
     instantCategory: 'Швидкі',
     arcadeCategory: 'Аркади',
+    slotsCategory: 'Слоти',
+    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Crash',
@@ -866,6 +872,8 @@ export const translations = {
     cardsCategory: 'Карталар',
     instantCategory: 'Жылдам',
     arcadeCategory: 'Аркадалар',
+    slotsCategory: 'Слоттар',
+    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Crash',

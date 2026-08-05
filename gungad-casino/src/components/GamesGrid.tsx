@@ -25,6 +25,7 @@ export const GamesGrid: React.FC<GamesGridProps> = ({ onSelectGame, lang }) => {
     { id: 'cards', labelKey: 'cardsCategory' },
     { id: 'instant', labelKey: 'instantCategory' },
     { id: 'arcade', labelKey: 'arcadeCategory' },
+    { id: 'slots', labelKey: 'slotsCategory' },
   ];
 
   return (
@@ -86,7 +87,13 @@ export const GamesGrid: React.FC<GamesGridProps> = ({ onSelectGame, lang }) => {
 
                 {/* Badge */}
                 {game.badge && (
-                  <span className="absolute top-3 left-3 bg-rose-950/90 border border-rose-600/70 text-rose-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg backdrop-blur-md shadow-md">
+                  <span
+                    className={
+                      game.badge === 'badge100x'
+                        ? 'absolute top-3 left-3 bg-amber-950/95 border border-amber-400/80 text-amber-300 text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg backdrop-blur-md shadow-[0_0_12px_rgba(251,191,36,0.45)]'
+                        : 'absolute top-3 left-3 bg-rose-950/90 border border-rose-600/70 text-rose-300 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg backdrop-blur-md shadow-md'
+                    }
+                  >
                     {t(game.badge as any, lang)}
                   </span>
                 )}

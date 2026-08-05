@@ -13,7 +13,7 @@ interface WinFlyLayerProps {
   onClear: (id: number) => void;
 }
 
-const FLY_DURATION = 900;
+const FLY_DURATION = 1350;
 
 const FlyLabel: React.FC<{ ev: FlyEvent; onDone: () => void }> = ({ ev, onDone }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -21,16 +21,27 @@ const FlyLabel: React.FC<{ ev: FlyEvent; onDone: () => void }> = ({ ev, onDone }
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const kf: Keyframe[] = [
-      { opacity: 0, transform: 'translate(-50%, 0) scale(0.6)' },
-      { opacity: 1, transform: 'translate(-50%, -14px) scale(1.15)', offset: 0.15 },
-      { opacity: 0.9, transform: 'translate(-50%, -80px) scale(1)', offset: 0.8 },
-      { opacity: 0, transform: 'translate(-50%, -110px) scale(0.85)' },
-    ];
-    const anim = el.animate(kf, { duration: FLY_DURATION, easing: 'ease-in-out', fill: 'forwards' });
+    const kf: Keyframe[] = ev.isMult
+      ? [
+          { opacity: 0, transform: 'translate(-50%, 0) scale(0.5)' },
+          { opacity: 1, transform: 'translate(-50%, -18px) scale(1.35)', offset: 0.18 },
+          { opacity: 1, transform: 'translate(-50%, -70px) scale(1.15)', offset: 0.55 },
+          { opacity: 0, transform: 'translate(-50%, -150px) scale(0.9)' },
+        ]
+      : [
+          { opacity: 0, transform: 'translate(-50%, 0) scale(0.6)' },
+          { opacity: 1, transform: 'translate(-50%, -14px) scale(1.2)', offset: 0.12 },
+          { opacity: 0.95, transform: 'translate(-50%, -100px) scale(1)', offset: 0.7 },
+          { opacity: 0, transform: 'translate(-50%, -140px) scale(0.85)' },
+        ];
+    const anim = el.animate(kf, {
+      duration: ev.isMult ? 1600 : FLY_DURATION,
+      easing: 'ease-in-out',
+      fill: 'forwards',
+    });
     anim.onfinish = onDone;
     return () => anim.cancel();
-  }, [onDone]);
+  }, [onDone, ev.isMult]);
 
   return (
     <div

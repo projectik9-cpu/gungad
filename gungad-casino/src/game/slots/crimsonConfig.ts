@@ -86,27 +86,27 @@ export const BASE_WEIGHTS: { id: SymbolId; w: number }[] = [
   { id: 11, w: 0.5}, // scatter — extremely rare natural FS trigger
 ];
 
-/** Free spins — more premium symbols, bombs appear, scatter for retrigger */
+/** Free spins — juicier than base but buy-bonus EV target ~55–70% of cost */
 export const FS_WEIGHTS: { id: SymbolId; w: number }[] = [
-  { id: 1,  w: 18 },
-  { id: 2,  w: 18 },
-  { id: 4,  w: 15 },
+  { id: 1,  w: 16 },
+  { id: 2,  w: 16 },
+  { id: 4,  w: 14 },
   { id: 6,  w: 12 },
-  { id: 7,  w: 9  },
-  { id: 8,  w: 6  },
-  { id: 9,  w: 4  },
+  { id: 7,  w: 10 },
+  { id: 8,  w: 7  },
+  { id: 9,  w: 4.5},
   { id: 10, w: 2.5},
-  { id: 11, w: 0.9}, // scatter — rare retrigger
-  { id: 12, w: 3  }, // bomb — present but not flooding
+  { id: 11, w: 1.0},
+  { id: 12, w: 4.2}, // bombs present but not flooding
 ];
 
 /** Bomb multiplier values and their rarity weights */
 export const MULT_VALUE_WEIGHTS: { value: number; w: number }[] = [
-  { value: 2,   w: 45 },
-  { value: 5,   w: 30 },
-  { value: 10,  w: 12 },
-  { value: 25,  w:  7 },
-  { value: 50,  w:  4 },
+  { value: 2,   w: 42 },
+  { value: 5,   w: 28 },
+  { value: 10,  w: 14 },
+  { value: 25,  w:  9 },
+  { value: 50,  w:  5 },
   { value: 100, w:  2 },
 ];
 

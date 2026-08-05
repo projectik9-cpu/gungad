@@ -21,7 +21,7 @@ export type GameId = 'crash' | 'roulette' | 'blackjack' | 'coinflip' | 'dice' | 
 export interface GameInfo {
   id: GameId;
   name: string;
-  category: 'crash' | 'table' | 'cards' | 'instant' | 'arcade';
+  category: 'crash' | 'table' | 'cards' | 'instant' | 'arcade' | 'slots';
   image: string;
   badge?: string;
   rtp: string;

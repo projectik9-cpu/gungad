@@ -186,8 +186,8 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
       return round.appliedPay;
     }
 
-    const winHold = () => (turboRef.current ? 120 : fsMode ? 700 : 550);
-    const explodeHold = () => (turboRef.current ? 80 : 420);
+    const winHold = () => (turboRef.current ? 120 : fsMode ? 1100 : 950);
+    const explodeHold = () => (turboRef.current ? 90 : fsMode ? 720 : 650);
 
     for (const step of round.tumbles) {
       setGrid(step.grid.map(c => ({ ...c })));
@@ -221,7 +221,7 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
     if (fsMode && round.multFactor > 1) {
       setMultFactor(round.multFactor);
       emitFly(`×${round.multFactor}`, 0.5, 0.3, true);
-      await sleep(turboRef.current ? 80 : 400);
+      await sleep(turboRef.current ? 100 : 900);
     }
 
     return round.appliedPay;
@@ -435,35 +435,44 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
         />
       </div>
 
-      {/* Reels */}
-      <div className="flex-1 min-h-0 px-1.5 sm:px-3 py-1 relative flex flex-col">
-        <div className="relative flex-1 min-h-0 w-full max-w-lg mx-auto">
-          <ReelGrid
-            grid={grid}
-            spinning={spinning}
-            stoppedCols={stoppedCols}
-            winCells={winCells}
-            explodeCells={explodeCells}
-            spinDurationMs={spinDurationMs}
-            gridRef={gridRef}
-          />
-          <WinFlyLayer events={flyEvents} onClear={clearFly} />
+      {/* 16:9 reel stage — letterboxed on phone and desktop */}
+      <div className="flex-1 min-h-0 px-1.5 sm:px-4 py-1 flex items-center justify-center">
+        <div
+          className="relative w-full max-w-5xl"
+          style={{
+            aspectRatio: '16 / 9',
+            maxHeight: '100%',
+            width: 'min(100%, calc(100dvh * 16 / 9))',
+          }}
+        >
+          <div className="absolute inset-0">
+            <ReelGrid
+              grid={grid}
+              spinning={spinning}
+              stoppedCols={stoppedCols}
+              winCells={winCells}
+              explodeCells={explodeCells}
+              spinDurationMs={spinDurationMs}
+              gridRef={gridRef}
+            />
+            <WinFlyLayer events={flyEvents} onClear={clearFly} />
 
-          {banner && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-              <div
-                className="text-center px-4 py-3 rounded-2xl"
-                style={{ background: 'rgba(6,6,10,0.88)', border: '1px solid rgba(225,29,72,0.4)' }}
-              >
+            {banner && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
                 <div
-                  className="font-display font-black text-lg sm:text-2xl text-rose-400 uppercase tracking-widest"
-                  style={{ textShadow: '0 0 24px rgba(225,29,72,0.8)' }}
+                  className="text-center px-4 py-3 rounded-2xl"
+                  style={{ background: 'rgba(6,6,10,0.88)', border: '1px solid rgba(225,29,72,0.4)' }}
                 >
-                  {banner}
+                  <div
+                    className="font-display font-black text-lg sm:text-2xl text-rose-400 uppercase tracking-widest"
+                    style={{ textShadow: '0 0 24px rgba(225,29,72,0.8)' }}
+                  >
+                    {banner}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

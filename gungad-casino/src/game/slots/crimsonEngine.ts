@@ -8,6 +8,7 @@ import {
   MAX_WIN_MULT,
   MAX_FREE_SPINS_CAP,
   BUY_BONUS_FS,
+  BUY_BONUS_COST_MULT,
   RETRIGGER_SCATTERS_NEEDED,
   RETRIGGER_FS_AWARDED,
   SymbolId,
@@ -110,8 +111,8 @@ export function fillGrid(rng: Rng, freeSpin: boolean): CellState[] {
   const weights = freeSpin ? FS_WEIGHTS : BASE_WEIGHTS;
   const grid = Array.from({ length: GRID_SIZE }, () => rollSymbol(weights, rng, freeSpin));
 
-  // Clump pass: copy neighbours so clusters of 8+ can form
-  const smears = freeSpin ? 18 : 15;
+  // Clump pass: base ~96% RTP; FS stronger for buy-bonus ~55–70% of cost
+  const smears = freeSpin ? 24 : 15;
   for (let s = 0; s < smears; s++) {
     const i = Math.floor(rng() * GRID_SIZE);
     const nbs = neighbors(i);
@@ -120,7 +121,7 @@ export function fillGrid(rng: Rng, freeSpin: boolean): CellState[] {
     const src = grid[i];
     if (src.symbol === SCATTER || src.symbol === MULT) continue;
     if (grid[j].symbol === SCATTER || grid[j].symbol === MULT) continue;
-    if (rng() < 0.58) {
+    if (rng() < (freeSpin ? 0.64 : 0.58)) {
       grid[j] = { symbol: src.symbol };
     }
   }
@@ -322,7 +323,7 @@ export function playBoughtBonus(betUSD: number, rng: Rng = Math.random): FullSpi
   };
 }
 
-/** Monte-Carlo RTP estimator */
+/** Monte-Carlo RTP estimator (base game spins including rare natural FS) */
 export function simulateRtp(
   spins: number,
   betUSD = 1,
@@ -337,4 +338,28 @@ export function simulateRtp(
     if (res.base.freeSpinsAwarded > 0) fsTriggers++;
   }
   return { rtp: paid / wagered, hitRate: hits / spins, avgWin: paid / spins, fsRate: fsTriggers / spins };
+}
+
+/** Buy-bonus EV: payout / (100 × bet). Target ~0.55–0.70 */
+export function simulateBuyBonus(
+  buys: number,
+  betUSD = 1,
+  rng: Rng = Math.random,
+): { meanReturn: number; medianMult: number; avgPayout: number; cost: number } {
+  const cost = betUSD * BUY_BONUS_COST_MULT;
+  const payouts: number[] = [];
+  let paid = 0;
+  for (let i = 0; i < buys; i++) {
+    const res = playBoughtBonus(betUSD, rng);
+    paid += res.totalPayoutUSD;
+    payouts.push(res.totalPayoutUSD);
+  }
+  payouts.sort((a, b) => a - b);
+  const median = payouts[Math.floor(payouts.length / 2)] ?? 0;
+  return {
+    meanReturn: paid / (buys * cost),
+    medianMult: median / betUSD,
+    avgPayout: paid / buys,
+    cost,
+  };
 }

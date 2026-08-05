@@ -9,8 +9,10 @@ import {
 } from '../../game/slots/crimsonConfig';
 import { CellState } from '../../game/slots/crimsonEngine';
 
-/** Extra filler symbols in the spinning strip above the visible window */
-const STRIP_EXTRA = 18;
+/** Random fillers above the final band */
+const STRIP_EXTRA = 16;
+/** Last N filler rows are copies of finals so slowdown matches the stop */
+const PREVIEW_ROWS = 2;
 
 interface ReelGridProps {
   grid: CellState[];
@@ -18,7 +20,6 @@ interface ReelGridProps {
   stoppedCols: Set<number>;
   winCells: Set<number>;
   explodeCells: Set<number>;
-  /** Duration per column stop (ms) — parent controls base vs FS vs turbo */
   spinDurationMs?: number;
   gridRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -112,16 +113,16 @@ const ReelColumn: React.FC<ColProps> = ({
   spinDurationMs,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
   const [cellH, setCellH] = useState(0);
   const [strip, setStrip] = useState<CellState[]>(() => [...colSymbols]);
   const [offsetY, setOffsetY] = useState(0);
   const [transition, setTransition] = useState('none');
   const [landed, setLanded] = useState(false);
   const wasSpinning = useRef(false);
+  const spinGen = useRef(0);
+  const finalsRef = useRef<CellState[]>(colSymbols);
   const rafRef = useRef(0);
 
-  // Measure cell height from viewport (5 rows)
   useLayoutEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -135,28 +136,45 @@ const ReelColumn: React.FC<ColProps> = ({
     return () => ro.disconnect();
   }, []);
 
-  // Start spin: build tall strip, animate translateY down to final symbols
+  // Capture finals when a new spin starts (before strip anim)
+  useEffect(() => {
+    if (isSpinning && !isStopped) {
+      finalsRef.current = colSymbols.map(c => ({ ...c }));
+    }
+  }, [isSpinning, isStopped, colSymbols]);
+
+  // Start spin animation once per spin
   useEffect(() => {
     if (!isSpinning || isStopped || cellH <= 0) return;
+    if (wasSpinning.current) return; // already animating this spin
+
     wasSpinning.current = true;
+    spinGen.current += 1;
+    const gen = spinGen.current;
     setLanded(false);
 
-    // Build strip: [extra fillers...][final 5 symbols]
-    const fillers = Array.from({ length: STRIP_EXTRA }, () => randomPaying());
-    const full = [...fillers, ...colSymbols];
+    const finals = finalsRef.current.length === ROWS
+      ? finalsRef.current
+      : colSymbols;
+
+    // Random fillers, then preview copies of finals, then exact finals
+    const randomCount = Math.max(0, STRIP_EXTRA - PREVIEW_ROWS);
+    const randoms = Array.from({ length: randomCount }, () => randomPaying());
+    const preview = finals.slice(0, PREVIEW_ROWS).map(c => ({ ...c }));
+    const full = [...randoms, ...preview, ...finals];
     setStrip(full);
 
-    // Start above so final symbols are off-screen; then ease down
-    const startY = -(STRIP_EXTRA * cellH);
+    const startY = -((randomCount + PREVIEW_ROWS) * cellH);
     setTransition('none');
     setOffsetY(startY);
 
     const duration = Math.max(400, spinDurationMs);
 
-    // Next frame: animate to 0
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = requestAnimationFrame(() => {
-        setTransition(`transform ${duration}ms cubic-bezier(0.15, 0.85, 0.25, 1)`);
+        if (spinGen.current !== gen) return;
+        // Softer ease — finals visible longer during slowdown
+        setTransition(`transform ${duration}ms cubic-bezier(0.22, 0.61, 0.36, 1)`);
         setOffsetY(0);
       });
     });
@@ -164,9 +182,9 @@ const ReelColumn: React.FC<ColProps> = ({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [isSpinning, isStopped, cellH, spinDurationMs, colIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isSpinning, isStopped, cellH, spinDurationMs, colIdx, colSymbols]);
 
-  // When column stops (or spin ends): snap to final grid + land bounce
+  // Stop: lock offset only — do NOT remount/replace strip (avoids symbol swap)
   useEffect(() => {
     if (isSpinning && !isStopped) return;
 
@@ -174,17 +192,18 @@ const ReelColumn: React.FC<ColProps> = ({
       wasSpinning.current = false;
       setTransition('none');
       setOffsetY(0);
-      setStrip([...colSymbols]);
+      // Keep strip as-is (ends with finals). Only bounce.
       setLanded(true);
-      const t = window.setTimeout(() => setLanded(false), 380);
+      const t = window.setTimeout(() => setLanded(false), 420);
       return () => clearTimeout(t);
     }
 
-    // Idle updates (cascade drops)
+    // Idle cascade updates — show settled grid as simple 5-row strip
     if (!isSpinning) {
+      wasSpinning.current = false;
       setTransition('none');
       setOffsetY(0);
-      setStrip([...colSymbols]);
+      setStrip(colSymbols.map(c => ({ ...c })));
     }
   }, [isSpinning, isStopped, colSymbols]);
 
@@ -198,7 +217,6 @@ const ReelColumn: React.FC<ColProps> = ({
       style={{ height: '100%', willChange: activelySpinning ? 'transform' : 'auto' }}
     >
       <div
-        ref={stripRef}
         className="absolute inset-x-0 top-0 flex flex-col"
         style={{
           transform: `translate3d(0, ${offsetY}px, 0)`,
@@ -207,16 +225,15 @@ const ReelColumn: React.FC<ColProps> = ({
         }}
       >
         {strip.map((cell, i) => {
-          // Map visible final rows to win/explode indices
-          const isFinalBand = !activelySpinning && i >= strip.length - ROWS;
-          const rowIdx = isFinalBand ? i - (strip.length - ROWS) : -1;
+          const inFinalBand = i >= strip.length - ROWS;
+          const rowIdx = inFinalBand ? i - (strip.length - ROWS) : -1;
           const cellIdx = rowIdx >= 0 ? rowIdx * COLS + colIdx : -1;
           const isWin = cellIdx >= 0 && winCells.has(cellIdx);
           const isExplode = cellIdx >= 0 && explodeCells.has(cellIdx);
 
           return (
             <div
-              key={`${i}-${cell.symbol}-${cell.multValue ?? 0}`}
+              key={`s${spinGen.current}-${i}`}
               className="shrink-0 w-full"
               style={{ height: cellH > 0 ? cellH : `${100 / ROWS}%`, padding: '1.5px' }}
             >
@@ -224,7 +241,7 @@ const ReelColumn: React.FC<ColProps> = ({
                 cell={cell}
                 isWin={isWin}
                 isExplode={isExplode}
-                showLabels={showLabels && isFinalBand}
+                showLabels={showLabels && inFinalBand}
               />
             </div>
           );
@@ -250,7 +267,7 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
   return (
     <div
       ref={gridRef}
-      className="relative grid gap-0.5 sm:gap-1 p-1 sm:p-2 rounded-xl sm:rounded-2xl bg-black/50 border border-zinc-800/60 w-full h-full min-h-0"
+      className="relative grid gap-0.5 sm:gap-1 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-black/50 border border-zinc-800/60 w-full h-full min-h-0"
       style={{
         gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
         gridTemplateRows: '1fr',

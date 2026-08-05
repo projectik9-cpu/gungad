@@ -75,6 +75,15 @@ export const translations = {
     slotsCongrats: 'Congratulations!',
     slotsCongratsHint: 'Tap anywhere to continue',
     slotsBonusTotal: 'Bonus Total',
+    slotsBalance: 'Balance',
+    slotsBet: 'Bet',
+    slotsCancel: 'Cancel',
+    slotsBuyNow: 'Buy Now',
+    slotsBuyBonusConfirm: 'Buy Bonus?',
+    slotsBuyBonusBody: 'Purchase {n} Free Spins for {cost}?',
+    slotsFreeSpins: 'Free Spins',
+    slotsMultiplier: 'Multiplier',
+    slotsSpeedUp: 'Speed up',
 
     // Common Game Controls
     betAmount: 'Bet Amount',
@@ -340,6 +349,15 @@ export const translations = {
     slotsCongrats: 'Поздравляем!',
     slotsCongratsHint: 'Нажмите куда угодно, чтобы продолжить',
     slotsBonusTotal: 'Итого бонус',
+    slotsBalance: 'Баланс',
+    slotsBet: 'Ставка',
+    slotsCancel: 'Отмена',
+    slotsBuyNow: 'Купить',
+    slotsBuyBonusConfirm: 'Купить бонус?',
+    slotsBuyBonusBody: 'Купить {n} фриспинов за {cost}?',
+    slotsFreeSpins: 'Фриспины',
+    slotsMultiplier: 'Множитель',
+    slotsSpeedUp: 'Ускорить',
 
     // Common Game Controls
     betAmount: 'Сумма ставки',
@@ -603,6 +621,15 @@ export const translations = {
     slotsCongrats: 'Вітаємо!',
     slotsCongratsHint: 'Натисніть будь-де, щоб продовжити',
     slotsBonusTotal: 'Підсумок бонусу',
+    slotsBalance: 'Баланс',
+    slotsBet: 'Ставка',
+    slotsCancel: 'Скасувати',
+    slotsBuyNow: 'Купити',
+    slotsBuyBonusConfirm: 'Купити бонус?',
+    slotsBuyBonusBody: 'Купити {n} фріспінів за {cost}?',
+    slotsFreeSpins: 'Фріспіни',
+    slotsMultiplier: 'Множник',
+    slotsSpeedUp: 'Прискорити',
 
     // Common Game Controls
     betAmount: 'Сума ставки',
@@ -866,6 +893,15 @@ export const translations = {
     slotsCongrats: 'Құттықтаймыз!',
     slotsCongratsHint: 'Жалғастыру үшін кез келген жерді басыңыз',
     slotsBonusTotal: 'Бонус жиыны',
+    slotsBalance: 'Баланс',
+    slotsBet: 'Бәс',
+    slotsCancel: 'Бас тарту',
+    slotsBuyNow: 'Сатып алу',
+    slotsBuyBonusConfirm: 'Бонус сатып алу?',
+    slotsBuyBonusBody: '{n} тегін айналдыруды {cost} үшін сатып алу?',
+    slotsFreeSpins: 'Тегін айналдырулар',
+    slotsMultiplier: 'Мультипликатор',
+    slotsSpeedUp: 'Жылдамдату',
 
     // Common Game Controls
     betAmount: 'Бәс сомасы',

@@ -3,9 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 export interface FlyEvent {
   id: number;
   label: string;
-  /** 0..1 relative X position in the grid */
   relX: number;
-  /** 0..1 relative Y position in the grid */
   relY: number;
   isMult?: boolean;
 }
@@ -13,10 +11,6 @@ export interface FlyEvent {
 interface WinFlyLayerProps {
   events: FlyEvent[];
   onClear: (id: number) => void;
-}
-
-interface FlyItem extends FlyEvent {
-  done: boolean;
 }
 
 const FLY_DURATION = 900;
@@ -27,7 +21,6 @@ const FlyLabel: React.FC<{ ev: FlyEvent; onDone: () => void }> = ({ ev, onDone }
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Animate via Web Animations API
     const kf: Keyframe[] = [
       { opacity: 0, transform: 'translate(-50%, 0) scale(0.6)' },
       { opacity: 1, transform: 'translate(-50%, -14px) scale(1.15)', offset: 0.15 },
@@ -51,7 +44,7 @@ const FlyLabel: React.FC<{ ev: FlyEvent; onDone: () => void }> = ({ ev, onDone }
       }}
     >
       <span
-        className={`font-display font-black text-sm sm:text-base px-2 py-0.5 rounded-lg`}
+        className="font-display font-black text-sm sm:text-base px-2 py-0.5 rounded-lg"
         style={
           ev.isMult
             ? {
@@ -84,7 +77,6 @@ export const WinFlyLayer: React.FC<WinFlyLayerProps> = ({ events, onClear }) => 
   );
 };
 
-// Hook for managing fly events from parent
 let _flyId = 0;
 export function useWinFlyLayer() {
   const [events, setEvents] = useState<FlyEvent[]>([]);
@@ -98,5 +90,9 @@ export function useWinFlyLayer() {
     setEvents(ev => ev.filter(e => e.id !== id));
   }, []);
 
-  return { events, emit, clear };
+  const clearAll = useCallback(() => {
+    setEvents([]);
+  }, []);
+
+  return { events, emit, clear, clearAll };
 }

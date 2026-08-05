@@ -284,28 +284,31 @@ export default function App() {
       onPointerDown={() => { if (legalOk) soundFx.unlockAndStartMusic(); }}
       aria-hidden={!legalOk}
     >
-      <Header
-        key={`hdr-${ratesVersion}`}
-        user={user}
-        currency={currency}
-        onCurrencyChange={setCurrency}
-        lang={lang}
-        onLangChange={setLang}
-        onOpenDeposit={openDeposit}
-        onOpenProfile={openProfile}
-        onCloseModals={closeAllModals}
-        activeModal={depositOpen ? 'deposit' : profileOpen ? 'profile' : null}
-        playMode={playMode}
-        onToggleDemo={handleToggleDemo}
-        onOpenSupport={openSupport}
-        sessionStatus={status}
-        activeTab={activeTab}
-        activeGameId={activeGameId}
-        onSelectTab={(tKey) => {
-          if (tKey === 'games') { setActiveGameId(null); setActiveTab('games'); }
-          else if (tKey === 'crash') { handleSelectGame('crash'); }
-        }}
-      />
+      {/* Hide casino chrome entirely while fullscreen slots is open */}
+      {activeGameId !== 'slots' && (
+        <Header
+          key={`hdr-${ratesVersion}`}
+          user={user}
+          currency={currency}
+          onCurrencyChange={setCurrency}
+          lang={lang}
+          onLangChange={setLang}
+          onOpenDeposit={openDeposit}
+          onOpenProfile={openProfile}
+          onCloseModals={closeAllModals}
+          activeModal={depositOpen ? 'deposit' : profileOpen ? 'profile' : null}
+          playMode={playMode}
+          onToggleDemo={handleToggleDemo}
+          onOpenSupport={openSupport}
+          sessionStatus={status}
+          activeTab={activeTab}
+          activeGameId={activeGameId}
+          onSelectTab={(tKey) => {
+            if (tKey === 'games') { setActiveGameId(null); setActiveTab('games'); }
+            else if (tKey === 'crash') { handleSelectGame('crash'); }
+          }}
+        />
+      )}
 
       <div className="flex-1 flex">
         <aside className="hidden lg:flex flex-col gap-2 w-48 shrink-0 border-r border-zinc-900 bg-[#09090b] px-3 py-5 sticky top-14 self-start h-[calc(100vh-56px)] overflow-y-auto">

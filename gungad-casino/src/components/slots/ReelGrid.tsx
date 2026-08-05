@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   COLS,
   ROWS,
@@ -6,11 +6,11 @@ import {
   SCATTER,
   MULT,
   SYMBOL_SRC,
-  SymbolId,
 } from '../../game/slots/crimsonConfig';
 import { CellState } from '../../game/slots/crimsonEngine';
 
-const CYCLE_MS = 72; // symbol cycling speed during spin
+/** Extra filler symbols in the spinning strip above the visible window */
+const STRIP_EXTRA = 18;
 
 interface ReelGridProps {
   grid: CellState[];
@@ -18,7 +18,78 @@ interface ReelGridProps {
   stoppedCols: Set<number>;
   winCells: Set<number>;
   explodeCells: Set<number>;
+  /** Duration per column stop (ms) — parent controls base vs FS vs turbo */
+  spinDurationMs?: number;
   gridRef?: React.RefObject<HTMLDivElement | null>;
+}
+
+function randomPaying(): CellState {
+  return { symbol: PAYING[Math.floor(Math.random() * PAYING.length)] };
+}
+
+function CellFace({
+  cell,
+  isWin,
+  isExplode,
+  showLabels,
+}: {
+  cell: CellState;
+  isWin: boolean;
+  isExplode: boolean;
+  showLabels: boolean;
+}) {
+  const isScatter = cell.symbol === SCATTER;
+  const isBomb = cell.symbol === MULT;
+
+  return (
+    <div
+      className={[
+        'relative w-full h-full rounded-md overflow-hidden bg-[#0a0a0d] border',
+        isWin && !isExplode ? 'cell-winning border-rose-400' : 'border-zinc-800/70',
+        isExplode ? 'cell-exploding' : '',
+        isScatter ? 'border-rose-800/60' : '',
+        isBomb ? 'border-amber-800/60' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <img
+        src={SYMBOL_SRC[cell.symbol]}
+        alt=""
+        draggable={false}
+        className={[
+          'w-full h-full object-contain select-none p-[3%]',
+          isScatter && showLabels ? 'scale-[1.1] retrigger-pulse' : '',
+          isWin && !isExplode ? 'brightness-125 saturate-150' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      />
+      {isBomb && showLabels && cell.multValue != null && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingTop: '42%' }}>
+          <span
+            className="font-display font-black text-[11px] sm:text-[14px] leading-none text-amber-300"
+            style={{ textShadow: '0 0 8px rgba(251,191,36,0.9), 0 1px 0 #000' }}
+          >
+            {cell.multValue}×
+          </span>
+        </div>
+      )}
+      {isScatter && showLabels && (
+        <div className="absolute bottom-0 inset-x-0 text-center pointer-events-none pb-0.5">
+          <span
+            className="text-[6px] sm:text-[7px] font-black tracking-widest uppercase text-rose-300"
+            style={{ textShadow: '0 0 6px rgba(225,29,72,0.8), 0 1px 0 #000' }}
+          >
+            RETRIGGER
+          </span>
+        </div>
+      )}
+      {isWin && !isExplode && (
+        <div className="absolute inset-0 pointer-events-none bg-rose-400/10 rounded-md" />
+      )}
+    </div>
+  );
 }
 
 interface ColProps {
@@ -28,9 +99,9 @@ interface ColProps {
   isStopped: boolean;
   winCells: Set<number>;
   explodeCells: Set<number>;
+  spinDurationMs: number;
 }
 
-/** One reel column */
 const ReelColumn: React.FC<ColProps> = ({
   colIdx,
   colSymbols,
@@ -38,127 +109,127 @@ const ReelColumn: React.FC<ColProps> = ({
   isStopped,
   winCells,
   explodeCells,
+  spinDurationMs,
 }) => {
-  const [displayed, setDisplayed] = useState<CellState[]>(colSymbols);
-  const [landedRows, setLandedRows] = useState<Set<number>>(new Set());
-  const prevStoppedRef = useRef(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [cellH, setCellH] = useState(0);
+  const [strip, setStrip] = useState<CellState[]>(() => [...colSymbols]);
+  const [offsetY, setOffsetY] = useState(0);
+  const [transition, setTransition] = useState('none');
+  const [landed, setLanded] = useState(false);
+  const wasSpinning = useRef(false);
+  const rafRef = useRef(0);
 
-  // Cycling random symbols during spin
-  useEffect(() => {
-    if (!isSpinning || isStopped) {
-      setDisplayed(colSymbols);
-      return;
-    }
-    const id = setInterval(() => {
-      setDisplayed(() =>
-        Array.from({ length: ROWS }, (_, rowIdx) => {
-          const idx = (colIdx * 7 + rowIdx * 3 + Math.floor(Date.now() / CYCLE_MS)) % PAYING.length;
-          return { symbol: PAYING[Math.abs(idx) % PAYING.length] };
-        }),
-      );
-    }, CYCLE_MS);
-    return () => clearInterval(id);
-  }, [isSpinning, isStopped, colSymbols, colIdx]);
+  // Measure cell height from viewport (5 rows)
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.clientHeight / ROWS;
+      if (h > 0) setCellH(h);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-  // Landing animation when column stops
+  // Start spin: build tall strip, animate translateY down to final symbols
   useEffect(() => {
-    if (isStopped && !prevStoppedRef.current) {
-      prevStoppedRef.current = true;
-      setDisplayed(colSymbols);
-      const rows = new Set(Array.from({ length: ROWS }, (_, i) => i));
-      setLandedRows(rows);
-      const t = setTimeout(() => setLandedRows(new Set()), 400);
+    if (!isSpinning || isStopped || cellH <= 0) return;
+    wasSpinning.current = true;
+    setLanded(false);
+
+    // Build strip: [extra fillers...][final 5 symbols]
+    const fillers = Array.from({ length: STRIP_EXTRA }, () => randomPaying());
+    const full = [...fillers, ...colSymbols];
+    setStrip(full);
+
+    // Start above so final symbols are off-screen; then ease down
+    const startY = -(STRIP_EXTRA * cellH);
+    setTransition('none');
+    setOffsetY(startY);
+
+    const duration = Math.max(400, spinDurationMs);
+
+    // Next frame: animate to 0
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = requestAnimationFrame(() => {
+        setTransition(`transform ${duration}ms cubic-bezier(0.15, 0.85, 0.25, 1)`);
+        setOffsetY(0);
+      });
+    });
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isSpinning, isStopped, cellH, spinDurationMs, colIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When column stops (or spin ends): snap to final grid + land bounce
+  useEffect(() => {
+    if (isSpinning && !isStopped) return;
+
+    if (wasSpinning.current && isStopped) {
+      wasSpinning.current = false;
+      setTransition('none');
+      setOffsetY(0);
+      setStrip([...colSymbols]);
+      setLanded(true);
+      const t = window.setTimeout(() => setLanded(false), 380);
       return () => clearTimeout(t);
     }
-    if (!isStopped) {
-      prevStoppedRef.current = false;
-    }
-  }, [isStopped, colSymbols]);
 
-  // Update displayed when fully settled (not spinning)
-  useEffect(() => {
+    // Idle updates (cascade drops)
     if (!isSpinning) {
-      setDisplayed(colSymbols);
+      setTransition('none');
+      setOffsetY(0);
+      setStrip([...colSymbols]);
     }
-  }, [isSpinning, colSymbols]);
+  }, [isSpinning, isStopped, colSymbols]);
 
   const activelySpinning = isSpinning && !isStopped;
+  const showLabels = !activelySpinning;
 
   return (
     <div
-      className={`flex flex-col gap-1 sm:gap-1.5${activelySpinning ? ' reel-spinning' : ''}`}
-      style={{ willChange: activelySpinning ? 'filter' : 'auto' }}
+      ref={viewportRef}
+      className={`relative overflow-hidden rounded-md${landed ? ' reel-landed' : ''}`}
+      style={{ height: '100%', willChange: activelySpinning ? 'transform' : 'auto' }}
     >
-      {displayed.map((cell, rowIdx) => {
-        const cellIdx = rowIdx * COLS + colIdx;
-        const isWin = winCells.has(cellIdx);
-        const isExplode = explodeCells.has(cellIdx);
-        const isScatter = cell.symbol === SCATTER;
-        const isBomb = cell.symbol === MULT;
-        const isLanded = landedRows.has(rowIdx);
+      <div
+        ref={stripRef}
+        className="absolute inset-x-0 top-0 flex flex-col"
+        style={{
+          transform: `translate3d(0, ${offsetY}px, 0)`,
+          transition,
+          height: cellH > 0 ? cellH * strip.length : '100%',
+        }}
+      >
+        {strip.map((cell, i) => {
+          // Map visible final rows to win/explode indices
+          const isFinalBand = !activelySpinning && i >= strip.length - ROWS;
+          const rowIdx = isFinalBand ? i - (strip.length - ROWS) : -1;
+          const cellIdx = rowIdx >= 0 ? rowIdx * COLS + colIdx : -1;
+          const isWin = cellIdx >= 0 && winCells.has(cellIdx);
+          const isExplode = cellIdx >= 0 && explodeCells.has(cellIdx);
 
-        return (
-          <div
-            key={rowIdx}
-            className={[
-              'relative aspect-square rounded-lg overflow-hidden bg-[#0a0a0d] border transition-colors duration-150',
-              isWin && !isExplode ? 'cell-winning border-rose-400' : 'border-zinc-800/70',
-              isExplode ? 'cell-exploding' : '',
-              isLanded ? 'reel-landed' : '',
-              isScatter ? 'border-rose-800/60' : '',
-              isBomb ? 'border-amber-800/60' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            <img
-              src={SYMBOL_SRC[cell.symbol]}
-              alt=""
-              draggable={false}
-              className={[
-                'w-full h-full object-contain select-none transition-all duration-150',
-                activelySpinning ? 'p-0.5 opacity-80' : 'p-0.5',
-                isScatter && !activelySpinning ? 'scale-[1.1] retrigger-pulse' : '',
-                isWin && !isExplode ? 'brightness-125 saturate-150' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            />
-
-            {/* Bomb multiplier label */}
-            {isBomb && !activelySpinning && cell.multValue != null && (
-              <div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{ paddingTop: '45%' }}
-              >
-                <span
-                  className="font-display font-black text-[13px] sm:text-[15px] leading-none text-amber-300"
-                  style={{ textShadow: '0 0 8px rgba(251,191,36,0.9), 0 1px 0 #000, 0 -1px 0 #000' }}
-                >
-                  {cell.multValue}×
-                </span>
-              </div>
-            )}
-
-            {/* RETRIGGER label on scatter */}
-            {isScatter && !activelySpinning && (
-              <div className="absolute bottom-0 inset-x-0 text-center pointer-events-none pb-0.5">
-                <span
-                  className="text-[7px] sm:text-[8px] font-black tracking-widest uppercase text-rose-300"
-                  style={{ textShadow: '0 0 6px rgba(225,29,72,0.8), 0 1px 0 #000' }}
-                >
-                  RETRIGGER
-                </span>
-              </div>
-            )}
-
-            {/* Win cluster sparkle overlay */}
-            {isWin && !isExplode && (
-              <div className="absolute inset-0 pointer-events-none bg-rose-400/10 rounded-lg" />
-            )}
-          </div>
-        );
-      })}
+          return (
+            <div
+              key={`${i}-${cell.symbol}-${cell.multValue ?? 0}`}
+              className="shrink-0 w-full"
+              style={{ height: cellH > 0 ? cellH : `${100 / ROWS}%`, padding: '1.5px' }}
+            >
+              <CellFace
+                cell={cell}
+                isWin={isWin}
+                isExplode={isExplode}
+                showLabels={showLabels && isFinalBand}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -169,9 +240,9 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
   stoppedCols,
   winCells,
   explodeCells,
+  spinDurationMs = 2800,
   gridRef,
 }) => {
-  // Build per-column arrays
   const columns = Array.from({ length: COLS }, (_, c) =>
     Array.from({ length: ROWS }, (_, r) => grid[r * COLS + c]),
   );
@@ -179,18 +250,15 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
   return (
     <div
       ref={gridRef}
-      className={[
-        'relative grid gap-1 sm:gap-1.5 p-1.5 sm:p-2.5 rounded-2xl',
-        'bg-black/50 border border-zinc-800/60',
-      ].join(' ')}
+      className="relative grid gap-0.5 sm:gap-1 p-1 sm:p-2 rounded-xl sm:rounded-2xl bg-black/50 border border-zinc-800/60 w-full h-full min-h-0"
       style={{
         gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
+        gridTemplateRows: '1fr',
         boxShadow: 'inset 0 0 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(225,29,72,0.08)',
       }}
     >
-      {/* Background vignette */}
       <div
-        className="pointer-events-none absolute inset-0 rounded-2xl opacity-70"
+        className="pointer-events-none absolute inset-0 rounded-xl sm:rounded-2xl opacity-70"
         style={{
           background:
             'radial-gradient(ellipse at 50% 0%, rgba(225,29,72,0.06), transparent 65%), radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.5) 100%)',
@@ -206,6 +274,7 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
           isStopped={stoppedCols.has(colIdx)}
           winCells={winCells}
           explodeCells={explodeCells}
+          spinDurationMs={spinDurationMs + colIdx * 140}
         />
       ))}
     </div>

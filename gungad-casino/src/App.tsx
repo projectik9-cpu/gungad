@@ -263,6 +263,12 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const handleExitSlots = useCallback(() => {
+    soundFx.playClick();
+    setActiveGameId(null);
+    setActiveTab('games');
+  }, []);
+
   const gameProps = useMemo(() => ({
     user,
     currency,
@@ -381,7 +387,7 @@ export default function App() {
           {activeTab === 'game' && activeGameId === 'dice'      && <DiceGame      {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'mines'     && <MinesGame     {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'plinko'    && <PlinkoGame    {...gameProps} />}
-          {activeTab === 'game' && activeGameId === 'slots'     && <SlotsGame     {...gameProps} />}
+          {/* slots is rendered fullscreen outside main layout — see overlay below */}
         </main>
       </div>
 
@@ -435,6 +441,14 @@ export default function App() {
     </div>
     {!legalOk && (
       <AgeGate lang={lang} onAccepted={() => setLegalOk(true)} />
+    )}
+
+    {/* Fullscreen slots overlay — hides all casino chrome */}
+    {activeGameId === 'slots' && (
+      <SlotsGame
+        {...gameProps}
+        onClose={handleExitSlots}
+      />
     )}
     </>
   );

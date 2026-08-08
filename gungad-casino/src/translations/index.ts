@@ -49,7 +49,6 @@ export const translations = {
     instantCategory: 'Instant',
     arcadeCategory: 'Arcade',
     slotsCategory: 'Slots',
-    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Crash',
@@ -66,11 +65,11 @@ export const translations = {
     minesDesc: 'Uncover diamond safezones on a 5x5 minefield. Multipliers compound per tile!',
     plinkoName: 'Plinko Drop',
     plinkoDesc: 'Drop high-velocity balls down peg obstacles into extreme multiplier pockets.',
-    slotsName: 'Crimson Cascade',
-    slotsDesc: 'Cluster pays cascade slot. 8+ matching symbols form a winning cluster. Buy Bonus for instant Free Spins.',
+    slotsName: 'One-Armed Bandit',
+    slotsDesc: 'Classic 3-reel fruit machine. Match 777, BAR, grapes or lemons on the payline. Two in a row returns your stake.',
     slotsSpin: 'Spin',
     slotsSpinning: 'Spinning...',
-    slotsHint: '8+ matching symbols pay. Cascades tumble until wins stop. Buy Bonus for 10 Free Spins.',
+    slotsHint: '3 of a kind pays big. 2 matching left-to-right returns your bet.',
     slotsBuyBonus: 'Buy Bonus',
     slotsRetrigger: 'RETRIGGER',
     slotsPaytable: 'Paytable',
@@ -86,6 +85,8 @@ export const translations = {
     slotsFreeSpins: 'Free Spins',
     slotsMultiplier: 'Multiplier',
     slotsSpeedUp: 'Speed up',
+    slotsPairPay: 'Any 2 in a row (left)',
+    slotsBack: 'Back',
 
     // Common Game Controls
     betAmount: 'Bet Amount',
@@ -325,7 +326,6 @@ export const translations = {
     instantCategory: 'Быстрые',
     arcadeCategory: 'Аркады',
     slotsCategory: 'Слоты',
-    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Краш',
@@ -342,11 +342,11 @@ export const translations = {
     minesDesc: 'Открывай безопасные ячейки на поле 5x5. Множитель растет с каждым шагом!',
     plinkoName: 'Плинко Дроп',
     plinkoDesc: 'Запускай шары по колышкам в секторы с коэффициентами.',
-    slotsName: 'Crimson Cascade',
-    slotsDesc: 'Кластерный каскадный слот. 8+ одинаковых символов — выигрыш. Купи бонус — 10 фриспинов гарантировано.',
+    slotsName: 'Однорукий бандит',
+    slotsDesc: 'Классический 3-барабанный слот. Собери 777, BAR, виноград или лимоны на линии. Два в ряд — возврат ставки.',
     slotsSpin: 'Крутить',
     slotsSpinning: 'Крутим...',
-    slotsHint: '8+ символов в кластере — выигрыш. Купи бонус за 100× ставки — 10 фриспинов.',
+    slotsHint: '3 в ряд — выигрыш. 2 одинаковых слева направо — возврат ставки.',
     slotsBuyBonus: 'Купить бонус',
     slotsRetrigger: 'RETRIGGER',
     slotsPaytable: 'Таблица выплат',
@@ -362,6 +362,8 @@ export const translations = {
     slotsFreeSpins: 'Фриспины',
     slotsMultiplier: 'Множитель',
     slotsSpeedUp: 'Ускорить',
+    slotsPairPay: 'Любые 2 в ряд (слева)',
+    slotsBack: 'Назад',
 
     // Common Game Controls
     betAmount: 'Сумма ставки',
@@ -599,7 +601,6 @@ export const translations = {
     instantCategory: 'Швидкі',
     arcadeCategory: 'Аркади',
     slotsCategory: 'Слоти',
-    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Crash',
@@ -616,11 +617,11 @@ export const translations = {
     minesDesc: 'Відкривай безпечні осередки на полі 5x5. Множник зростає з кожним кроком!',
     plinkoName: 'Плінко Дроп',
     plinkoDesc: 'Запускай кулі по кілочках у сектори з коефіцієнтами.',
-    slotsName: 'Crimson Cascade',
-    slotsDesc: 'Кластерний каскадний слот. 8+ символів — виграш. Купи бонус — 10 фріспінів гарантовано.',
+    slotsName: 'Однорукий бандит',
+    slotsDesc: 'Класичний 3-барабанний слот. Збери 777, BAR, виноград або лимони на лінії. Два підряд — повернення ставки.',
     slotsSpin: 'Крутити',
     slotsSpinning: 'Крутимо...',
-    slotsHint: '8+ символів у кластері — виграш. Купи бонус за 100× ставки — 10 фріспінів.',
+    slotsHint: '3 підряд — виграш. 2 однакових зліва направо — повернення ставки.',
     slotsBuyBonus: 'Купити бонус',
     slotsRetrigger: 'RETRIGGER',
     slotsPaytable: 'Таблиця виплат',
@@ -636,6 +637,8 @@ export const translations = {
     slotsFreeSpins: 'Фріспіни',
     slotsMultiplier: 'Множник',
     slotsSpeedUp: 'Прискорити',
+    slotsPairPay: 'Будь-які 2 підряд (зліва)',
+    slotsBack: 'Назад',
 
     // Common Game Controls
     betAmount: 'Сума ставки',
@@ -873,7 +876,6 @@ export const translations = {
     instantCategory: 'Жылдам',
     arcadeCategory: 'Аркадалар',
     slotsCategory: 'Слоттар',
-    badge100x: '100X',
 
     // Game Titles & Descriptions
     crashName: 'Gun Crash',
@@ -890,11 +892,11 @@ export const translations = {
     minesDesc: '5x5 өрісінде қауіпсіз ұяшықтарды аш. Коэффициент сайын өседі!',
     plinkoName: 'Плинко Дроп',
     plinkoDesc: 'Шарларды экстрим коэффициенттері бар секторларға жібер.',
-    slotsName: 'Crimson Cascade',
-    slotsDesc: 'Кластерлі каскад слот. 8+ символ — ұтыс. Бонус сатып ал — 10 тегін айналдыру кепілді.',
+    slotsName: 'Бір қолды бандит',
+    slotsDesc: 'Классикалық 3 барабанды слот. 777, BAR, жүзім немесе лимон жина. Екі қатар — бәсті қайтару.',
     slotsSpin: 'Айналдыру',
     slotsSpinning: 'Айналуда...',
-    slotsHint: '8+ бірдей символ кластері ұтады. Бонус сатып ал 100× бәске — 10 тегін айналдыру.',
+    slotsHint: '3 бірдей — ұтыс. Солдан оңға 2 бірдей — бәсті қайтару.',
     slotsBuyBonus: 'Бонус сатып алу',
     slotsRetrigger: 'RETRIGGER',
     slotsPaytable: 'Төлем кестесі',
@@ -910,6 +912,8 @@ export const translations = {
     slotsFreeSpins: 'Тегін айналдырулар',
     slotsMultiplier: 'Мультипликатор',
     slotsSpeedUp: 'Жылдамдату',
+    slotsPairPay: 'Кез келген 2 қатар (солдан)',
+    slotsBack: 'Артқа',
 
     // Common Game Controls
     betAmount: 'Бәс сомасы',

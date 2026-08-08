@@ -44,3 +44,4 @@ temp/
 # Vercel / deploy caches
 .vercel
 gungad-casino/.vercel
+.env*

@@ -5,11 +5,13 @@ import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
+import { pickRouletteWinner, roulettePayoutMult } from '../../game/demoOdds';
 
 interface RouletteGameProps {
   user: UserProfile;
   currency: Currency;
   lang: any;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
 }
@@ -34,28 +36,28 @@ function getNumberColor(num: number) {
   return RED_NUMBERS.includes(num) ? 'red' : 'black';
 }
 
-function evalBet(bet: BetType, winner: number): { win: boolean; multiplier: number } {
+function evalBet(bet: BetType, winner: number, isDemo = false): { win: boolean; multiplier: number } {
   if (typeof bet === 'number') {
-    return { win: bet === winner, multiplier: 36 };
+    return { win: bet === winner, multiplier: roulettePayoutMult(36, isDemo) };
   }
-  if (bet === 'red')    return { win: RED_NUMBERS.includes(winner) && winner !== 0, multiplier: 2 };
-  if (bet === 'black')  return { win: !RED_NUMBERS.includes(winner) && winner !== 0, multiplier: 2 };
-  if (bet === 'zero')   return { win: winner === 0, multiplier: 36 };
-  if (bet === 'even')   return { win: winner !== 0 && winner % 2 === 0, multiplier: 2 };
-  if (bet === 'odd')    return { win: winner !== 0 && winner % 2 !== 0, multiplier: 2 };
-  if (bet === '1to18')  return { win: winner >= 1 && winner <= 18, multiplier: 2 };
-  if (bet === '19to36') return { win: winner >= 19 && winner <= 36, multiplier: 2 };
-  if (bet === '1stDozen') return { win: winner >= 1 && winner <= 12, multiplier: 3 };
-  if (bet === '2ndDozen') return { win: winner >= 13 && winner <= 24, multiplier: 3 };
-  if (bet === '3rdDozen') return { win: winner >= 25 && winner <= 36, multiplier: 3 };
-  if (bet === 'col1')   return { win: winner !== 0 && winner % 3 === 1, multiplier: 3 };
-  if (bet === 'col2')   return { win: winner !== 0 && winner % 3 === 2, multiplier: 3 };
-  if (bet === 'col3')   return { win: winner !== 0 && winner % 3 === 0, multiplier: 3 };
+  if (bet === 'red')    return { win: RED_NUMBERS.includes(winner) && winner !== 0, multiplier: roulettePayoutMult(2, isDemo) };
+  if (bet === 'black')  return { win: !RED_NUMBERS.includes(winner) && winner !== 0, multiplier: roulettePayoutMult(2, isDemo) };
+  if (bet === 'zero')   return { win: winner === 0, multiplier: roulettePayoutMult(36, isDemo) };
+  if (bet === 'even')   return { win: winner !== 0 && winner % 2 === 0, multiplier: roulettePayoutMult(2, isDemo) };
+  if (bet === 'odd')    return { win: winner !== 0 && winner % 2 !== 0, multiplier: roulettePayoutMult(2, isDemo) };
+  if (bet === '1to18')  return { win: winner >= 1 && winner <= 18, multiplier: roulettePayoutMult(2, isDemo) };
+  if (bet === '19to36') return { win: winner >= 19 && winner <= 36, multiplier: roulettePayoutMult(2, isDemo) };
+  if (bet === '1stDozen') return { win: winner >= 1 && winner <= 12, multiplier: roulettePayoutMult(3, isDemo) };
+  if (bet === '2ndDozen') return { win: winner >= 13 && winner <= 24, multiplier: roulettePayoutMult(3, isDemo) };
+  if (bet === '3rdDozen') return { win: winner >= 25 && winner <= 36, multiplier: roulettePayoutMult(3, isDemo) };
+  if (bet === 'col1')   return { win: winner !== 0 && winner % 3 === 1, multiplier: roulettePayoutMult(3, isDemo) };
+  if (bet === 'col2')   return { win: winner !== 0 && winner % 3 === 2, multiplier: roulettePayoutMult(3, isDemo) };
+  if (bet === 'col3')   return { win: winner !== 0 && winner % 3 === 0, multiplier: roulettePayoutMult(3, isDemo) };
   return { win: false, multiplier: 0 };
 }
 
 export const RouletteGame: React.FC<RouletteGameProps> = ({
-  user, currency, lang, onUpdateBalance, onAddHistory,
+  user, currency, lang, playMode = 'real', onUpdateBalance, onAddHistory,
 }) => {
   const [betAmountUSD, setBetAmountUSD] = useState<number>(10);
   const [placedBets, setPlacedBets] = useState<PlacedBet[]>([]);
@@ -66,14 +68,26 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const [spinDisplay, setSpinDisplay] = useState<number | null>(null);
   const [showNumbers, setShowNumbers] = useState<boolean>(false);
-  const spinRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const spinRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickSndRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (spinRef.current) clearTimeout(spinRef.current);
+      if (tickSndRef.current) clearInterval(tickSndRef.current);
+      if (settleRef.current) clearTimeout(settleRef.current);
+    };
+  }, []);
 
   const totalBetUSD = placedBets.reduce((s, b) => s + b.amountUSD, 0);
 
   const addBet = (type: BetType) => {
     if (isSpinning) return;
     if (placedBets.length >= MAX_BETS) return;
-    // Увеличить ставку, если такой тип уже есть
     setPlacedBets(prev => {
       const exists = prev.find(b => b.type === type);
       if (exists) return prev.map(b => b.type === type ? { ...b, amountUSD: b.amountUSD + betAmountUSD } : b);
@@ -94,6 +108,7 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
     const stakeUSD = totalBetUSD;
     const betsSnapshot = [...placedBets];
     const balanceAfterBet = user.balanceUSD - stakeUSD;
+    const isDemo = playMode === 'demo';
 
     soundFx.playClick();
     onUpdateBalance(balanceAfterBet);
@@ -102,28 +117,27 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
     setWinningNumber(null);
     setShowNumbers(true);
 
-    const winnerIndex = Math.floor(Math.random() * ROULETTE_NUMBERS.length);
-    const winnerNum = ROULETTE_NUMBERS[winnerIndex];
+    const winnerNum = pickRouletteWinner(ROULETTE_NUMBERS, isDemo);
+    const winnerIndex = ROULETTE_NUMBERS.indexOf(winnerNum);
 
-    // Центр выигрышного сектора должен оказаться строго под стрелкой (0°)
     const anglePerSeg = 360 / 37;
     const winnerCenterAngle = winnerIndex * anglePerSeg + anglePerSeg / 2;
     const targetMod = (360 - winnerCenterAngle) % 360;
     const currentMod = ((wheelRotation % 360) + 360) % 360;
     let delta = (targetMod - currentMod + 360) % 360;
-    delta += 360 * 6; // полные обороты для анимации
+    delta += 360 * 6;
     setWheelRotation(prev => prev + delta);
 
-    // Быстро пролетающие числа в центре
     let tickSpeed = 60;
     let numIdx = 0;
     const totalDuration = 4000;
     const startTime = Date.now();
 
     const tickNumbers = () => {
+      if (!mountedRef.current) return;
       const elapsed = Date.now() - startTime;
       const progress = elapsed / totalDuration;
-      tickSpeed = 60 + Math.pow(progress, 2) * 400; // замедление
+      tickSpeed = 60 + Math.pow(progress, 2) * 400;
 
       setSpinDisplay(ROULETTE_NUMBERS[numIdx % ROULETTE_NUMBERS.length]);
       numIdx++;
@@ -137,10 +151,17 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
     tickNumbers();
 
     let ticks = 0;
-    const tickSnd = setInterval(() => { soundFx.playSpinTick(); if (++ticks > 30) clearInterval(tickSnd); }, 110);
+    if (tickSndRef.current) clearInterval(tickSndRef.current);
+    tickSndRef.current = setInterval(() => {
+      soundFx.playSpinTick();
+      if (++ticks > 30 && tickSndRef.current) clearInterval(tickSndRef.current);
+    }, 110);
 
-    setTimeout(() => {
+    if (settleRef.current) clearTimeout(settleRef.current);
+    settleRef.current = setTimeout(() => {
       if (spinRef.current) clearTimeout(spinRef.current);
+      if (tickSndRef.current) clearInterval(tickSndRef.current);
+      if (!mountedRef.current) return;
       setIsSpinning(false);
       setShowNumbers(false);
       setSpinDisplay(null);
@@ -150,7 +171,7 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
       let totalPayout = 0;
       let anyWin = false;
       betsSnapshot.forEach(bet => {
-        const { win, multiplier } = evalBet(bet.type, winnerNum);
+        const { win, multiplier } = evalBet(bet.type, winnerNum, isDemo);
         if (win) { totalPayout += bet.amountUSD * multiplier; anyWin = true; }
       });
 

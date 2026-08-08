@@ -257,6 +257,7 @@ export default function App() {
   }, [isLive, session]);
 
   const handleSelectGame = useCallback((gameId: GameId) => {
+    soundFx.stopAllFx();
     soundFx.playClick();
     setActiveGameId(gameId);
     setActiveTab('game');
@@ -264,18 +265,24 @@ export default function App() {
   }, []);
 
   const handleExitSlots = useCallback(() => {
+    soundFx.stopAllFx();
     soundFx.playClick();
     setActiveGameId(null);
     setActiveTab('games');
   }, []);
 
+  useEffect(() => {
+    soundFx.stopAllFx();
+  }, [activeGameId]);
+
   const gameProps = useMemo(() => ({
     user,
     currency,
     lang,
+    playMode,
     onUpdateBalance: handleUpdateBalance,
     onAddHistory:    handleAddBetHistory,
-  }), [user, currency, lang, handleUpdateBalance, handleAddBetHistory]);
+  }), [user, currency, lang, playMode, handleUpdateBalance, handleAddBetHistory]);
 
   return (
     <>
@@ -304,7 +311,7 @@ export default function App() {
           activeTab={activeTab}
           activeGameId={activeGameId}
           onSelectTab={(tKey) => {
-            if (tKey === 'games') { setActiveGameId(null); setActiveTab('games'); }
+            if (tKey === 'games') { soundFx.stopAllFx(); setActiveGameId(null); setActiveTab('games'); }
             else if (tKey === 'crash') { handleSelectGame('crash'); }
           }}
         />
@@ -328,7 +335,7 @@ export default function App() {
               key={item.id}
               onClick={() => {
                 soundFx.playClick();
-                if (item.id === 'games') { setActiveGameId(null); setActiveTab('games'); }
+                if (item.id === 'games') { soundFx.stopAllFx(); setActiveGameId(null); setActiveTab('games'); }
                 else { handleSelectGame(item.id as GameId); }
               }}
               className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -368,7 +375,7 @@ export default function App() {
           {activeTab === 'game' && activeGameId && (
             <div className="flex items-center justify-between gap-2 shrink-0">
               <button
-                onClick={() => { soundFx.playClick(); setActiveTab('games'); setActiveGameId(null); }}
+                onClick={() => { soundFx.stopAllFx(); soundFx.playClick(); setActiveTab('games'); setActiveGameId(null); }}
                 className="px-3 py-1.5 bg-[#121217] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[11px] font-display font-bold uppercase rounded-lg flex items-center gap-1.5 transition-all"
               >
                 <ArrowLeft className="w-3.5 h-3.5 text-rose-500" />

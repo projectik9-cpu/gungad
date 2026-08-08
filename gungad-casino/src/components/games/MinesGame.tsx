@@ -6,11 +6,13 @@ import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
 import { Bomb, Diamond } from 'lucide-react';
+import { minesEdgeFactor } from '../../game/demoOdds';
 
 interface MinesGameProps {
   user: UserProfile;
   currency: Currency;
   lang: any;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
 }
@@ -24,6 +26,7 @@ export const MinesGame: React.FC<MinesGameProps> = ({
   user,
   currency,
   lang,
+  playMode = 'real',
   onUpdateBalance,
   onAddHistory,
 }) => {
@@ -41,7 +44,7 @@ export const MinesGame: React.FC<MinesGameProps> = ({
     for (let i = 0; i < gems; i++) {
       mult *= (25 - i) / (25 - minesCount - i);
     }
-    return parseFloat((mult * 0.99).toFixed(2)); // 1% house edge
+    return parseFloat((mult * minesEdgeFactor(playMode === 'demo')).toFixed(2));
   };
 
   const handleStartGame = () => {
@@ -79,9 +82,7 @@ export const MinesGame: React.FC<MinesGameProps> = ({
     setGrid(newGrid);
 
     if (tile.isMine) {
-      // Hit a mine!
       soundFx.playExplosion();
-      soundFx.playLoss();
       // Reveal all mines
       setGrid(newGrid.map((t) => (t.isMine ? { ...t, revealed: true } : t)));
       setGameState('game_over');

@@ -6,29 +6,19 @@ import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
 import { Flame, Rocket, History } from 'lucide-react';
+import { generateCrashPoint } from '../../game/demoOdds';
 
 interface CrashGameProps {
   user: UserProfile;
   currency: Currency;
   lang: any;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
 }
 
-// Генерируем честный crashPoint с house edge ~5%
-function generateCrashPoint(): number {
-  const rand = Math.random();
-  // Распределение: ~55% краш ниже 1.5x, ~75% ниже 2x, ~90% ниже 5x, ~97% ниже 10x
-  if (rand < 0.08) return parseFloat((1.00 + Math.random() * 0.04).toFixed(2));
-  if (rand < 0.55) return parseFloat((1.01 + Math.random() * 0.49).toFixed(2));
-  if (rand < 0.75) return parseFloat((1.5 + Math.random() * 0.5).toFixed(2));
-  if (rand < 0.90) return parseFloat((2.0 + Math.random() * 3.0).toFixed(2));
-  if (rand < 0.97) return parseFloat((5.0 + Math.random() * 5.0).toFixed(2));
-  return parseFloat((10.0 + Math.random() * 90.0).toFixed(2));
-}
-
 export const CrashGame: React.FC<CrashGameProps> = ({
-  user, currency, lang, onUpdateBalance, onAddHistory,
+  user, currency, lang, playMode = 'real', onUpdateBalance, onAddHistory,
 }) => {
   const [betAmountUSD, setBetAmountUSD] = useState<number>(10);
   // autoCashout по умолчанию пустой
@@ -42,21 +32,104 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const [countdown, setCountdown] = useState<number>(5);
   const [hasBet, setHasBet] = useState<boolean>(false);
 
+  const playModeRef = useRef(playMode);
+  useEffect(() => { playModeRef.current = playMode; }, [playMode]);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animRef = useRef<number | null>(null);
   const multiplierRef = useRef<number>(1.0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+  const hasBetRef = useRef(false);
+  const betRef = useRef(10);
+  const cashedOutRef = useRef(false);
+  const autoCashoutRef = useRef(autoCashout);
+  const userBalanceRef = useRef(user.balanceUSD);
 
-  // Перманентный цикл: waiting 5s -> running -> crashed -> waiting 5s -> ...
-  useEffect(() => {
-    startCountdown();
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
+  useEffect(() => { hasBetRef.current = hasBet; }, [hasBet]);
+  useEffect(() => { betRef.current = betAmountUSD; }, [betAmountUSD]);
+  useEffect(() => { autoCashoutRef.current = autoCashout; }, [autoCashout]);
+  useEffect(() => { userBalanceRef.current = user.balanceUSD; }, [user.balanceUSD]);
+
+  const clearLoopTimers = () => {
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    animRef.current = null;
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = null;
+    if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+    restartTimeoutRef.current = null;
+  };
+
+  const doWin = (winMult: number) => {
+    if (!mountedRef.current) return;
+    cashedOutRef.current = true;
+    setCashedMultiplier(winMult);
+    setGameState('cashed_out');
+    const payoutUSD = betRef.current * winMult;
+    onUpdateBalance(userBalanceRef.current + payoutUSD);
+    soundFx.playWin();
+    if (winMult >= 5) confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    onAddHistory({
+      id: String(Date.now()), gameId: 'crash', gameName: t('crashName', lang),
+      timestamp: new Date(), betAmountUSD: betRef.current,
+      multiplier: winMult, payoutUSD, win: true, currency,
+    });
+  };
+
+  const runRound = () => {
+    if (!mountedRef.current) return;
+    const cp = generateCrashPoint(playModeRef.current === 'demo');
+    setCrashPoint(cp);
+    cashedOutRef.current = false;
+    setGameState('running');
+
+    let current = 1.0;
+    const startTime = Date.now();
+
+    const tick = () => {
+      if (!mountedRef.current) return;
+      const elapsed = (Date.now() - startTime) / 1000;
+      current = parseFloat((1 + Math.pow(elapsed * 0.38, 1.65)).toFixed(2));
+      multiplierRef.current = current;
+      setMultiplier(current);
+
+      const acVal = parseFloat(autoCashoutRef.current);
+      if (!cashedOutRef.current && !isNaN(acVal) && acVal > 1.01 && current >= acVal && current < cp) {
+        doWin(current);
+      }
+
+      if (current >= cp) {
+        setHistory(prev => [cp, ...prev.slice(0, 9)]);
+        if (!cashedOutRef.current) {
+          setGameState('crashed');
+          if (hasBetRef.current) {
+            soundFx.playExplosion();
+            onAddHistory({
+              id: String(Date.now()), gameId: 'crash', gameName: t('crashName', lang),
+              timestamp: new Date(), betAmountUSD: betRef.current,
+              multiplier: 0, payoutUSD: 0, win: false, currency,
+            });
+          }
+        } else {
+          setGameState('crashed');
+        }
+        cashedOutRef.current = false;
+        if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = setTimeout(() => {
+          restartTimeoutRef.current = null;
+          startCountdown();
+        }, 2500);
+        return;
+      }
+
+      animRef.current = requestAnimationFrame(tick);
     };
-  }, []);
+    animRef.current = requestAnimationFrame(tick);
+  };
 
   const startCountdown = () => {
+    if (!mountedRef.current) return;
     setGameState('waiting');
     setMultiplier(1.0);
     multiplierRef.current = 1.0;
@@ -67,88 +140,28 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     let c = 5;
     if (countdownRef.current) clearInterval(countdownRef.current);
     countdownRef.current = setInterval(() => {
+      if (!mountedRef.current) {
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        return;
+      }
       c--;
       setCountdown(c);
       if (c <= 0) {
         if (countdownRef.current) clearInterval(countdownRef.current);
+        countdownRef.current = null;
         runRound();
       }
     }, 1000);
   };
 
-  const runRound = () => {
-    const cp = generateCrashPoint();
-    setCrashPoint(cp);
-    cashedOutRef.current = false;
-    setGameState('running');
-
-    let current = 1.0;
-    const startTime = Date.now();
-
-    const tick = () => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      current = parseFloat((1 + Math.pow(elapsed * 0.38, 1.65)).toFixed(2));
-      multiplierRef.current = current;
-      setMultiplier(current);
-
-      // auto cashout — only if player hasn't already cashed out
-      const acVal = parseFloat(autoCashout);
-      if (!cashedOutRef.current && !isNaN(acVal) && acVal > 1.01 && current >= acVal && current < cp) {
-        doWin(current);
-        // Don't return — rocket keeps flying
-      }
-
-      if (current >= cp) {
-        soundFx.playExplosion();
-        setHistory(prev => [cp, ...prev.slice(0, 9)]);
-        if (!cashedOutRef.current) {
-          // Player lost
-          soundFx.playLoss();
-          setGameState('crashed');
-          if (hasBetRef.current) {
-            onAddHistory({
-              id: String(Date.now()), gameId: 'crash', gameName: t('crashName', lang),
-              timestamp: new Date(), betAmountUSD: betRef.current,
-              multiplier: 0, payoutUSD: 0, win: false, currency,
-            });
-          }
-        } else {
-          // Player had already cashed out — show crash point briefly then restart
-          setGameState('crashed');
-        }
-        cashedOutRef.current = false;
-        setTimeout(startCountdown, 2500);
-        return;
-      }
-
-      animRef.current = requestAnimationFrame(tick);
+  useEffect(() => {
+    mountedRef.current = true;
+    startCountdown();
+    return () => {
+      mountedRef.current = false;
+      clearLoopTimers();
     };
-    animRef.current = requestAnimationFrame(tick);
-  };
-
-  // refs для доступа в closure
-  const hasBetRef = useRef(false);
-  const betRef = useRef(10);
-  const cashedOutRef = useRef(false); // player already cashed out this round
-  useEffect(() => { hasBetRef.current = hasBet; }, [hasBet]);
-  useEffect(() => { betRef.current = betAmountUSD; }, [betAmountUSD]);
-
-  const doWin = (winMult: number) => {
-    // DON'T cancel animation — rocket keeps flying until actual crash point
-    cashedOutRef.current = true;
-    setCashedMultiplier(winMult);
-    setGameState('cashed_out');
-    const payoutUSD = betRef.current * winMult;
-    onUpdateBalance(user.balanceUSD + payoutUSD);
-    soundFx.playWin();
-    if (winMult >= 5) confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-    onAddHistory({
-      id: String(Date.now()), gameId: 'crash', gameName: t('crashName', lang),
-      timestamp: new Date(), betAmountUSD: betRef.current,
-      multiplier: winMult, payoutUSD, win: true, currency,
-    });
-    // Round ends naturally when tick() reaches crashPoint
-  };
+  }, []);
 
   const handlePlaceBet = () => {
     if (gameState !== 'waiting') return;

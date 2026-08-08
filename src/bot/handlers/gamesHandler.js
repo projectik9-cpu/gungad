@@ -31,7 +31,7 @@ export async function gameCallbackHandler(ctx) {
     await ctx.answerCbQuery();
 
     const gameMessages = {
-      slots: '🎰 Crimson Cascade — каскадный слот уже в веб-приложении!',
+      slots: '🎰 Однорукий бандит — классический 3-барабанный слот уже в веб-приложении!',
       dice: '🎲 Кости уже в веб-приложении!',
       roulette: '🎡 Рулетка уже в веб-приложении!',
       blackjack: '🃏 Блэкджек уже в веб-приложении!',

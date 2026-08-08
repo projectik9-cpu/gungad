@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../../types';
 import { t } from '../../translations';
 import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
-import { Dices, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
+import { housePayoutFactor } from '../../game/demoOdds';
 
 interface DiceGameProps {
   user: UserProfile;
   currency: Currency;
   lang: any;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
 }
@@ -19,6 +21,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
   user,
   currency,
   lang,
+  playMode = 'real',
   onUpdateBalance,
   onAddHistory,
 }) => {
@@ -28,11 +31,21 @@ export const DiceGame: React.FC<DiceGameProps> = ({
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [lastRoll, setLastRoll] = useState<number | null>(null);
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
+  const mountedRef = useRef(true);
+  const timersRef = useRef<Array<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>>>([]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
+  }, []);
 
   // Win chance calculation
   const winChance = mode === 'over' ? 100 - targetValue : targetValue;
-  // Multiplier formula with 1% house edge
-  const multiplier = parseFloat((99 / winChance).toFixed(4));
+  const multiplier = parseFloat(((99 * housePayoutFactor(playMode === 'demo')) / winChance).toFixed(4));
   const potentialProfitUSD = betAmountUSD * (multiplier - 1);
 
   const handleRoll = () => {
@@ -45,14 +58,20 @@ export const DiceGame: React.FC<DiceGameProps> = ({
 
     let count = 0;
     const interval = setInterval(() => {
+      if (!mountedRef.current) {
+        clearInterval(interval);
+        return;
+      }
       soundFx.playSpinTick();
       setLastRoll(parseFloat((Math.random() * 100).toFixed(2)));
       count++;
       if (count > 12) clearInterval(interval);
     }, 60);
+    timersRef.current.push(interval);
 
-    setTimeout(() => {
+    const done = setTimeout(() => {
       clearInterval(interval);
+      if (!mountedRef.current) return;
       const finalRoll = parseFloat((Math.random() * 99.99).toFixed(2));
       setLastRoll(finalRoll);
       setIsRolling(false);
@@ -80,6 +99,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
         currency,
       });
     }, 800);
+    timersRef.current.push(done);
   };
 
   return (

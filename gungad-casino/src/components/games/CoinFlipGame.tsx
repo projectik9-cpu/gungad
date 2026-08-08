@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../../types';
 import { t } from '../../translations';
 import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import confetti from 'canvas-confetti';
 import { Target, Skull, AlertCircle } from 'lucide-react';
+import { coinFlipWinMult } from '../../game/demoOdds';
 
 interface CoinFlipGameProps {
   user: UserProfile;
   currency: Currency;
   lang: any;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
 }
@@ -18,24 +20,37 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
   user,
   currency,
   lang,
+  playMode = 'real',
   onUpdateBalance,
   onAddHistory,
 }) => {
   const [betAmountUSD, setBetAmountUSD] = useState<number>(10);
-  // null = сторона не выбрана
   const [choice, setChoice] = useState<'heads' | 'tails' | null>(null);
-  // сторона, зафиксированная на момент броска (не меняется после результата)
   const [playedChoice, setPlayedChoice] = useState<'heads' | 'tails' | null>(null);
   const [isFlipping, setIsFlipping] = useState<boolean>(false);
   const [result, setResult] = useState<'heads' | 'tails' | null>(null);
   const [rotation, setRotation] = useState<number>(0);
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const [showChoiceWarning, setShowChoiceWarning] = useState<boolean>(false);
+  const mountedRef = useRef(true);
+  const timersRef = useRef<Array<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>>>([]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
+  }, []);
+
+  const winMult = coinFlipWinMult(playMode === 'demo');
 
   const handleFlip = () => {
     if (choice === null) {
       setShowChoiceWarning(true);
-      setTimeout(() => setShowChoiceWarning(false), 3000);
+      const warn = setTimeout(() => setShowChoiceWarning(false), 3000);
+      timersRef.current.push(warn);
       return;
     }
     if (betAmountUSD <= 0 || betAmountUSD > user.balanceUSD || isFlipping) return;
@@ -60,18 +75,24 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
 
     let flips = 0;
     const interval = setInterval(() => {
+      if (!mountedRef.current) {
+        clearInterval(interval);
+        return;
+      }
       soundFx.playSpinTick();
       flips++;
       if (flips > 10) clearInterval(interval);
     }, 100);
+    timersRef.current.push(interval);
 
-    setTimeout(() => {
+    const done = setTimeout(() => {
       clearInterval(interval);
+      if (!mountedRef.current) return;
       setIsFlipping(false);
       setResult(outcome);
 
       const win = outcome === lockedChoice;
-      const multiplier = win ? 1.98 : 0;
+      const multiplier = win ? winMult : 0;
       const payoutUSD = win ? betAmountUSD * multiplier : 0;
 
       if (win) {
@@ -94,13 +115,13 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
         currency,
       });
     }, 1600);
+    timersRef.current.push(done);
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       <div className="lg:col-span-8 flex flex-col gap-4">
         <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-8 min-h-[380px] flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow">
-          {/* Choice Selector — блокируется во время броска и пока показан результат прошлого раунда */}
           <div className="flex gap-4 mb-8 z-10">
             <button
               onClick={() => {
@@ -108,7 +129,6 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
                 soundFx.playClick();
                 setChoice('heads');
                 setShowChoiceWarning(false);
-                // новый выбор = подготовка к следующему раунду
                 if (result) { setResult(null); setPlayedChoice(null); }
               }}
               disabled={isFlipping}
@@ -142,7 +162,6 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
             </button>
           </div>
 
-          {/* Предупреждение — выберите сторону */}
           {showChoiceWarning && (
             <div className="absolute top-4 left-4 right-4 z-30 flex items-center gap-2 bg-amber-950/90 border border-amber-600/60 text-amber-300 px-4 py-3 rounded-xl text-sm font-semibold animate-pulse">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -150,7 +169,6 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
             </div>
           )}
 
-          {/* 3D Coin */}
           <div
             className="w-44 h-44 md:w-52 md:h-52 rounded-full relative cursor-pointer transition-transform duration-[1600ms] ease-out shadow-[0_0_40px_rgba(225,29,72,0.5)]"
             style={{ transform: `rotateY(${rotation}deg)`, transformStyle: 'preserve-3d' }}
@@ -171,7 +189,7 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
           {result && playedChoice && !isFlipping && (
             <div className="mt-8 text-center animate-bounce">
               <span className="font-display font-black text-2xl md:text-3xl text-white uppercase">
-                {result === playedChoice ? `${t('playerWins', lang)} +1.98x` : t('dealerWins', lang)}
+                {result === playedChoice ? `${t('playerWins', lang)} +${winMult.toFixed(2)}x` : t('dealerWins', lang)}
               </span>
             </div>
           )}

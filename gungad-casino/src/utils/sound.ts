@@ -1,5 +1,6 @@
 class SoundController {
   private ctx: AudioContext | null = null;
+  private masterFx: GainNode | null = null;
   private isMuted: boolean = false;
   private musicMuted: boolean = false;
   private volume: number = 0.7;
@@ -25,10 +26,35 @@ class SoundController {
     if (this.ctx.state === 'suspended') {
       void this.ctx.resume();
     }
+    if (!this.masterFx && this.ctx) {
+      this.masterFx = this.ctx.createGain();
+      this.masterFx.gain.value = 1;
+      this.masterFx.connect(this.ctx.destination);
+    }
+  }
+
+  private fxOut(): AudioNode {
+    this.initCtx();
+    return this.masterFx ?? this.ctx!.destination;
   }
 
   private fxGain(): number {
     return this.isMuted ? 0 : this.volume;
+  }
+
+  /** Kill in-flight FX (e.g. when switching games). Music is untouched. */
+  public stopAllFx() {
+    if (!this.ctx || !this.masterFx) return;
+    try {
+      this.masterFx.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.masterFx.gain.setValueAtTime(0, this.ctx.currentTime);
+      this.masterFx.disconnect();
+    } catch {
+      // ignore
+    }
+    this.masterFx = this.ctx.createGain();
+    this.masterFx.gain.value = 1;
+    this.masterFx.connect(this.ctx.destination);
   }
 
   private getClickAudio(): HTMLAudioElement {
@@ -153,7 +179,7 @@ class SoundController {
     gain.gain.setValueAtTime(g, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.fxOut());
     osc.start();
     osc.stop(this.ctx.currentTime + 0.08);
   }
@@ -172,7 +198,7 @@ class SoundController {
       gain.gain.setValueAtTime(0.12 * this.volume, this.ctx.currentTime + idx * 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.08 + 0.25);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.fxOut());
       osc.start(this.ctx.currentTime + idx * 0.08);
       osc.stop(this.ctx.currentTime + idx * 0.08 + 0.25);
     });
@@ -192,7 +218,7 @@ class SoundController {
       gain.gain.setValueAtTime(0.15 * this.volume, this.ctx.currentTime + idx * 0.06);
       gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.06 + 0.4);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.fxOut());
       osc.start(this.ctx.currentTime + idx * 0.06);
       osc.stop(this.ctx.currentTime + idx * 0.06 + 0.4);
     });
@@ -210,7 +236,7 @@ class SoundController {
     gain.gain.setValueAtTime(0.2 * this.volume, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.fxOut());
     osc.start();
     osc.stop(this.ctx.currentTime + 0.35);
   }
@@ -226,7 +252,7 @@ class SoundController {
     gain.gain.setValueAtTime(0.08 * this.volume, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.03);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.fxOut());
     osc.start();
     osc.stop(this.ctx.currentTime + 0.03);
   }
@@ -243,7 +269,7 @@ class SoundController {
     gain.gain.setValueAtTime(0.12 * this.volume, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.07);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.fxOut());
     osc.start();
     osc.stop(this.ctx.currentTime + 0.07);
   }
@@ -267,8 +293,9 @@ class SoundController {
     gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
     whiteNoise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.fxOut());
     whiteNoise.start();
+    whiteNoise.stop(this.ctx.currentTime + 0.4);
   }
 
   public playGem() {
@@ -283,7 +310,7 @@ class SoundController {
     gain.gain.setValueAtTime(0.15 * this.volume, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.fxOut());
     osc.start();
     osc.stop(this.ctx.currentTime + 0.12);
   }

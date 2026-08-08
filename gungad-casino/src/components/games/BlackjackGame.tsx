@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../../types';
 import { t } from '../../translations';
 import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import confetti from 'canvas-confetti';
 import { Layers, Shield } from 'lucide-react';
+import { blackjackNaturalMult } from '../../game/demoOdds';
 
 interface BlackjackGameProps {
   user: UserProfile;
   currency: Currency;
   lang: any;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
 }
@@ -76,6 +78,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
   user,
   currency,
   lang,
+  playMode = 'real',
   onUpdateBalance,
   onAddHistory,
 }) => {
@@ -86,6 +89,26 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
   const [resultMessage, setResultMessage] = useState<string>('');
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const [dealStep, setDealStep] = useState<number>(0);
+  const mountedRef = useRef(true);
+  const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
+  }, []);
+
+  const trackTimeout = (fn: () => void, ms: number) => {
+    const id = setTimeout(() => {
+      if (!mountedRef.current) return;
+      fn();
+    }, ms);
+    timersRef.current.push(id);
+    return id;
+  };
 
   const playerScore = calculateHandScore(playerCards);
   const dealerScore = calculateHandScore(dealerCards);
@@ -96,6 +119,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
 
     const stakeUSD = betAmountUSD;
     const balanceAfterBet = user.balanceUSD - stakeUSD;
+    const naturalMult = blackjackNaturalMult(playMode === 'demo');
 
     soundFx.playCard();
     onUpdateBalance(balanceAfterBet);
@@ -106,17 +130,16 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
     const p1 = getRandomCard(true);
     const d1 = getRandomCard(true);
     const p2 = getRandomCard(true);
-    const d2 = getRandomCard(false); // скрытая карта дилера
+    const d2 = getRandomCard(false);
 
-    // Поочерёдная раздача с задержками
     setPlayerCards([]);
     setDealerCards([]);
     setDealStep(0);
 
-    setTimeout(() => { soundFx.playCard(); setPlayerCards([p1]); setDealStep(1); }, 300);
-    setTimeout(() => { soundFx.playCard(); setDealerCards([d1]); setDealStep(2); }, 700);
-    setTimeout(() => { soundFx.playCard(); setPlayerCards([p1, p2]); setDealStep(3); }, 1100);
-    setTimeout(() => {
+    trackTimeout(() => { soundFx.playCard(); setPlayerCards([p1]); setDealStep(1); }, 300);
+    trackTimeout(() => { soundFx.playCard(); setDealerCards([d1]); setDealStep(2); }, 700);
+    trackTimeout(() => { soundFx.playCard(); setPlayerCards([p1, p2]); setDealStep(3); }, 1100);
+    trackTimeout(() => {
       soundFx.playCard();
       setDealerCards([d1, d2]);
       setDealStep(4);
@@ -125,11 +148,11 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
       if (pScore === 21) {
         soundFx.playWin();
         confetti({ particleCount: 80, spread: 60 });
-        const payoutUSD = stakeUSD * 2.5;
+        const payoutUSD = stakeUSD * naturalMult;
         onUpdateBalance(balanceAfterBet + payoutUSD);
         setResultMessage(t('blackJackWin', lang));
         setGameState('game_over');
-        onAddHistory({ id: String(Date.now()), gameId: 'blackjack', gameName: t('blackjackName', lang), timestamp: new Date(), betAmountUSD: stakeUSD, multiplier: 2.5, payoutUSD, win: true, currency });
+        onAddHistory({ id: String(Date.now()), gameId: 'blackjack', gameName: t('blackjackName', lang), timestamp: new Date(), betAmountUSD: stakeUSD, multiplier: naturalMult, payoutUSD, win: true, currency });
       } else {
         setGameState('player_turn');
       }
@@ -219,14 +242,14 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
         currentDealer = [...currentDealer, next];
         dScore = calculateFullScore(currentDealer);
         setDealerCards([...currentDealer]);
-        setTimeout(dealerPlay, 600);
+        trackTimeout(dealerPlay, 600);
         return;
       }
 
       const pScore = calculateFullScore(playerHand);
       settleRound(pScore, dScore, stakeUSD, balanceAfterBet);
     };
-    setTimeout(dealerPlay, 500);
+    trackTimeout(dealerPlay, 500);
   };
 
   const visibleDealerScore = gameState === 'player_turn' ? calculateHandScore(dealerCards.filter(c => c.visible)) : dealerFullScore;

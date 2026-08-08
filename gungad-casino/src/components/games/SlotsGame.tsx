@@ -1,6 +1,5 @@
 /**
- * SlotsGame — Crimson Cascade fullscreen slot
- * Casino chrome is hidden by App while this overlay is open.
+ * SlotsGame — classic 3-reel One-Armed Bandit (fullscreen)
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
@@ -9,505 +8,240 @@ import { t } from '../../translations';
 import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import {
-  COLS,
-  ROWS,
-  PAYING,
-  DEFAULT_BET_INDEX,
   BET_PRESETS,
-  BUY_BONUS_COST_MULT,
-} from '../../game/slots/crimsonConfig';
-import {
-  CellState,
-  SpinRound,
-  playFullSpin,
-  playBoughtBonus,
-  FullSpinResult,
-} from '../../game/slots/crimsonEngine';
-
-import { GunGadPlayLoader } from '../slots/GunGadPlayLoader';
+  DEFAULT_BET_INDEX,
+  REELS,
+  SYMBOL_LABEL,
+  TRIPLE_PAY,
+  PAIR_PAY,
+  BanditSymbol,
+} from '../../game/slots/banditConfig';
+import { initialGrid, playSpin } from '../../game/slots/banditEngine';
 import { ReelGrid } from '../slots/ReelGrid';
 import { SlotBetBar } from '../slots/SlotBetBar';
-import { WinPanel } from '../slots/WinPanel';
-import { WinFlyLayer, useWinFlyLayer } from '../slots/WinFlyLayer';
-import { PaytableModal } from '../slots/PaytableModal';
-import { BuyBonusModal, BuyBonusStep } from '../slots/BuyBonusModal';
 
 interface SlotsGameProps {
   user: UserProfile;
   currency: Currency;
   lang: Language;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
   onClose: () => void;
 }
 
-function initGrid(): CellState[] {
-  return Array.from({ length: COLS * ROWS }, (_, i) => ({
-    symbol: PAYING[i % PAYING.length],
-  }));
-}
-
-/** Base / FS / turbo spin durations (first column; stagger added in ReelGrid) */
-const SPIN_MS = { base: 2600, fs: 3600, turbo: 700 };
-const STAGGER = 140;
-const COLS_N = 6;
+const SPIN_MS = 2200;
+const STAGGER = 180;
 
 export const SlotsGame: React.FC<SlotsGameProps> = ({
   user,
   currency,
   lang,
+  playMode = 'real',
   onUpdateBalance,
   onAddHistory,
   onClose,
 }) => {
-  const [loaded, setLoaded] = useState(false);
   const [betIndex, setBetIndex] = useState(DEFAULT_BET_INDEX);
-  const [grid, setGrid] = useState<CellState[]>(initGrid);
+  const [grid, setGrid] = useState<BanditSymbol[]>(() => initialGrid());
   const [spinning, setSpinning] = useState(false);
-  const [stoppedCols, setStoppedCols] = useState<Set<number>>(() => new Set([0, 1, 2, 3, 4, 5]));
-  const [winCells, setWinCells] = useState<Set<number>>(() => new Set());
-  const [explodeCells, setExplodeCells] = useState<Set<number>>(() => new Set());
-  const [spinDurationMs, setSpinDurationMs] = useState(SPIN_MS.base);
-
-  const [isFs, setIsFs] = useState(false);
-  const [fsLeft, setFsLeft] = useState(0);
-  const [fsTotal, setFsTotal] = useState(0);
-  const [bonusTotal, setBonusTotal] = useState(0);
-  const [currentWin, setCurrentWin] = useState(0);
-  const [multFactor, setMultFactor] = useState(1);
-
-  const [banner, setBanner] = useState<string | null>(null);
+  const [stoppedCols, setStoppedCols] = useState<Set<number>>(() => new Set([0, 1, 2]));
+  const [winLine, setWinLine] = useState(false);
+  const [lastWin, setLastWin] = useState(0);
   const [showPaytable, setShowPaytable] = useState(false);
-  const [buyStep, setBuyStep] = useState<BuyBonusStep>('none');
-  const [busyUi, setBusyUi] = useState(false);
-
-  const buyResultRef = useRef<FullSpinResult | null>(null);
   const busyRef = useRef(false);
-  const turboRef = useRef(false);
-  const skipRef = useRef(false);
-  const sleepResolvers = useRef<Array<() => void>>([]);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const { events: flyEvents, emit: emitFly, clear: clearFly, clearAll: clearAllFly } = useWinFlyLayer();
+  const mountedRef = useRef(true);
+  const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
   const bet = BET_PRESETS[betIndex];
 
-  /** Interruptible sleep — resolves early when skip/turbo is requested */
-  const sleep = useCallback((ms: number) => {
-    return new Promise<void>(resolve => {
-      if (skipRef.current || turboRef.current) {
-        // Turbo: short residual delay so UI still ticks
-        const short = Math.min(ms, turboRef.current ? Math.max(40, ms * 0.12) : 0);
-        if (short <= 0) {
-          resolve();
-          return;
-        }
-        ms = short;
-      }
-      let done = false;
-      const finish = () => {
-        if (done) return;
-        done = true;
-        sleepResolvers.current = sleepResolvers.current.filter(f => f !== finish);
-        resolve();
-      };
-      sleepResolvers.current.push(finish);
-      window.setTimeout(finish, ms);
-    });
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
   }, []);
 
-  const flushSkips = useCallback(() => {
-    const pending = [...sleepResolvers.current];
-    sleepResolvers.current = [];
-    pending.forEach(f => f());
+  const trackTimeout = useCallback((fn: () => void, ms: number) => {
+    const id = setTimeout(() => {
+      if (!mountedRef.current) return;
+      fn();
+    }, ms);
+    timersRef.current.push(id);
+    return id;
   }, []);
 
-  const resetFx = useCallback(() => {
-    setWinCells(new Set());
-    setExplodeCells(new Set());
-    setMultFactor(1);
-    setBanner(null);
-    clearAllFly();
-  }, [clearAllFly]);
+  const handleSpin = useCallback(() => {
+    if (busyRef.current) return;
+    if (bet > user.balanceUSD) return;
 
-  const showBannerFor = useCallback(async (text: string, ms = 1600) => {
-    setBanner(text);
-    await sleep(ms);
-    setBanner(null);
-  }, [sleep]);
-
-  const doReelSpin = useCallback(async (finalGrid: CellState[], mode: 'base' | 'fs') => {
-    resetFx();
-    setCurrentWin(0);
-
-    const duration = turboRef.current
-      ? SPIN_MS.turbo
-      : mode === 'fs'
-        ? SPIN_MS.fs
-        : SPIN_MS.base;
-    setSpinDurationMs(duration);
-
+    const balanceAfterBet = user.balanceUSD - bet;
+    busyRef.current = true;
+    soundFx.playClick();
+    onUpdateBalance(balanceAfterBet);
+    setWinLine(false);
+    setLastWin(0);
     setSpinning(true);
     setStoppedCols(new Set());
-    setGrid(finalGrid);
-    soundFx.playSpinTick();
 
-    const handles: number[] = [];
-    for (let col = 0; col < COLS_N; col++) {
-      const delay = duration + col * STAGGER;
-      handles.push(
-        window.setTimeout(() => {
-          soundFx.playSpinTick();
-          setStoppedCols(prev => {
-            const next = new Set(prev);
-            next.add(col);
-            return next;
-          });
-        }, turboRef.current ? Math.min(delay, 120 + col * 40) : delay),
-      );
+    const result = playSpin(bet, playMode === 'demo');
+
+    // Tick sounds while spinning
+    for (let i = 0; i < 12; i++) {
+      trackTimeout(() => soundFx.playSpinTick(), 80 + i * 120);
     }
 
-    const totalWait = turboRef.current
-      ? 120 + (COLS_N - 1) * 40 + 120
-      : duration + (COLS_N - 1) * STAGGER + 220;
+    setGrid(result.grid);
 
-    await sleep(totalWait);
-    handles.forEach(clearTimeout);
-
-    setStoppedCols(new Set([0, 1, 2, 3, 4, 5]));
-    setSpinning(false);
-    setGrid(finalGrid);
-  }, [resetFx, sleep]);
-
-  const animateCascade = useCallback(async (round: SpinRound, fsMode: boolean): Promise<number> => {
-    if (round.tumbles.length === 0) {
-      setGrid(round.finalGrid);
-      setWinCells(new Set());
-      setExplodeCells(new Set());
-      return round.appliedPay;
+    for (let col = 0; col < REELS; col++) {
+      trackTimeout(() => {
+        setStoppedCols(prev => new Set(prev).add(col));
+        soundFx.playSpinTick();
+      }, SPIN_MS + col * STAGGER);
     }
 
-    const winHold = () => (turboRef.current ? 120 : fsMode ? 1100 : 950);
-    const explodeHold = () => (turboRef.current ? 90 : fsMode ? 720 : 650);
+    const totalSpin = SPIN_MS + (REELS - 1) * STAGGER + 120;
+    trackTimeout(() => {
+      setSpinning(false);
+      setStoppedCols(new Set([0, 1, 2]));
+      busyRef.current = false;
 
-    for (const step of round.tumbles) {
-      setGrid(step.grid.map(c => ({ ...c })));
-      const wins = new Set(step.removed);
-      setWinCells(wins);
-      setExplodeCells(new Set());
-
-      if (step.stepPay > 0) {
-        const displayPay =
-          fsMode && round.multFactor > 1 ? step.stepPay * round.multFactor : step.stepPay;
-        emitFly(`+${formatCurrency(displayPay, currency)}`, 0.5, 0.45);
-      }
-
-      soundFx.playWin();
-      await sleep(winHold());
-
-      setExplodeCells(wins);
-      setWinCells(new Set());
-      soundFx.playExplosion();
-      await sleep(explodeHold());
-
-      setExplodeCells(new Set());
-      setCurrentWin(prev => prev + step.stepPay * (fsMode ? round.multFactor : 1));
-      await sleep(turboRef.current ? 20 : 80);
-    }
-
-    setGrid(round.finalGrid);
-    setWinCells(new Set());
-    setExplodeCells(new Set());
-
-    if (fsMode && round.multFactor > 1) {
-      setMultFactor(round.multFactor);
-      emitFly(`×${round.multFactor}`, 0.5, 0.3, true);
-      await sleep(turboRef.current ? 100 : 900);
-    }
-
-    return round.appliedPay;
-  }, [emitFly, currency, sleep]);
-
-  const runSpin = useCallback(async (precomputed?: FullSpinResult) => {
-    if (busyRef.current) return;
-    if (!precomputed && bet > user.balanceUSD) return;
-
-    busyRef.current = true;
-    setBusyUi(true);
-    turboRef.current = false;
-    skipRef.current = false;
-    soundFx.playClick();
-
-    const startBalance = user.balanceUSD;
-    const isBought = !!precomputed;
-    const cost = isBought ? bet * BUY_BONUS_COST_MULT : bet;
-
-    onUpdateBalance(startBalance - cost);
-
-    const result = precomputed ?? playFullSpin(bet);
-
-    setIsFs(false);
-    setCurrentWin(0);
-    setMultFactor(1);
-    setBonusTotal(0);
-    resetFx();
-
-    // Bought bonus: skip empty base spin — go straight to FS
-    if (!isBought) {
-      await doReelSpin(result.base.finalGrid, 'base');
-      await animateCascade(result.base, false);
-    }
-
-    if (result.freeSpins.length > 0) {
-      // Only show FS banner for natural triggers (buy already showed congrats modal)
-      if (!isBought && result.base.freeSpinsAwarded > 0) {
-        await showBannerFor(
-          `${result.base.freeSpinsAwarded} ${t('slotsFreeSpins', lang)}!`,
-          1600,
-        );
-      }
-
-      setIsFs(true);
-      setFsTotal(result.totalFreeSpinsPlayed);
-      let fsRemaining = result.freeSpins.length;
-
-      confetti({
-        particleCount: 60,
-        spread: 65,
-        colors: ['#e11d48', '#f43f5e', '#fbbf24'],
-        origin: { y: 0.55 },
-      });
-
-      let bonusAcc = 0;
-
-      for (let i = 0; i < result.freeSpins.length; i++) {
-        const round = result.freeSpins[i];
-        setFsLeft(Math.max(0, fsRemaining - i));
-        setCurrentWin(0);
-        setMultFactor(1);
-        resetFx();
-
-        await doReelSpin(round.finalGrid, 'fs');
-        const roundPay = await animateCascade(round, true);
-        bonusAcc += roundPay;
-        setBonusTotal(bonusAcc);
-
-        if (round.retriggered) {
-          await showBannerFor(`+5 ${t('slotsFreeSpins', lang)}!`, turboRef.current ? 400 : 1000);
-          fsRemaining += 5;
+      if (result.multiplier > 0) {
+        setWinLine(true);
+        setLastWin(result.payoutUSD);
+        onUpdateBalance(balanceAfterBet + result.payoutUSD);
+        if (result.kind === 'triple' && result.multiplier >= 8) {
+          soundFx.playBigWin();
+          confetti({ particleCount: 80, spread: 60 });
+        } else if (result.kind === 'triple') {
+          soundFx.playWin();
+        } else {
+          soundFx.playGem();
         }
-
-        await sleep(turboRef.current ? 80 : 400);
+      } else {
+        soundFx.playLoss();
       }
 
-      setFsLeft(0);
-      setIsFs(false);
-      if (bonusAcc > 0) setCurrentWin(bonusAcc);
-    }
-
-    const payout = result.totalPayoutUSD;
-    onUpdateBalance(startBalance - cost + payout);
-
-    onAddHistory({
-      id: String(Date.now()),
-      gameId: 'slots',
-      gameName: 'Crimson Cascade',
-      timestamp: new Date(),
-      betAmountUSD: cost,
-      multiplier: cost > 0 ? payout / cost : 0,
-      payoutUSD: payout,
-      win: payout > 0,
-      currency,
-    });
-
-    if (payout > cost * 10) {
-      soundFx.playBigWin();
-      confetti({ particleCount: 120, spread: 85, colors: ['#e11d48', '#fda4af', '#fbbf24'], origin: { y: 0.5 } });
-    } else if (payout > 0) {
-      soundFx.playWin();
-    } else {
-      soundFx.playLoss();
-    }
-
-    resetFx();
-    turboRef.current = false;
-    skipRef.current = false;
-    busyRef.current = false;
-    setBusyUi(false);
-  }, [
-    bet,
-    user.balanceUSD,
-    onUpdateBalance,
-    onAddHistory,
-    currency,
-    lang,
-    doReelSpin,
-    animateCascade,
-    showBannerFor,
-    sleep,
-    resetFx,
-  ]);
-
-  /** Idle = new spin; busy = enable turbo + skip current waits */
-  const handleSpinPress = useCallback(() => {
-    if (busyRef.current) {
-      turboRef.current = true;
-      skipRef.current = true;
-      setSpinDurationMs(SPIN_MS.turbo);
-      flushSkips();
-      soundFx.playClick();
-      return;
-    }
-    void runSpin();
-  }, [runSpin, flushSkips]);
-
-  const handleBuyBonusClick = () => {
-    if (busyRef.current || spinning) return;
-    if (bet * BUY_BONUS_COST_MULT > user.balanceUSD) return;
-    setBuyStep('confirm');
-  };
-
-  const handleBuyConfirm = () => {
-    const result = playBoughtBonus(bet);
-    buyResultRef.current = result;
-    setBuyStep('congrats');
-  };
-
-  const handleBuyContinue = () => {
-    setBuyStep('none');
-    if (buyResultRef.current) {
-      const r = buyResultRef.current;
-      buyResultRef.current = null;
-      void runSpin(r);
-    }
-  };
-
-  useEffect(() => () => {
-    busyRef.current = false;
-    flushSkips();
-  }, [flushSkips]);
-
-  if (!loaded) {
-    return <GunGadPlayLoader onDone={() => setLoaded(true)} />;
-  }
+      onAddHistory({
+        id: String(Date.now()),
+        gameId: 'slots',
+        gameName: t('slotsName', lang),
+        timestamp: new Date(),
+        betAmountUSD: bet,
+        multiplier: result.multiplier,
+        payoutUSD: result.payoutUSD,
+        win: result.multiplier > 0,
+        currency,
+      });
+    }, totalSpin);
+  }, [bet, user.balanceUSD, playMode, onUpdateBalance, onAddHistory, lang, currency, trackTimeout]);
 
   return (
-    <div
-      className="fixed inset-0 z-[250] flex flex-col overflow-hidden select-none"
-      style={{
-        height: '100dvh',
-        background: 'radial-gradient(ellipse at 50% 0%, #1a0510 0%, #06060a 60%)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}
-    >
-      {/* Compact title row */}
-      <div className="flex items-center justify-between px-2 sm:px-3 py-1.5 shrink-0">
+    <div className="fixed inset-0 z-[80] bg-[#07070a] flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-b border-zinc-900">
         <button
           type="button"
           onClick={onClose}
-          disabled={busyUi}
-          className="w-8 h-8 rounded-lg border border-zinc-700 bg-zinc-900/80 hover:border-rose-700 text-zinc-400 hover:text-white transition-all flex items-center justify-center disabled:opacity-40"
-          title="Back"
+          className="px-3 py-1.5 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-wider"
         >
-          <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none">
-            <path d="M17 10H5M11 4l-6 6 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          ← {t('slotsBack', lang)}
         </button>
-
-        <div className="font-display font-black uppercase tracking-wider text-xs sm:text-sm">
-          <span className="text-white">Crimson</span>{' '}
-          <span className="text-rose-500">Cascade</span>
+        <div className="text-center">
+          <h1 className="font-display font-black text-white text-sm sm:text-base tracking-wide uppercase">
+            {t('slotsName', lang)}
+          </h1>
+          <p className="text-[10px] text-zinc-500 font-mono">{t('slotsHint', lang)}</p>
         </div>
-
-        <div className="w-8" />
-      </div>
-
-      {/* Win panel — only when needed */}
-      <div className="shrink-0 px-2">
-        <WinPanel
-          currentWin={currentWin}
-          fsLeft={fsLeft}
-          fsTotal={fsTotal}
-          multFactor={multFactor}
-          bonusTotal={bonusTotal}
-          isFs={isFs}
-          currency={currency}
-          lang={lang}
-        />
-      </div>
-
-      {/* 16:9 reel stage — letterboxed on phone and desktop */}
-      <div className="flex-1 min-h-0 px-1.5 sm:px-4 py-1 flex items-center justify-center">
-        <div
-          className="relative w-full max-w-5xl"
-          style={{
-            aspectRatio: '16 / 9',
-            maxHeight: '100%',
-            width: 'min(100%, calc(100dvh * 16 / 9))',
-          }}
+        <button
+          type="button"
+          onClick={() => setShowPaytable(true)}
+          className="sm:hidden px-3 py-1.5 rounded-xl border border-zinc-800 text-zinc-400 text-[10px] font-bold uppercase"
         >
-          <div className="absolute inset-0">
-            <ReelGrid
-              grid={grid}
-              spinning={spinning}
-              stoppedCols={stoppedCols}
-              winCells={winCells}
-              explodeCells={explodeCells}
-              spinDurationMs={spinDurationMs}
-              gridRef={gridRef}
-            />
-            <WinFlyLayer events={flyEvents} onClear={clearFly} />
-
-            {banner && (
-              <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-                <div
-                  className="text-center px-4 py-3 rounded-2xl"
-                  style={{ background: 'rgba(6,6,10,0.88)', border: '1px solid rgba(225,29,72,0.4)' }}
-                >
-                  <div
-                    className="font-display font-black text-lg sm:text-2xl text-rose-400 uppercase tracking-widest"
-                    style={{ textShadow: '0 0 24px rgba(225,29,72,0.8)' }}
-                  >
-                    {banner}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+          {t('slotsPaytable', lang)}
+        </button>
+        <div className="hidden sm:block w-16" />
       </div>
 
-      {/* Bet bar — sits above safe area, no casino bottom nav */}
-      <div className="shrink-0 px-1.5 sm:px-3 pb-2 sm:pb-3 pt-1">
+      {/* Stage */}
+      <div className="flex-1 flex flex-col items-center justify-center px-3 sm:px-6 py-4 gap-4 min-h-0">
+        <div
+          className="w-full max-w-md rounded-2xl border border-rose-900/40 p-3 sm:p-4 shadow-2xl red-border-glow"
+          style={{ background: 'radial-gradient(ellipse at 50% 0%, #1a0a10 0%, #0a0a0d 55%)' }}
+        >
+          <ReelGrid
+            grid={grid}
+            spinning={spinning}
+            stoppedCols={stoppedCols}
+            winLine={winLine}
+            spinDurationMs={SPIN_MS}
+          />
+        </div>
+
+        {lastWin > 0 && !spinning && (
+          <div className="text-center animate-bounce">
+            <span className="font-display font-black text-2xl text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
+              +{formatCurrency(lastWin, currency)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Bet bar */}
+      <div className="px-2 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
         <SlotBetBar
           betIndex={betIndex}
           onChangeBetIndex={setBetIndex}
           balance={user.balanceUSD}
           currency={currency}
           lang={lang}
-          busy={busyUi}
+          busy={spinning || busyRef.current}
           spinning={spinning}
-          onSpin={handleSpinPress}
-          onBuyBonus={handleBuyBonusClick}
+          onSpin={handleSpin}
           onOpenPaytable={() => setShowPaytable(true)}
         />
       </div>
 
-      <PaytableModal
-        isOpen={showPaytable}
-        onClose={() => setShowPaytable(false)}
-        betUSD={bet}
-        currency={currency}
-      />
-
-      <BuyBonusModal
-        step={buyStep}
-        betUSD={bet}
-        currency={currency}
-        lang={lang}
-        onConfirm={handleBuyConfirm}
-        onCancel={() => setBuyStep('none')}
-        onContinue={handleBuyContinue}
-      />
+      {showPaytable && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setShowPaytable(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-zinc-700 bg-[#111115] p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-display font-bold text-white uppercase text-sm tracking-wide">
+                {t('slotsPaytable', lang)}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowPaytable(false)}
+                className="text-zinc-500 hover:text-white text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <ul className="space-y-2 text-sm">
+              {(Object.keys(TRIPLE_PAY) as BanditSymbol[]).map((s) => (
+                <li key={s} className="flex items-center justify-between bg-zinc-900/80 rounded-xl px-3 py-2 border border-zinc-800">
+                  <span className="font-bold text-zinc-200">
+                    {SYMBOL_LABEL[s]} × 3
+                  </span>
+                  <span className="font-mono font-bold text-rose-400">{TRIPLE_PAY[s]}x</span>
+                </li>
+              ))}
+              <li className="flex items-center justify-between bg-zinc-900/80 rounded-xl px-3 py-2 border border-zinc-800">
+                <span className="font-bold text-zinc-200">{t('slotsPairPay', lang)}</span>
+                <span className="font-mono font-bold text-amber-400">{PAIR_PAY}x</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

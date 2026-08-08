@@ -1,32 +1,27 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../../types';
 import { t } from '../../translations';
 import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import confetti from 'canvas-confetti';
+import { plinkoMultipliers } from '../../game/demoOdds';
 
 interface PlinkoGameProps {
   user: UserProfile;
   currency: Currency;
   lang: any;
+  playMode?: 'real' | 'demo';
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
 }
 
-// Ряды пирамиды: 8 рядов → 9 корзин (стандартный Plinko)
 const ROW_COUNT = 8;
-
-const MULTIPLIERS_MAP: Record<string, number[]> = {
-  // buckets = rows + 1
-  low:    [5.6, 2.1, 1.1, 1.0, 0.5, 1.0, 1.1, 2.1, 5.6],
-  medium: [13, 3, 1.3, 0.7, 0.4, 0.7, 1.3, 3, 13],
-  high:   [29, 4, 1.5, 0.3, 0.2, 0.3, 1.5, 4, 29],
-};
 
 export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   user,
   currency,
   lang,
+  playMode = 'real',
   onUpdateBalance,
   onAddHistory,
 }) => {
@@ -37,9 +32,20 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   const [lastMultiplier, setLastMultiplier] = useState<number | null>(null);
   const [hitBucket, setHitBucket] = useState<number | null>(null);
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
+  const mountedRef = useRef(true);
+  const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
-  const buckets = MULTIPLIERS_MAP[risk];
-  const BUCKET_COUNT = buckets.length; // = ROW_COUNT + 1
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
+  }, []);
+
+  const buckets = plinkoMultipliers(risk, playMode === 'demo');
+  const BUCKET_COUNT = buckets.length;
 
   // Пирамида: ряд i имеет (i+3) пегов, нижний ряд = BUCKET_COUNT
   // Старт с 3 пегов сверху → к низу расширяется
@@ -108,6 +114,7 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
 
     let step = 0;
     const advance = () => {
+      if (!mountedRef.current) return;
       if (step >= path.length) {
         setIsDropping(false);
         setBallPos(null);
@@ -137,10 +144,12 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
       soundFx.playSpinTick();
       setBallPos(path[step]);
       step++;
-      setTimeout(advance, 110);
+      const next = setTimeout(advance, 110);
+      timersRef.current.push(next);
     };
 
-    setTimeout(advance, 60);
+    const start = setTimeout(advance, 60);
+    timersRef.current.push(start);
   };
 
   return (

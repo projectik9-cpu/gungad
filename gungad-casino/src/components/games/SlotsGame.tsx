@@ -10,14 +10,12 @@ import { formatCurrency } from '../../utils/currencies';
 import {
   BET_PRESETS,
   DEFAULT_BET_INDEX,
-  REELS,
-  SYMBOL_LABEL,
   TRIPLE_PAY,
   PAIR_PAY,
   BanditSymbol,
 } from '../../game/slots/banditConfig';
-import { initialGrid, playSpin } from '../../game/slots/banditEngine';
-import { ReelGrid } from '../slots/ReelGrid';
+import { initialGrid, playSpin, SpinResult } from '../../game/slots/banditEngine';
+import { ReelGrid, SymbolFace } from '../slots/ReelGrid';
 import { SlotBetBar } from '../slots/SlotBetBar';
 
 interface SlotsGameProps {
@@ -30,8 +28,15 @@ interface SlotsGameProps {
   onClose: () => void;
 }
 
-const SPIN_MS = 2200;
-const STAGGER = 180;
+const SPIN_MS = 2600;
+const STAGGER = 220;
+
+const SYMBOL_NAME: Record<BanditSymbol, string> = {
+  seven: '777',
+  bar: 'BAR',
+  grape: 'Grape',
+  lemon: 'Lemon',
+};
 
 export const SlotsGame: React.FC<SlotsGameProps> = ({
   user,
@@ -44,34 +49,64 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
 }) => {
   const [betIndex, setBetIndex] = useState(DEFAULT_BET_INDEX);
   const [grid, setGrid] = useState<BanditSymbol[]>(() => initialGrid());
+  const [spinId, setSpinId] = useState(0);
   const [spinning, setSpinning] = useState(false);
-  const [stoppedCols, setStoppedCols] = useState<Set<number>>(() => new Set([0, 1, 2]));
   const [winLine, setWinLine] = useState(false);
   const [lastWin, setLastWin] = useState(0);
   const [showPaytable, setShowPaytable] = useState(false);
   const busyRef = useRef(false);
   const mountedRef = useRef(true);
-  const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const resultRef = useRef<SpinResult | null>(null);
+  const balanceAfterRef = useRef(0);
+  const betRef = useRef(BET_PRESETS[DEFAULT_BET_INDEX]);
 
   const bet = BET_PRESETS[betIndex];
+  betRef.current = bet;
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      timersRef.current.forEach(clearTimeout);
-      timersRef.current = [];
     };
   }, []);
 
-  const trackTimeout = useCallback((fn: () => void, ms: number) => {
-    const id = setTimeout(() => {
-      if (!mountedRef.current) return;
-      fn();
-    }, ms);
-    timersRef.current.push(id);
-    return id;
-  }, []);
+  const settle = useCallback(() => {
+    if (!mountedRef.current) return;
+    const result = resultRef.current;
+    if (!result) return;
+
+    setSpinning(false);
+    busyRef.current = false;
+
+    if (result.multiplier > 0) {
+      setWinLine(true);
+      setLastWin(result.payoutUSD);
+      onUpdateBalance(balanceAfterRef.current + result.payoutUSD);
+      if (result.kind === 'triple' && result.multiplier >= 8) {
+        soundFx.playBigWin();
+        confetti({ particleCount: 90, spread: 65 });
+      } else if (result.kind === 'triple') {
+        soundFx.playWin();
+      } else {
+        soundFx.playGem();
+      }
+    } else {
+      soundFx.playLoss();
+    }
+
+    onAddHistory({
+      id: String(Date.now()),
+      gameId: 'slots',
+      gameName: t('slotsName', lang),
+      timestamp: new Date(),
+      betAmountUSD: betRef.current,
+      multiplier: result.multiplier,
+      payoutUSD: result.payoutUSD,
+      win: result.multiplier > 0,
+      currency,
+    });
+    resultRef.current = null;
+  }, [onUpdateBalance, onAddHistory, lang, currency]);
 
   const handleSpin = useCallback(() => {
     if (busyRef.current) return;
@@ -81,67 +116,33 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
     busyRef.current = true;
     soundFx.playClick();
     onUpdateBalance(balanceAfterBet);
+    balanceAfterRef.current = balanceAfterBet;
     setWinLine(false);
     setLastWin(0);
     setSpinning(true);
-    setStoppedCols(new Set());
 
     const result = playSpin(bet, playMode === 'demo');
-
-    // Tick sounds while spinning
-    for (let i = 0; i < 12; i++) {
-      trackTimeout(() => soundFx.playSpinTick(), 80 + i * 120);
-    }
-
+    resultRef.current = result;
+    // Lock final grid BEFORE bumping spinId so reels read the correct strip
     setGrid(result.grid);
+    setSpinId((id) => id + 1);
+  }, [bet, user.balanceUSD, playMode, onUpdateBalance]);
 
-    for (let col = 0; col < REELS; col++) {
-      trackTimeout(() => {
-        setStoppedCols(prev => new Set(prev).add(col));
-        soundFx.playSpinTick();
-      }, SPIN_MS + col * STAGGER);
-    }
-
-    const totalSpin = SPIN_MS + (REELS - 1) * STAGGER + 120;
-    trackTimeout(() => {
-      setSpinning(false);
-      setStoppedCols(new Set([0, 1, 2]));
-      busyRef.current = false;
-
-      if (result.multiplier > 0) {
-        setWinLine(true);
-        setLastWin(result.payoutUSD);
-        onUpdateBalance(balanceAfterBet + result.payoutUSD);
-        if (result.kind === 'triple' && result.multiplier >= 8) {
-          soundFx.playBigWin();
-          confetti({ particleCount: 80, spread: 60 });
-        } else if (result.kind === 'triple') {
-          soundFx.playWin();
-        } else {
-          soundFx.playGem();
-        }
-      } else {
-        soundFx.playLoss();
-      }
-
-      onAddHistory({
-        id: String(Date.now()),
-        gameId: 'slots',
-        gameName: t('slotsName', lang),
-        timestamp: new Date(),
-        betAmountUSD: bet,
-        multiplier: result.multiplier,
-        payoutUSD: result.payoutUSD,
-        win: result.multiplier > 0,
-        currency,
-      });
-    }, totalSpin);
-  }, [bet, user.balanceUSD, playMode, onUpdateBalance, onAddHistory, lang, currency, trackTimeout]);
+  const handleReelStop = useCallback((_col: number) => {
+    soundFx.playSpinTick();
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[80] bg-[#07070a] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-b border-zinc-900">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 20%, rgba(225,29,72,0.25), transparent 55%), radial-gradient(ellipse at 80% 80%, rgba(251,191,36,0.08), transparent 40%)',
+        }}
+      />
+
+      <div className="relative flex items-center justify-between px-3 sm:px-5 py-3 border-b border-zinc-900/80">
         <button
           type="button"
           onClick={onClose}
@@ -150,7 +151,7 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
           ← {t('slotsBack', lang)}
         </button>
         <div className="text-center">
-          <h1 className="font-display font-black text-white text-sm sm:text-base tracking-wide uppercase">
+          <h1 className="font-display font-black text-white text-sm sm:text-base tracking-wide uppercase drop-shadow-[0_0_12px_rgba(225,29,72,0.45)]">
             {t('slotsName', lang)}
           </h1>
           <p className="text-[10px] text-zinc-500 font-mono">{t('slotsHint', lang)}</p>
@@ -165,32 +166,29 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
         <div className="hidden sm:block w-16" />
       </div>
 
-      {/* Stage */}
-      <div className="flex-1 flex flex-col items-center justify-center px-3 sm:px-6 py-4 gap-4 min-h-0">
-        <div
-          className="w-full max-w-md rounded-2xl border border-rose-900/40 p-3 sm:p-4 shadow-2xl red-border-glow"
-          style={{ background: 'radial-gradient(ellipse at 50% 0%, #1a0a10 0%, #0a0a0d 55%)' }}
-        >
+      <div className="relative flex-1 flex flex-col items-center justify-center px-3 sm:px-6 py-4 gap-4 min-h-0">
+        <div className="w-full max-w-lg">
           <ReelGrid
             grid={grid}
-            spinning={spinning}
-            stoppedCols={stoppedCols}
+            spinId={spinId}
             winLine={winLine}
             spinDurationMs={SPIN_MS}
+            staggerMs={STAGGER}
+            onReelStop={handleReelStop}
+            onSpinComplete={settle}
           />
         </div>
 
         {lastWin > 0 && !spinning && (
           <div className="text-center animate-bounce">
-            <span className="font-display font-black text-2xl text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
+            <span className="font-display font-black text-2xl sm:text-3xl text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
               +{formatCurrency(lastWin, currency)}
             </span>
           </div>
         )}
       </div>
 
-      {/* Bet bar */}
-      <div className="px-2 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
+      <div className="relative px-2 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">
         <SlotBetBar
           betIndex={betIndex}
           onChangeBetIndex={setBetIndex}
@@ -227,10 +225,18 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
             </div>
             <ul className="space-y-2 text-sm">
               {(Object.keys(TRIPLE_PAY) as BanditSymbol[]).map((s) => (
-                <li key={s} className="flex items-center justify-between bg-zinc-900/80 rounded-xl px-3 py-2 border border-zinc-800">
-                  <span className="font-bold text-zinc-200">
-                    {SYMBOL_LABEL[s]} × 3
-                  </span>
+                <li
+                  key={s}
+                  className="flex items-center justify-between bg-zinc-900/80 rounded-xl px-3 py-2 border border-zinc-800 gap-3"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-10 h-10 shrink-0">
+                      <SymbolFace symbol={s} />
+                    </div>
+                    <span className="font-bold text-zinc-200 truncate">
+                      {SYMBOL_NAME[s]} × 3
+                    </span>
+                  </div>
                   <span className="font-mono font-bold text-rose-400">{TRIPLE_PAY[s]}x</span>
                 </li>
               ))}

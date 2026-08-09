@@ -17,6 +17,19 @@ interface PlinkoGameProps {
 
 const ROW_COUNT = 8;
 
+interface Ball {
+  id: number;
+  x: number;
+  y: number;
+  squash: boolean;
+}
+
+interface Ripple {
+  id: number;
+  x: number;
+  y: number;
+}
+
 export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   user,
   currency,
@@ -27,13 +40,21 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
 }) => {
   const [betAmountUSD, setBetAmountUSD] = useState<number>(10);
   const [risk, setRisk] = useState<'low' | 'medium' | 'high'>('medium');
-  const [isDropping, setIsDropping] = useState<boolean>(false);
-  const [ballPos, setBallPos] = useState<{ x: number; y: number } | null>(null);
+  const [balls, setBalls] = useState<Ball[]>([]);
+  const [ripples, setRipples] = useState<Ripple[]>([]);
   const [lastMultiplier, setLastMultiplier] = useState<number | null>(null);
-  const [hitBucket, setHitBucket] = useState<number | null>(null);
+  const [hitBuckets, setHitBuckets] = useState<Record<number, number>>({});
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const mountedRef = useRef(true);
   const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const ballIdRef = useRef(0);
+  const rippleIdRef = useRef(0);
+  const balanceRef = useRef(user.balanceUSD);
+  const bucketsRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    balanceRef.current = user.balanceUSD;
+  }, [user.balanceUSD]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -45,18 +66,15 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   }, []);
 
   const buckets = plinkoMultipliers(risk, playMode === 'demo');
+  bucketsRef.current = buckets;
   const BUCKET_COUNT = buckets.length;
 
-  // Пирамида: ряд i имеет (i+3) пегов, нижний ряд = BUCKET_COUNT
-  // Старт с 3 пегов сверху → к низу расширяется
   const pegRows = useMemo(() => {
     return Array.from({ length: ROW_COUNT }, (_, i) => 3 + i);
   }, []);
 
-  // Фиксированный шаг между пегами (% от ширины нижней строки)
-  // Нижний ряд занимает ~92% ширины, пеги равномерно
   const bottomPegs = pegRows[pegRows.length - 1];
-  const pegStep = 92 / (bottomPegs - 1); // % между соседними пегами
+  const pegStep = 92 / (bottomPegs - 1);
   const boardCenter = 50;
 
   const getPegX = (rowIdx: number, pegIdx: number) => {
@@ -67,72 +85,79 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   };
 
   const getRowY = (rowIdx: number) => {
-    // пеги занимают от 6% до 82% высоты (под корзины оставляем низ)
     return 6 + (rowIdx / (ROW_COUNT - 1)) * 76;
   };
 
+  const spawnRipple = (x: number, y: number) => {
+    const id = ++rippleIdRef.current;
+    setRipples((prev) => [...prev, { id, x, y }]);
+    const t = setTimeout(() => {
+      if (!mountedRef.current) return;
+      setRipples((prev) => prev.filter((r) => r.id !== id));
+    }, 420);
+    timersRef.current.push(t);
+  };
+
   const handleDrop = () => {
-    if (betAmountUSD <= 0 || betAmountUSD > user.balanceUSD || isDropping) return;
+    if (betAmountUSD <= 0 || betAmountUSD > balanceRef.current) return;
+
+    const stake = betAmountUSD;
+    const riskBuckets = bucketsRef.current;
 
     soundFx.playClick();
-    onUpdateBalance(user.balanceUSD - betAmountUSD);
-    setLastBetUSD(betAmountUSD);
-    setIsDropping(true);
-    setLastMultiplier(null);
-    setHitBucket(null);
+    const afterBet = balanceRef.current - stake;
+    balanceRef.current = afterBet;
+    onUpdateBalance(afterBet);
+    setLastBetUSD(stake);
 
-    // Путь: стартуем с центра, на каждом ряду +1 (вправо) или 0 (влево)
-    // bucketIndex = число смещений вправо (0..ROW_COUNT)
+    const id = ++ballIdRef.current;
     let rights = 0;
-    const path: { x: number; y: number }[] = [];
-
-    // Старт над вершиной
-    path.push({ x: boardCenter, y: 2 });
+    const path: { x: number; y: number; peg?: boolean }[] = [];
+    path.push({ x: boardCenter, y: 2, peg: false });
 
     for (let r = 0; r < ROW_COUNT; r++) {
       const goRight = Math.random() < 0.5;
       if (goRight) rights++;
-      // На ряду r позиция пега = rights (смещения вправо) среди count пегов
-      // После r+1 решений позиция относительно центра ряда
-      const pegIdx = Math.min(rights, pegRows[r] - 1);
-      // Интерполируем между пегами с учётом накопленных rights
-      // Проще: x = центр_ряда + (rights - r/2) * pegStep
       const count = pegRows[r];
       const rowWidth = pegStep * (count - 1);
       const startX = boardCenter - rowWidth / 2;
-      // позиция после r решений: rights вправо из (r+1) возможных
       const idx = Math.min(Math.max(0, rights), count - 1);
       const x = startX + idx * pegStep;
       const y = getRowY(r);
-      path.push({ x, y });
+      path.push({ x, y, peg: true });
     }
 
-    // Финальная корзина
     const bucketIndex = Math.max(0, Math.min(BUCKET_COUNT - 1, rights));
     const bucketX = (100 / BUCKET_COUNT) * (bucketIndex + 0.5);
-    path.push({ x: bucketX, y: 92 });
+    path.push({ x: bucketX, y: 92, peg: false });
+
+    setBalls((prev) => [...prev, { id, x: path[0].x, y: path[0].y, squash: false }]);
 
     let step = 0;
     const advance = () => {
       if (!mountedRef.current) return;
+
       if (step >= path.length) {
-        setIsDropping(false);
-        setBallPos(null);
-        setHitBucket(bucketIndex);
+        setBalls((prev) => prev.filter((b) => b.id !== id));
+        setHitBuckets((prev) => ({ ...prev, [bucketIndex]: Date.now() }));
+        setLastMultiplier(riskBuckets[bucketIndex]);
 
-        const winMult = buckets[bucketIndex];
-        setLastMultiplier(winMult);
-        const payoutUSD = betAmountUSD * winMult;
+        const winMult = riskBuckets[bucketIndex];
+        const payoutUSD = stake * winMult;
 
-        if (winMult >= 5) confetti({ particleCount: 60, spread: 60 });
+        if (winMult >= 5) confetti({ particleCount: 50, spread: 55 });
         soundFx[winMult > 1.0 ? 'playWin' : 'playLoss']();
-        onUpdateBalance(user.balanceUSD - betAmountUSD + payoutUSD);
+
+        const nextBal = balanceRef.current + payoutUSD;
+        balanceRef.current = nextBal;
+        onUpdateBalance(nextBal);
+
         onAddHistory({
-          id: String(Date.now()),
+          id: String(Date.now()) + '-' + id,
           gameId: 'plinko',
           gameName: t('plinkoName', lang),
           timestamp: new Date(),
-          betAmountUSD,
+          betAmountUSD: stake,
           multiplier: winMult,
           payoutUSD,
           win: winMult >= 1.0,
@@ -141,20 +166,39 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
         return;
       }
 
-      soundFx.playSpinTick();
-      setBallPos(path[step]);
+      const pt = path[step];
+      if (pt.peg) {
+        soundFx.playChip();
+        spawnRipple(pt.x, pt.y);
+        setBalls((prev) =>
+          prev.map((b) => (b.id === id ? { ...b, x: pt.x, y: pt.y, squash: true } : b)),
+        );
+        const unsquash = setTimeout(() => {
+          if (!mountedRef.current) return;
+          setBalls((prev) =>
+            prev.map((b) => (b.id === id ? { ...b, squash: false } : b)),
+          );
+        }, 90);
+        timersRef.current.push(unsquash);
+      } else {
+        setBalls((prev) =>
+          prev.map((b) => (b.id === id ? { ...b, x: pt.x, y: pt.y, squash: false } : b)),
+        );
+      }
+
       step++;
-      const next = setTimeout(advance, 110);
+      const next = setTimeout(advance, 105);
       timersRef.current.push(next);
     };
 
-    const start = setTimeout(advance, 60);
+    const start = setTimeout(advance, 40);
     timersRef.current.push(start);
   };
 
+  const activeHits = hitBuckets;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-      {/* Controls first on mobile so bet is visible without scrolling */}
       <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
         <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2.5 flex flex-col gap-1.5">
           <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{t('riskLevel', lang)}</label>
@@ -163,7 +207,6 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
               <button
                 key={r}
                 onClick={() => { soundFx.playClick(); setRisk(r); }}
-                disabled={isDropping}
                 className={`py-1.5 text-[11px] font-bold rounded-lg border transition-all ${
                   risk === r
                     ? r === 'low' ? 'bg-emerald-950 border-emerald-600 text-emerald-400'
@@ -184,11 +227,11 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
           userBalanceUSD={user.balanceUSD}
           currency={currency}
           lang={lang}
-          disabled={isDropping}
+          disabled={false}
           lastBetUSD={lastBetUSD}
-          actionButtonLabel={isDropping ? '...' : t('dropBall', lang)}
+          actionButtonLabel={t('dropBall', lang)}
           onAction={handleDrop}
-          actionDisabled={isDropping || betAmountUSD > user.balanceUSD}
+          actionDisabled={betAmountUSD > user.balanceUSD || betAmountUSD <= 0}
           compact
         />
       </div>
@@ -214,17 +257,26 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
             )}
           </div>
 
-          {ballPos && (
+          {ripples.map((r) => (
             <div
-              className="absolute w-3 h-3 rounded-full bg-rose-500 border border-white shadow-[0_0_12px_rgba(225,29,72,1)] z-20"
+              key={r.id}
+              className="plinko-ripple absolute z-[15] pointer-events-none"
+              style={{ left: `${r.x}%`, top: `${r.y}%` }}
+            />
+          ))}
+
+          {balls.map((b) => (
+            <div
+              key={b.id}
+              className="absolute w-3.5 h-3.5 rounded-full bg-rose-500 border border-white shadow-[0_0_12px_rgba(225,29,72,1)] z-20"
               style={{
-                left: `${ballPos.x}%`,
-                top: `${ballPos.y}%`,
-                transform: 'translate(-50%, -50%)',
-                transition: 'left 100ms linear, top 100ms linear',
+                left: `${b.x}%`,
+                top: `${b.y}%`,
+                transform: `translate(-50%, -50%) scale(${b.squash ? '1.35, 0.75' : '1, 1'})`,
+                transition: 'left 95ms linear, top 95ms linear, transform 80ms ease-out',
               }}
             />
-          )}
+          ))}
 
           <div
             className="absolute bottom-1 z-10 flex"
@@ -233,24 +285,27 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
               width: `${pegStep * bottomPegs}%`,
             }}
           >
-            {buckets.map((m, idx) => (
-              <div
-                key={idx}
-                className={`flex-1 mx-px h-7 flex items-center justify-center font-mono font-bold text-[9px] rounded-t-md transition-all ${
-                  hitBucket === idx
-                    ? 'bg-yellow-400 text-black scale-105'
-                    : m >= 10
-                    ? 'bg-rose-600 text-white'
-                    : m >= 2
-                    ? 'bg-rose-800/80 text-rose-200'
-                    : m >= 1
-                    ? 'bg-zinc-700 text-zinc-200'
-                    : 'bg-zinc-900 text-zinc-500'
-                }`}
-              >
-                {m}x
-              </div>
-            ))}
+            {buckets.map((m, idx) => {
+              const recentlyHit = activeHits[idx] && Date.now() - activeHits[idx] < 600;
+              return (
+                <div
+                  key={idx}
+                  className={`flex-1 mx-px h-7 flex items-center justify-center font-mono font-bold text-[9px] rounded-t-md transition-all ${
+                    recentlyHit
+                      ? 'bg-yellow-400 text-black scale-105'
+                      : m >= 10
+                      ? 'bg-rose-600 text-white'
+                      : m >= 2
+                      ? 'bg-rose-800/80 text-rose-200'
+                      : m >= 1
+                      ? 'bg-zinc-700 text-zinc-200'
+                      : 'bg-zinc-900 text-zinc-500'
+                  }`}
+                >
+                  {m}x
+                </div>
+              );
+            })}
           </div>
         </div>
 

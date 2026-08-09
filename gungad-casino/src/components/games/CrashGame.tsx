@@ -90,7 +90,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     const tick = () => {
       if (!mountedRef.current) return;
       const elapsed = (Date.now() - startTime) / 1000;
-      current = parseFloat((1 + Math.pow(elapsed * 0.38, 1.65)).toFixed(2));
+      current = parseFloat((1 + Math.pow(elapsed * (0.38 / 1.15), 1.65)).toFixed(2));
       multiplierRef.current = current;
       setMultiplier(current);
 

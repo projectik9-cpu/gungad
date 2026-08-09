@@ -46,8 +46,8 @@ export const DEMO_WEIGHTS: Record<BanditSymbol, number> = {
 export const SYMBOL_LABEL: Record<BanditSymbol, string> = {
   seven: '777',
   bar: 'BAR',
-  grape: '🍇',
-  lemon: '🍋',
+  grape: 'Grape',
+  lemon: 'Lemon',
 };
 
 export const SYMBOL_COLOR: Record<BanditSymbol, string> = {

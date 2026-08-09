@@ -136,17 +136,16 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
     const tickNumbers = () => {
       if (!mountedRef.current) return;
       const elapsed = Date.now() - startTime;
+      if (elapsed >= totalDuration - 300) {
+        setSpinDisplay(winnerNum);
+        return;
+      }
       const progress = elapsed / totalDuration;
       tickSpeed = 60 + Math.pow(progress, 2) * 400;
 
       setSpinDisplay(ROULETTE_NUMBERS[numIdx % ROULETTE_NUMBERS.length]);
       numIdx++;
-
-      if (elapsed < totalDuration - 300) {
-        spinRef.current = setTimeout(tickNumbers, tickSpeed);
-      } else {
-        setSpinDisplay(winnerNum);
-      }
+      spinRef.current = setTimeout(tickNumbers, tickSpeed);
     };
     tickNumbers();
 

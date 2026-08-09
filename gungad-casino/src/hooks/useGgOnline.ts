@@ -1,6 +1,6 @@
 /**
  * useGgOnline — real online player count via Railway API (service_role),
- * sends heartbeat every 15s. No direct anon Supabase read (RLS broke the view).
+ * sends heartbeat every 15s. Presence is independent of demo/real play mode.
  */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type { GgGameId } from '../types/database';
@@ -15,22 +15,29 @@ export function useGgOnline(
   activeGameId: GgGameId | null,
   isLive: boolean,
 ): number {
-  // Start at 1 when live (at least yourself), 0 until first poll otherwise
   const [onlineCount, setOnlineCount] = useState<number>(isLive ? 1 : 0);
   const heartbeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const liveRef = useRef(isLive);
+  liveRef.current = isLive;
+
+  const applyCount = useCallback((n: number) => {
+    // While live with a profile, never display below yourself
+    const floor = liveRef.current && profileId ? 1 : 0;
+    setOnlineCount(Math.max(floor, n));
+  }, [profileId]);
 
   const fetchOnline = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/heartbeat/online`);
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok && typeof json.online_count === 'number') {
-        setOnlineCount(Math.max(0, json.online_count));
+        applyCount(json.online_count);
       }
     } catch {
       // keep last known
     }
-  }, []);
+  }, [applyCount]);
 
   const sendHeartbeat = useCallback(async () => {
     if (!profileId) return;
@@ -46,12 +53,15 @@ export function useGgOnline(
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok && typeof json.online_count === 'number') {
-        setOnlineCount(Math.max(1, json.online_count));
+        applyCount(json.online_count);
+      } else if (res.ok) {
+        // Heartbeat wrote presence even if count missing — at least show self
+        applyCount(1);
       }
     } catch {
       // ignore transient failures
     }
-  }, [profileId, sessionId, activeGameId]);
+  }, [profileId, sessionId, activeGameId, applyCount]);
 
   useEffect(() => {
     if (!isLive || !profileId) {
@@ -59,14 +69,13 @@ export function useGgOnline(
       return;
     }
 
-    // Immediate write + read
+    setOnlineCount((n) => Math.max(1, n));
     sendHeartbeat();
     fetchOnline();
 
     pollTimer.current = setInterval(fetchOnline, ONLINE_POLL_INTERVAL);
     heartbeatTimer.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
 
-    // Telegram / mobile WebViews throttle timers in background — pulse on focus
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         sendHeartbeat();

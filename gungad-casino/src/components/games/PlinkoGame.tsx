@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../../types';
 import { t } from '../../translations';
 import { BetControls } from '../BetControls';
@@ -16,18 +16,29 @@ interface PlinkoGameProps {
 }
 
 const ROW_COUNT = 8;
+const MAX_RIPPLES = 10;
+const STEP_MS = 100;
 
-interface Ball {
+interface BallState {
   id: number;
   x: number;
   y: number;
-  squash: boolean;
 }
 
 interface Ripple {
   id: number;
   x: number;
   y: number;
+}
+
+interface ActiveBall {
+  id: number;
+  path: { x: number; y: number; peg: boolean }[];
+  step: number;
+  nextAt: number;
+  stake: number;
+  bucketIndex: number;
+  buckets: number[];
 }
 
 export const PlinkoGame: React.FC<PlinkoGameProps> = ({
@@ -40,17 +51,22 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
 }) => {
   const [betAmountUSD, setBetAmountUSD] = useState<number>(10);
   const [risk, setRisk] = useState<'low' | 'medium' | 'high'>('medium');
-  const [balls, setBalls] = useState<Ball[]>([]);
+  const [balls, setBalls] = useState<BallState[]>([]);
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [lastMultiplier, setLastMultiplier] = useState<number | null>(null);
   const [hitBuckets, setHitBuckets] = useState<Record<number, number>>({});
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
+
   const mountedRef = useRef(true);
-  const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const ballIdRef = useRef(0);
   const rippleIdRef = useRef(0);
   const balanceRef = useRef(user.balanceUSD);
   const bucketsRef = useRef<number[]>([]);
+  const activeRef = useRef<Map<number, ActiveBall>>(new Map());
+  const rafRef = useRef<number | null>(null);
+  const positionsDirty = useRef(false);
+  const pendingRipples = useRef<Ripple[]>([]);
+  const settleQueue = useRef<Array<() => void>>([]);
 
   useEffect(() => {
     balanceRef.current = user.balanceUSD;
@@ -60,8 +76,8 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      timersRef.current.forEach(clearTimeout);
-      timersRef.current = [];
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      activeRef.current.clear();
     };
   }, []);
 
@@ -88,15 +104,112 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
     return 6 + (rowIdx / (ROW_COUNT - 1)) * 76;
   };
 
-  const spawnRipple = (x: number, y: number) => {
-    const id = ++rippleIdRef.current;
-    setRipples((prev) => [...prev, { id, x, y }]);
-    const t = setTimeout(() => {
-      if (!mountedRef.current) return;
-      setRipples((prev) => prev.filter((r) => r.id !== id));
-    }, 420);
-    timersRef.current.push(t);
-  };
+  const flushUi = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    if (positionsDirty.current) {
+      positionsDirty.current = false;
+      const next: BallState[] = [];
+      activeRef.current.forEach((b) => {
+        const pt = b.path[Math.min(b.step, b.path.length - 1)];
+        next.push({ id: b.id, x: pt.x, y: pt.y });
+      });
+      setBalls(next);
+    }
+
+    if (pendingRipples.current.length) {
+      const add = pendingRipples.current.splice(0, pendingRipples.current.length);
+      setRipples((prev) => {
+        const merged = [...prev, ...add];
+        return merged.length > MAX_RIPPLES ? merged.slice(-MAX_RIPPLES) : merged;
+      });
+      // Auto-remove after animation
+      add.forEach((r) => {
+        window.setTimeout(() => {
+          if (!mountedRef.current) return;
+          setRipples((prev) => prev.filter((x) => x.id !== r.id));
+        }, 400);
+      });
+    }
+
+    while (settleQueue.current.length) {
+      const fn = settleQueue.current.shift();
+      fn?.();
+    }
+  }, []);
+
+  const ensureLoop = useCallback(() => {
+    if (rafRef.current != null) return;
+
+    const tick = (now: number) => {
+      if (!mountedRef.current) {
+        rafRef.current = null;
+        return;
+      }
+
+      let any = false;
+      activeRef.current.forEach((ball, id) => {
+        any = true;
+        if (now < ball.nextAt) return;
+
+        ball.step += 1;
+        ball.nextAt = now + STEP_MS;
+
+        if (ball.step >= ball.path.length) {
+          activeRef.current.delete(id);
+          positionsDirty.current = true;
+
+          const winMult = ball.buckets[ball.bucketIndex];
+          const payoutUSD = ball.stake * winMult;
+          const bucketIndex = ball.bucketIndex;
+
+          settleQueue.current.push(() => {
+            setHitBuckets((prev) => ({ ...prev, [bucketIndex]: Date.now() }));
+            setLastMultiplier(winMult);
+            if (winMult >= 5) confetti({ particleCount: 40, spread: 50 });
+            soundFx[winMult > 1.0 ? 'playWin' : 'playLoss']();
+            const nextBal = balanceRef.current + payoutUSD;
+            balanceRef.current = nextBal;
+            onUpdateBalance(nextBal);
+            onAddHistory({
+              id: `${Date.now()}-${id}`,
+              gameId: 'plinko',
+              gameName: t('plinkoName', lang),
+              timestamp: new Date(),
+              betAmountUSD: ball.stake,
+              multiplier: winMult,
+              payoutUSD,
+              win: winMult >= 1.0,
+              currency,
+            });
+          });
+          return;
+        }
+
+        const pt = ball.path[ball.step];
+        positionsDirty.current = true;
+        if (pt.peg) {
+          soundFx.playChip();
+          pendingRipples.current.push({
+            id: ++rippleIdRef.current,
+            x: pt.x,
+            y: pt.y,
+          });
+        }
+      });
+
+      flushUi();
+
+      if (any || activeRef.current.size > 0) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        rafRef.current = null;
+        flushUi();
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+  }, [flushUi, onUpdateBalance, onAddHistory, lang, currency]);
 
   const handleDrop = () => {
     if (betAmountUSD <= 0 || betAmountUSD > balanceRef.current) return;
@@ -112,90 +225,35 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
 
     const id = ++ballIdRef.current;
     let rights = 0;
-    const path: { x: number; y: number; peg?: boolean }[] = [];
+    const path: { x: number; y: number; peg: boolean }[] = [];
     path.push({ x: boardCenter, y: 2, peg: false });
 
     for (let r = 0; r < ROW_COUNT; r++) {
-      const goRight = Math.random() < 0.5;
-      if (goRight) rights++;
+      if (Math.random() < 0.5) rights++;
       const count = pegRows[r];
       const rowWidth = pegStep * (count - 1);
       const startX = boardCenter - rowWidth / 2;
       const idx = Math.min(Math.max(0, rights), count - 1);
-      const x = startX + idx * pegStep;
-      const y = getRowY(r);
-      path.push({ x, y, peg: true });
+      path.push({ x: startX + idx * pegStep, y: getRowY(r), peg: true });
     }
 
     const bucketIndex = Math.max(0, Math.min(BUCKET_COUNT - 1, rights));
     const bucketX = (100 / BUCKET_COUNT) * (bucketIndex + 0.5);
     path.push({ x: bucketX, y: 92, peg: false });
 
-    setBalls((prev) => [...prev, { id, x: path[0].x, y: path[0].y, squash: false }]);
-
-    let step = 0;
-    const advance = () => {
-      if (!mountedRef.current) return;
-
-      if (step >= path.length) {
-        setBalls((prev) => prev.filter((b) => b.id !== id));
-        setHitBuckets((prev) => ({ ...prev, [bucketIndex]: Date.now() }));
-        setLastMultiplier(riskBuckets[bucketIndex]);
-
-        const winMult = riskBuckets[bucketIndex];
-        const payoutUSD = stake * winMult;
-
-        if (winMult >= 5) confetti({ particleCount: 50, spread: 55 });
-        soundFx[winMult > 1.0 ? 'playWin' : 'playLoss']();
-
-        const nextBal = balanceRef.current + payoutUSD;
-        balanceRef.current = nextBal;
-        onUpdateBalance(nextBal);
-
-        onAddHistory({
-          id: String(Date.now()) + '-' + id,
-          gameId: 'plinko',
-          gameName: t('plinkoName', lang),
-          timestamp: new Date(),
-          betAmountUSD: stake,
-          multiplier: winMult,
-          payoutUSD,
-          win: winMult >= 1.0,
-          currency,
-        });
-        return;
-      }
-
-      const pt = path[step];
-      if (pt.peg) {
-        soundFx.playChip();
-        spawnRipple(pt.x, pt.y);
-        setBalls((prev) =>
-          prev.map((b) => (b.id === id ? { ...b, x: pt.x, y: pt.y, squash: true } : b)),
-        );
-        const unsquash = setTimeout(() => {
-          if (!mountedRef.current) return;
-          setBalls((prev) =>
-            prev.map((b) => (b.id === id ? { ...b, squash: false } : b)),
-          );
-        }, 90);
-        timersRef.current.push(unsquash);
-      } else {
-        setBalls((prev) =>
-          prev.map((b) => (b.id === id ? { ...b, x: pt.x, y: pt.y, squash: false } : b)),
-        );
-      }
-
-      step++;
-      const next = setTimeout(advance, 105);
-      timersRef.current.push(next);
-    };
-
-    const start = setTimeout(advance, 40);
-    timersRef.current.push(start);
+    activeRef.current.set(id, {
+      id,
+      path,
+      step: 0,
+      nextAt: performance.now() + 40,
+      stake,
+      bucketIndex,
+      buckets: riskBuckets,
+    });
+    positionsDirty.current = true;
+    flushUi();
+    ensureLoop();
   };
-
-  const activeHits = hitBuckets;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
@@ -268,12 +326,12 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
           {balls.map((b) => (
             <div
               key={b.id}
-              className="absolute w-3.5 h-3.5 rounded-full bg-rose-500 border border-white shadow-[0_0_12px_rgba(225,29,72,1)] z-20"
+              className="absolute w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(225,29,72,0.9)] z-20 will-change-transform"
               style={{
                 left: `${b.x}%`,
                 top: `${b.y}%`,
-                transform: `translate(-50%, -50%) scale(${b.squash ? '1.35, 0.75' : '1, 1'})`,
-                transition: 'left 95ms linear, top 95ms linear, transform 80ms ease-out',
+                transform: 'translate(-50%, -50%)',
+                transition: 'left 90ms linear, top 90ms linear',
               }}
             />
           ))}
@@ -286,7 +344,7 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
             }}
           >
             {buckets.map((m, idx) => {
-              const recentlyHit = activeHits[idx] && Date.now() - activeHits[idx] < 600;
+              const recentlyHit = hitBuckets[idx] && Date.now() - hitBuckets[idx] < 600;
               return (
                 <div
                   key={idx}

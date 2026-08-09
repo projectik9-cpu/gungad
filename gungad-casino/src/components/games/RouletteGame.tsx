@@ -31,6 +31,15 @@ interface PlacedBet {
 
 const MAX_BETS = 13;
 
+function seedRouletteHistory(len = 6): number[] {
+  const out: number[] = [];
+  while (out.length < len) {
+    const n = ROULETTE_NUMBERS[Math.floor(Math.random() * ROULETTE_NUMBERS.length)];
+    if (out.length === 0 || out[out.length - 1] !== n) out.push(n);
+  }
+  return out;
+}
+
 function getNumberColor(num: number) {
   if (num === 0) return 'green';
   return RED_NUMBERS.includes(num) ? 'red' : 'black';
@@ -64,7 +73,7 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [winningNumber, setWinningNumber] = useState<number | null>(null);
   const [wheelRotation, setWheelRotation] = useState<number>(0);
-  const [history, setHistory] = useState<number[]>([14,0,32,19,7,25]);
+  const [history, setHistory] = useState<number[]>(() => seedRouletteHistory(6));
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const [spinDisplay, setSpinDisplay] = useState<number | null>(null);
   const [showNumbers, setShowNumbers] = useState<boolean>(false);
@@ -129,19 +138,22 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
     setWheelRotation(prev => prev + delta);
 
     let tickSpeed = 60;
-    let numIdx = 0;
+    let numIdx = Math.floor(Math.random() * ROULETTE_NUMBERS.length);
     const totalDuration = 4000;
+    const winnerRevealAt = totalDuration - 800; // last 800ms: only winner
     const startTime = Date.now();
 
     const tickNumbers = () => {
       if (!mountedRef.current) return;
       const elapsed = Date.now() - startTime;
-      if (elapsed >= totalDuration - 300) {
+      const progress = elapsed / totalDuration;
+      tickSpeed = 60 + Math.pow(progress, 2) * 400;
+
+      // If this tick or the next delay would enter the reveal window — lock winner
+      if (elapsed >= winnerRevealAt || elapsed + tickSpeed >= winnerRevealAt) {
         setSpinDisplay(winnerNum);
         return;
       }
-      const progress = elapsed / totalDuration;
-      tickSpeed = 60 + Math.pow(progress, 2) * 400;
 
       setSpinDisplay(ROULETTE_NUMBERS[numIdx % ROULETTE_NUMBERS.length]);
       numIdx++;

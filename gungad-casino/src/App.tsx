@@ -203,7 +203,7 @@ export default function App() {
     session?.profile_id ?? null,
     SESSION_ID,
     activeGameId,
-    isLive && playMode === 'real',
+    isLive,
   );
 
   const handleUpdateBalance = useCallback((newBalanceUSD: number) => {

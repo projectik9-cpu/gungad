@@ -10,16 +10,24 @@ bot.use(async (ctx, next) => {
   const start = Date.now();
   const user = ctx.from;
   const chatType = ctx.chat?.type || 'unknown';
-  
+  const uid = user?.id ?? ctx.channelPost?.sender_chat?.id ?? 'n/a';
+  const uname = user?.username || ctx.chat?.username || 'unknown';
+
   logger.info(
-    `📨 Входящее сообщение от ${user.id} (@${user.username || 'unknown'}) | Тип чата: ${chatType}`
+    `📨 Входящее от ${uid} (@${uname}) | Тип чата: ${chatType} | update=${ctx.updateType}`,
   );
 
   try {
     await next();
   } catch (error) {
-    logger.error(`Ошибка при обработке сообщения от ${user.id}:`, error);
-    await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
+    logger.error(`Ошибка при обработке сообщения от ${uid}:`, error);
+    try {
+      if (ctx.chat?.type === 'private') {
+        await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   const duration = Date.now() - start;

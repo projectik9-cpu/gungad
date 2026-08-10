@@ -46,8 +46,19 @@ function isAllowedChat(ctx) {
 
 async function replyChunks(ctx, html) {
   const text = String(html ?? '');
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+
+  const send = async (chunk) => {
+    // channel_post: ctx.reply can fail; sendMessage is reliable for both
+    await ctx.telegram.sendMessage(chatId, chunk, {
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    });
+  };
+
   if (text.length <= TG_LIMIT) {
-    await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true });
+    await send(text);
     return;
   }
   let rest = text;
@@ -56,13 +67,32 @@ async function replyChunks(ctx, html) {
     let chunk = rest.slice(0, TG_LIMIT);
     const cut = chunk.lastIndexOf('\n');
     if (cut > TG_LIMIT * 0.55) chunk = chunk.slice(0, cut);
-    await ctx.reply(part === 1 ? chunk : `…(${part})\n${chunk}`, {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    });
+    await send(part === 1 ? chunk : `…(${part})\n${chunk}`);
     rest = rest.slice(chunk.length);
     part += 1;
   }
+}
+
+function getCommandText(ctx) {
+  return (
+    ctx.message?.text ||
+    ctx.channelPost?.text ||
+    ctx.update?.channel_post?.text ||
+    ''
+  );
+}
+
+function parseCommand(text) {
+  const raw = String(text || '').trim();
+  if (!raw.startsWith('/')) return null;
+  // /help@BotName args...
+  const m = raw.match(/^\/([a-zA-Z0-9_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/);
+  if (!m) return null;
+  return {
+    command: m[1].toLowerCase(),
+    args: (m[2] || '').trim(),
+    arg0: (m[2] || '').trim().split(/\s+/)[0] || '',
+  };
 }
 
 function parseArgId(raw) {
@@ -111,23 +141,23 @@ const HELP_TEXT = `
 Пиши в этом канале или в ЛС боту (если ты в ADMIN_IDS).
 
 <b>Игрок</b>
-/user <tg_id|@user|uuid> — полный досье
-/balance <id> — баланс и totals
-/bets <id> [n] — последние ставки (default 15)
-/wins <id> [n] — только выигрыши
-/losses <id> [n] — только проигрыши
-/ledger <id> [n] — ledger (деньги)
-/deps <id> [n] — депозиты
-/wds <id> [n] — выводы
-/ref <id> — реферер и рефералы
-/tickets <id> — тикеты поддержки
+/user TG_ID | @nick | uuid — полный досье
+/balance ID — баланс и totals
+/bets ID [n] — последние ставки (default 15)
+/wins ID [n] — только выигрыши
+/losses ID [n] — только проигрыши
+/ledger ID [n] — ledger (деньги)
+/deps ID [n] — депозиты
+/wds ID [n] — выводы
+/ref ID — реферер и рефералы
+/tickets ID — тикеты поддержки
 
 <b>Поиск / топы</b>
-/search <текст> — поиск по username / имени / tg id
-/top [wagered|won|lost|deposited|withdrawn|balance] [n]
+/search текст — поиск по username / имени / tg id
+/top wagered|won|lost|deposited|withdrawn|balance [n]
 /online — сколько онлайн
 /stats — сводка казино
-/bigwins [n] — последние крупные выигрыши (профит ≥ $10)
+/bigwins [n] — крупные выигрыши (профит ≥ $10)
 
 <b>Прочее</b>
 /help — это меню
@@ -141,9 +171,10 @@ async function cmdHelp(ctx) {
 }
 
 async function cmdPing(ctx) {
-  await ctx.reply(`pong · chat=<code>${ctx.chat?.id}</code> · you=<code>${ctx.from?.id}</code>`, {
-    parse_mode: 'HTML',
-  });
+  await replyChunks(
+    ctx,
+    `pong · chat=<code>${ctx.chat?.id}</code> · you=<code>${ctx.from?.id ?? 'channel'}</code>`,
+  );
 }
 
 async function buildUserDossier(profile) {
@@ -259,29 +290,28 @@ async function buildUserDossier(profile) {
 }
 
 async function cmdUser(ctx) {
-  const arg = ctx.message?.text?.split(/\s+/)[1];
+  const arg = parseCommand(getCommandText(ctx))?.arg0;
   if (!arg) {
-    await ctx.reply('Использование: <code>/user &lt;tg_id|@user|uuid&gt;</code>', { parse_mode: 'HTML' });
+    await replyChunks(ctx, 'Использование: <code>/user TG_ID</code> или <code>/user @nick</code>');
     return;
   }
   const profile = await resolveProfile(arg);
   if (!profile) {
-    await ctx.reply(`❌ Игрок не найден: <code>${escapeHtml(arg)}</code>`, { parse_mode: 'HTML' });
+    await replyChunks(ctx, `❌ Игрок не найден: <code>${escapeHtml(arg)}</code>`);
     return;
   }
-  const dossier = await buildUserDossier(profile);
-  await replyChunks(ctx, dossier);
+  await replyChunks(ctx, await buildUserDossier(profile));
 }
 
 async function cmdBalance(ctx) {
-  const arg = ctx.message?.text?.split(/\s+/)[1];
+  const arg = parseCommand(getCommandText(ctx))?.arg0;
   if (!arg) {
-    await ctx.reply('Использование: <code>/balance &lt;id&gt;</code>', { parse_mode: 'HTML' });
+    await replyChunks(ctx, 'Использование: <code>/balance TG_ID</code>');
     return;
   }
   const profile = await resolveProfile(arg);
   if (!profile) {
-    await ctx.reply('❌ Не найден', { parse_mode: 'HTML' });
+    await replyChunks(ctx, '❌ Не найден');
     return;
   }
   const wallet = await fetchWallet(profile.id);
@@ -294,16 +324,16 @@ async function cmdBalance(ctx) {
 }
 
 async function listBets(ctx, filter) {
-  const parts = (ctx.message?.text || '').trim().split(/\s+/);
-  const arg = parts[1];
-  const n = Math.min(Math.max(parseInt(parts[2] || '15', 10) || 15, 1), 40);
+  const parsed = parseCommand(getCommandText(ctx));
+  const arg = parsed?.arg0;
+  const n = Math.min(Math.max(parseInt((parsed?.args || '').split(/\s+/)[1] || '15', 10) || 15, 1), 40);
   if (!arg) {
-    await ctx.reply('Нужен id игрока', { parse_mode: 'HTML' });
+    await replyChunks(ctx, 'Нужен id: <code>/bets TG_ID</code>');
     return;
   }
   const profile = await resolveProfile(arg);
   if (!profile) {
-    await ctx.reply('❌ Не найден', { parse_mode: 'HTML' });
+    await replyChunks(ctx, '❌ Не найден');
     return;
   }
   const sb = getSupabaseAdmin();
@@ -317,7 +347,7 @@ async function listBets(ctx, filter) {
   if (filter === 'losses') q = q.eq('status', 'lost');
   const { data, error } = await q;
   if (error) {
-    await ctx.reply(`Ошибка: ${escapeHtml(error.message)}`, { parse_mode: 'HTML' });
+    await replyChunks(ctx, `Ошибка: ${escapeHtml(error.message)}`);
     return;
   }
   const title = filter === 'wins' ? 'ВЫИГРЫШИ' : filter === 'losses' ? 'ПРОИГРЫШИ' : 'СТАВКИ';
@@ -338,16 +368,16 @@ async function listBets(ctx, filter) {
 }
 
 async function cmdLedger(ctx) {
-  const parts = (ctx.message?.text || '').trim().split(/\s+/);
-  const arg = parts[1];
-  const n = Math.min(Math.max(parseInt(parts[2] || '20', 10) || 20, 1), 50);
+  const parsed = parseCommand(getCommandText(ctx));
+  const arg = parsed?.arg0;
+  const n = Math.min(Math.max(parseInt((parsed?.args || '').split(/\s+/)[1] || '20', 10) || 20, 1), 50);
   if (!arg) {
-    await ctx.reply('Использование: <code>/ledger &lt;id&gt; [n]</code>', { parse_mode: 'HTML' });
+    await replyChunks(ctx, 'Использование: <code>/ledger TG_ID [n]</code>');
     return;
   }
   const profile = await resolveProfile(arg);
   if (!profile) {
-    await ctx.reply('❌ Не найден', { parse_mode: 'HTML' });
+    await replyChunks(ctx, '❌ Не найден');
     return;
   }
   const sb = getSupabaseAdmin();
@@ -358,7 +388,7 @@ async function cmdLedger(ctx) {
     .order('created_at', { ascending: false })
     .limit(n);
   if (error) {
-    await ctx.reply(`Ошибка: ${escapeHtml(error.message)}`, { parse_mode: 'HTML' });
+    await replyChunks(ctx, `Ошибка: ${escapeHtml(error.message)}`);
     return;
   }
   const lines = [
@@ -374,12 +404,18 @@ async function cmdLedger(ctx) {
 }
 
 async function cmdDeps(ctx) {
-  const parts = (ctx.message?.text || '').trim().split(/\s+/);
-  const arg = parts[1];
-  const n = Math.min(Math.max(parseInt(parts[2] || '15', 10) || 15, 1), 40);
-  if (!arg) return ctx.reply('Нужен id');
+  const parsed = parseCommand(getCommandText(ctx));
+  const arg = parsed?.arg0;
+  const n = Math.min(Math.max(parseInt((parsed?.args || '').split(/\s+/)[1] || '15', 10) || 15, 1), 40);
+  if (!arg) {
+    await replyChunks(ctx, 'Нужен id: <code>/deps TG_ID</code>');
+    return;
+  }
   const profile = await resolveProfile(arg);
-  if (!profile) return ctx.reply('❌ Не найден');
+  if (!profile) {
+    await replyChunks(ctx, '❌ Не найден');
+    return;
+  }
   const sb = getSupabaseAdmin();
   const { data } = await sb
     .from('gg_deposit_requests')
@@ -400,12 +436,18 @@ async function cmdDeps(ctx) {
 }
 
 async function cmdWds(ctx) {
-  const parts = (ctx.message?.text || '').trim().split(/\s+/);
-  const arg = parts[1];
-  const n = Math.min(Math.max(parseInt(parts[2] || '15', 10) || 15, 1), 40);
-  if (!arg) return ctx.reply('Нужен id');
+  const parsed = parseCommand(getCommandText(ctx));
+  const arg = parsed?.arg0;
+  const n = Math.min(Math.max(parseInt((parsed?.args || '').split(/\s+/)[1] || '15', 10) || 15, 1), 40);
+  if (!arg) {
+    await replyChunks(ctx, 'Нужен id: <code>/wds TG_ID</code>');
+    return;
+  }
   const profile = await resolveProfile(arg);
-  if (!profile) return ctx.reply('❌ Не найден');
+  if (!profile) {
+    await replyChunks(ctx, '❌ Не найден');
+    return;
+  }
   const sb = getSupabaseAdmin();
   const { data } = await sb
     .from('gg_withdrawals')
@@ -427,10 +469,16 @@ async function cmdWds(ctx) {
 }
 
 async function cmdRef(ctx) {
-  const arg = ctx.message?.text?.split(/\s+/)[1];
-  if (!arg) return ctx.reply('Нужен id');
+  const arg = parseCommand(getCommandText(ctx))?.arg0;
+  if (!arg) {
+    await replyChunks(ctx, 'Нужен id: <code>/ref TG_ID</code>');
+    return;
+  }
   const profile = await resolveProfile(arg);
-  if (!profile) return ctx.reply('❌ Не найден');
+  if (!profile) {
+    await replyChunks(ctx, '❌ Не найден');
+    return;
+  }
   const sb = getSupabaseAdmin();
   let referrer = null;
   if (profile.referrer_telegram_id) {
@@ -467,10 +515,16 @@ async function cmdRef(ctx) {
 }
 
 async function cmdTickets(ctx) {
-  const arg = ctx.message?.text?.split(/\s+/)[1];
-  if (!arg) return ctx.reply('Нужен id');
+  const arg = parseCommand(getCommandText(ctx))?.arg0;
+  if (!arg) {
+    await replyChunks(ctx, 'Нужен id: <code>/tickets TG_ID</code>');
+    return;
+  }
   const profile = await resolveProfile(arg);
-  if (!profile) return ctx.reply('❌ Не найден');
+  if (!profile) {
+    await replyChunks(ctx, '❌ Не найден');
+    return;
+  }
   const sb = getSupabaseAdmin();
   const { data } = await sb
     .from('gg_support_tickets')
@@ -491,9 +545,9 @@ async function cmdTickets(ctx) {
 }
 
 async function cmdSearch(ctx) {
-  const q = (ctx.message?.text || '').replace(/^\/search(@\w+)?\s*/i, '').trim();
+  const q = (parseCommand(getCommandText(ctx))?.args || '').trim();
   if (!q || q.length < 2) {
-    await ctx.reply('Использование: <code>/search username|имя|tg_id</code>', { parse_mode: 'HTML' });
+    await replyChunks(ctx, 'Использование: <code>/search username</code>');
     return;
   }
   const sb = getSupabaseAdmin();
@@ -511,7 +565,7 @@ async function cmdSearch(ctx) {
     rows = data || [];
   }
   if (!rows.length) {
-    await ctx.reply('Никого не нашёл');
+    await replyChunks(ctx, 'Никого не нашёл');
     return;
   }
   const lines = ['🔎 <b>ПОИСК</b>', `Запрос: <code>${escapeHtml(q)}</code>`, ''];
@@ -526,7 +580,8 @@ async function cmdSearch(ctx) {
 }
 
 async function cmdTop(ctx) {
-  const parts = (ctx.message?.text || '').trim().split(/\s+/);
+  const parsed = parseCommand(getCommandText(ctx));
+  const parts = (parsed?.args || '').trim().split(/\s+/).filter(Boolean);
   const fieldMap = {
     wagered: 'total_wagered_cents',
     won: 'total_won_cents',
@@ -535,9 +590,9 @@ async function cmdTop(ctx) {
     withdrawn: 'total_withdrawn_cents',
     balance: 'balance_cents',
   };
-  const key = (parts[1] || 'wagered').toLowerCase();
+  const key = (parts[0] || 'wagered').toLowerCase();
   const col = fieldMap[key] || fieldMap.wagered;
-  const n = Math.min(Math.max(parseInt(parts[2] || '10', 10) || 10, 1), 25);
+  const n = Math.min(Math.max(parseInt(parts[1] || '10', 10) || 10, 1), 25);
   const sb = getSupabaseAdmin();
   const { data, error } = await sb
     .from('gg_wallets')
@@ -545,7 +600,6 @@ async function cmdTop(ctx) {
     .order(col, { ascending: false })
     .limit(n);
   if (error) {
-    // Fallback without join embed
     const { data: wallets } = await sb.from('gg_wallets').select(`profile_id, ${col}, balance_cents`).order(col, { ascending: false }).limit(n);
     const lines = [`🏆 <b>TOP ${escapeHtml(key)}</b>`, ''];
     let i = 1;
@@ -573,11 +627,11 @@ async function cmdOnline(ctx) {
   const sb = getSupabaseAdmin();
   const { data, error } = await sb.rpc('gg_online_count');
   if (error) {
-    await ctx.reply(`Ошибка: ${escapeHtml(error.message)}`, { parse_mode: 'HTML' });
+    await replyChunks(ctx, `Ошибка: ${escapeHtml(error.message)}`);
     return;
   }
   const count = typeof data === 'number' ? data : data?.count ?? data;
-  await ctx.reply(`🟢 Онлайн сейчас: <b>${escapeHtml(String(count))}</b>`, { parse_mode: 'HTML' });
+  await replyChunks(ctx, `🟢 Онлайн сейчас: <b>${escapeHtml(String(count))}</b>`);
 }
 
 async function cmdStats(ctx) {
@@ -637,7 +691,7 @@ async function cmdStats(ctx) {
 }
 
 async function cmdBigWins(ctx) {
-  const n = Math.min(Math.max(parseInt((ctx.message?.text || '').split(/\s+/)[1] || '15', 10) || 15, 1), 40);
+  const n = Math.min(Math.max(parseInt(parseCommand(getCommandText(ctx))?.arg0 || '15', 10) || 15, 1), 40);
   const sb = getSupabaseAdmin();
   // payout meaningfully above bet
   const { data } = await sb
@@ -669,18 +723,12 @@ async function cmdBigWins(ctx) {
 function wrap(handler) {
   return async (ctx) => {
     try {
-      if (!isAllowedChat(ctx)) {
-        // Silently ignore outside admin contexts (players shouldn't see admin help)
-        if (ctx.chat?.type === 'private' && !isAdminUser(ctx.from?.id)) {
-          return;
-        }
-        return;
-      }
+      if (!isAllowedChat(ctx)) return;
       await handler(ctx);
     } catch (e) {
       logger.error(`[logAdmin] ${handler.name || 'cmd'}: ${e?.message || e}`);
       try {
-        await ctx.reply(`❌ Ошибка: ${escapeHtml(e?.message || e)}`, { parse_mode: 'HTML' });
+        await replyChunks(ctx, `❌ Ошибка: ${escapeHtml(e?.message || e)}`);
       } catch {
         /* ignore */
       }
@@ -688,27 +736,46 @@ function wrap(handler) {
   };
 }
 
-export function registerLogAdminHandlers(bot) {
-  bot.command('help', wrap(cmdHelp));
-  bot.command('ping', wrap(cmdPing));
-  bot.command('user', wrap(cmdUser));
-  bot.command('balance', wrap(cmdBalance));
-  bot.command('bets', wrap((ctx) => listBets(ctx, 'all')));
-  bot.command('wins', wrap((ctx) => listBets(ctx, 'wins')));
-  bot.command('losses', wrap((ctx) => listBets(ctx, 'losses')));
-  bot.command('ledger', wrap(cmdLedger));
-  bot.command('deps', wrap(cmdDeps));
-  bot.command('wds', wrap(cmdWds));
-  bot.command('ref', wrap(cmdRef));
-  bot.command('tickets', wrap(cmdTickets));
-  bot.command('search', wrap(cmdSearch));
-  bot.command('top', wrap(cmdTop));
-  bot.command('online', wrap(cmdOnline));
-  bot.command('stats', wrap(cmdStats));
-  bot.command('bigwins', wrap(cmdBigWins));
+const COMMAND_MAP = {
+  help: cmdHelp,
+  ping: cmdPing,
+  user: cmdUser,
+  balance: cmdBalance,
+  bets: (ctx) => listBets(ctx, 'all'),
+  wins: (ctx) => listBets(ctx, 'wins'),
+  losses: (ctx) => listBets(ctx, 'losses'),
+  ledger: cmdLedger,
+  deps: cmdDeps,
+  wds: cmdWds,
+  ref: cmdRef,
+  tickets: cmdTickets,
+  search: cmdSearch,
+  top: cmdTop,
+  online: cmdOnline,
+  stats: cmdStats,
+  bigwins: cmdBigWins,
+};
 
-  // Also react to /help@BotName in groups
-  logger.info('✅ Log-channel admin analytics commands registered');
+async function dispatchAdminCommand(ctx) {
+  const text = getCommandText(ctx);
+  if (!text.startsWith('/')) return;
+  const parsed = parseCommand(text);
+  if (!parsed) return;
+  const fn = COMMAND_MAP[parsed.command];
+  if (!fn) return;
+  await fn(ctx);
+}
+
+export function registerLogAdminHandlers(bot) {
+  const run = wrap(dispatchAdminCommand);
+
+  // Channels post as channel_post (NOT message) — this is why /help was silent in @dbdjdjd66
+  bot.on('channel_post', run);
+  bot.on('edited_channel_post', run);
+  // Private chats / groups
+  bot.on('message', run);
+
+  logger.info('✅ Log-channel admin analytics commands registered (message + channel_post)');
 }
 
 export async function maybeAnnounceCommandsOnline() {

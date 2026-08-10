@@ -4,6 +4,7 @@ import { startWebServer, setStarsBot, setWithdrawBot, setSupportBot } from './we
 import { startTonMonitor } from './services/tonMonitor.js';
 import { startCryptoBotReconcile } from './services/cryptoBotReconcile.js';
 import { setLogBot } from './services/telegramLog.js';
+import { maybeAnnounceCommandsOnline } from './bot/handlers/logAdminHandler.js';
 import { testConnection, syncDatabase } from './database/database.js';
 import logger from './utils/logger.js';
 import config from './config/config.js';
@@ -52,6 +53,24 @@ async function startApplication() {
 
     // Меню: кнопка WebApp «Казино» (даёт initData в Mini App)
     await bot.telegram.deleteMyCommands();
+    try {
+      await bot.telegram.setMyCommands(
+        [
+          { command: 'help', description: 'Список admin-команд' },
+          { command: 'user', description: 'Досье игрока' },
+          { command: 'stats', description: 'Сводка казино' },
+          { command: 'online', description: 'Онлайн сейчас' },
+          { command: 'search', description: 'Поиск игрока' },
+          { command: 'top', description: 'Топы' },
+          { command: 'bigwins', description: 'Крупные выигрыши' },
+          { command: 'start', description: 'Открыть казино' },
+        ],
+        { scope: { type: 'all_private_chats' } },
+      );
+    } catch (e) {
+      logger.warn(`[bot] setMyCommands failed: ${e?.message || e}`);
+    }
+
     await bot.telegram.setChatMenuButton({
       menuButton: {
         type: 'web_app',
@@ -66,6 +85,7 @@ async function startApplication() {
     });
 
     logger.logBotStart();
+    void maybeAnnounceCommandsOnline();
 
     // Обработка завершения приложения
     process.once('SIGINT', () => gracefulShutdown('SIGINT'));

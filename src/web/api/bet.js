@@ -10,6 +10,7 @@ import express from 'express';
 import { getSupabaseAdmin } from '../../database/supabase.js';
 import logger from '../../utils/logger.js';
 import { assertProfileOwnership } from './telegramAuth.js';
+import { logBetOutcome, logBetPlaced } from '../../services/telegramLog.js';
 
 const router = express.Router();
 
@@ -46,7 +47,6 @@ router.post('/', async (req, res) => {
     if (!VALID_GAMES.includes(game_id)) {
       return res.status(400).json({ error: `Invalid game_id: ${game_id}` });
     }
-    // Crash must use place/resolve so stake is locked before outcome
     if (game_id === 'crash') {
       return res.status(400).json({
         error: 'Crash must use /api/bet/place and /api/bet/resolve',
@@ -95,6 +95,21 @@ router.post('/', async (req, res) => {
     }
 
     logger.info('[bet] settled profile=%s game=%s bet=%d payout=%d', profile_id, game_id, bet_cents, payout_cents);
+
+    void logBetOutcome({
+      profileId: profile_id,
+      gameId: game_id,
+      betCents: bet_cents,
+      payoutCents: payout_cents,
+      multiplier,
+      status,
+      betId: data?.bet_id,
+      phase: 'settle',
+      balanceCents: data?.balance_cents,
+      lockedCents: data?.locked_cents,
+      idempotent: Boolean(data?.idempotent),
+    });
+
     return res.json({ ok: true, ...data });
   } catch (err) {
     logger.error('[bet] Unexpected error', err);
@@ -139,6 +154,17 @@ router.post('/place', async (req, res) => {
     }
 
     logger.info('[bet/place] profile=%s game=%s bet=%d id=%s', profile_id, game_id, bet_cents, data?.bet_id);
+
+    void logBetPlaced({
+      profileId: profile_id,
+      gameId: game_id,
+      betCents: bet_cents,
+      betId: data?.bet_id,
+      balanceCents: data?.balance_cents,
+      lockedCents: data?.locked_cents,
+      idempotent: Boolean(data?.idempotent),
+    });
+
     return res.json({ ok: true, ...data });
   } catch (err) {
     logger.error('[bet/place] Unexpected error', err);
@@ -171,6 +197,23 @@ router.post('/resolve', async (req, res) => {
     }
 
     const sb = getSupabaseAdmin();
+
+    let stakeCents = null;
+    let gameId = 'crash';
+    try {
+      const { data: betRow } = await sb
+        .from('gg_bets')
+        .select('bet_cents, game_id')
+        .eq('id', bet_id)
+        .maybeSingle();
+      if (betRow) {
+        stakeCents = betRow.bet_cents;
+        gameId = betRow.game_id || 'crash';
+      }
+    } catch {
+      /* ignore */
+    }
+
     const { data, error } = await sb.rpc('gg_resolve_bet', {
       p_profile_id: profile_id,
       p_bet_id:     bet_id,
@@ -197,6 +240,21 @@ router.post('/resolve', async (req, res) => {
       '[bet/resolve] profile=%s bet=%s status=%s payout=%s',
       profile_id, bet_id, status, data?.payout_cents,
     );
+
+    void logBetOutcome({
+      profileId: profile_id,
+      gameId,
+      betCents: stakeCents ?? 0,
+      payoutCents: data?.payout_cents ?? 0,
+      multiplier: data?.multiplier ?? mult,
+      status: data?.status ?? status,
+      betId: bet_id,
+      phase: 'resolve',
+      balanceCents: data?.balance_cents,
+      lockedCents: data?.locked_cents,
+      idempotent: Boolean(data?.idempotent),
+    });
+
     return res.json({ ok: true, ...data });
   } catch (err) {
     logger.error('[bet/resolve] Unexpected error', err);

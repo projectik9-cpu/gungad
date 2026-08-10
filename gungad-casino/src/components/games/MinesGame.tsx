@@ -178,7 +178,7 @@ export const MinesGame: React.FC<MinesGameProps> = ({
               ? gemsRevealed > 0
                 ? `${t('cashout', lang)} (${formatCurrency(betAmountUSD * currentMultiplier, currency)})`
                 : t('selectSafeTiles', lang)
-              : t('placeBet', lang)
+              : t('minesSearch', lang)
           }
           onAction={gameState === 'playing' ? () => handleCashout() : handleStartGame}
           actionDisabled={gameState === 'playing' ? gemsRevealed === 0 : betAmountUSD > user.balanceUSD}

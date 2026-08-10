@@ -7,7 +7,7 @@ import { X } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
 
-/** Wheel slices in clockwise order starting at top (pointer at 12 o'clock) */
+/** Clockwise from top (pointer). Must match conic-gradient stops. */
 export const WELCOME_SLICES = [
   { cents: 100, label: '$1', color: '#be123c' },
   { cents: 200, label: '$2', color: '#9f1239' },
@@ -38,10 +38,15 @@ function getInitData(): string | null {
   return null;
 }
 
-function rotationForSlice(index: number, spins = 5): number {
-  // Pointer at top; slice center should land under pointer
-  const center = index * SLICE_DEG + SLICE_DEG / 2;
-  return spins * 360 + (360 - center);
+/** CSS rotate() is clockwise. Conic from -90deg puts stop 0° at top. */
+function rotationForSlice(index: number, currentRotation: number, spins = 5): number {
+  const centerFromTop = index * SLICE_DEG + SLICE_DEG / 2;
+  // Rotate wheel so this center lands under the top pointer
+  const targetMod = ((360 - centerFromTop) % 360 + 360) % 360;
+  const currentMod = ((currentRotation % 360) + 360) % 360;
+  let delta = targetMod - currentMod;
+  if (delta <= 0) delta += 360;
+  return currentRotation + spins * 360 + delta;
 }
 
 export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
@@ -58,6 +63,7 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
   const [resultCents, setResultCents] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const claimedRef = useRef(false);
+  const rotationRef = useRef(0);
 
   useEffect(() => {
     if (open) {
@@ -82,6 +88,7 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
       const end = start + SLICE_DEG;
       return `${s.color} ${start}deg ${end}deg`;
     });
+    // from -90deg → 0° stop is at 12 o'clock (pointer)
     return `conic-gradient(from -90deg, ${parts.join(', ')})`;
   }, []);
 
@@ -122,7 +129,12 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
       const amount = Number(data.amount_cents) || 0;
       const idx = WELCOME_SLICES.findIndex((s) => s.cents === amount);
       const sliceIndex = idx >= 0 ? idx : 0;
-      const target = rotationForSlice(sliceIndex, 5 + Math.floor(Math.random() * 2));
+      const target = rotationForSlice(
+        sliceIndex,
+        rotationRef.current,
+        5 + Math.floor(Math.random() * 2),
+      );
+      rotationRef.current = target;
       setRotation(target);
 
       window.setTimeout(() => {
@@ -174,10 +186,12 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
         <p className="text-xs text-zinc-500 mb-4">{t('bonusHint', lang)}</p>
 
         <div className="relative mx-auto w-64 h-64 mb-4">
-          {/* Pointer */}
-          <div className="absolute left-1/2 -translate-x-1/2 -top-1 z-10 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[18px] border-l-transparent border-r-transparent border-t-rose-400 drop-shadow" />
+          {/* Pointer — fixed at top */}
+          <div className="absolute left-1/2 -translate-x-1/2 -top-1 z-20 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[18px] border-l-transparent border-r-transparent border-t-rose-400 drop-shadow" />
+
+          {/* Spinning disc */}
           <div
-            className="w-full h-full rounded-full border-4 border-zinc-700 shadow-inner relative overflow-hidden"
+            className="absolute inset-0 rounded-full border-4 border-zinc-700 shadow-inner overflow-hidden"
             style={{
               background: conic,
               transform: `rotate(${rotation}deg)`,
@@ -185,22 +199,26 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
             }}
           >
             {WELCOME_SLICES.map((s, i) => {
-              const mid = i * SLICE_DEG + SLICE_DEG / 2 - 90;
+              // Angle from top, clockwise — matches conic stops (no -90 offset)
+              const mid = i * SLICE_DEG + SLICE_DEG / 2;
               return (
                 <span
                   key={s.cents}
-                  className="absolute left-1/2 top-1/2 text-[11px] font-black text-white drop-shadow"
+                  className="absolute left-1/2 top-1/2 text-[12px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] whitespace-nowrap"
                   style={{
-                    transform: `rotate(${mid}deg) translate(0, -78px) rotate(${-mid}deg)`,
+                    // No extra counter-rotate: when a slice lands at the pointer, its label is upright
+                    transform: `rotate(${mid}deg) translate(0, -78px)`,
                   }}
                 >
                   {s.label}
                 </span>
               );
             })}
-            <div className="absolute inset-[38%] rounded-full bg-[#0f0f14] border border-zinc-700 flex items-center justify-center">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">GG</span>
-            </div>
+          </div>
+
+          {/* Fixed hub — never upside-down */}
+          <div className="pointer-events-none absolute inset-[38%] z-10 rounded-full bg-[#0f0f14] border border-zinc-700 flex items-center justify-center shadow-lg">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">GG</span>
           </div>
         </div>
 

@@ -312,7 +312,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
             gameState === 'running' && hasBet
               ? `${t('cashout', lang)} (${multiplier.toFixed(2)}x)`
               : gameState === 'waiting'
-              ? hasBet ? `✓ ${t('betPlaced', lang)}` : t('placeBet', lang)
+              ? hasBet ? `✓ ${t('betPlaced', lang)}` : t('crashFly', lang)
               : t('waitingForRound', lang)
           }
           onAction={gameState === 'running' && hasBet ? handleCashout : handlePlaceBet}

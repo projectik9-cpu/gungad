@@ -17,6 +17,8 @@ export const WELCOME_SLICES = [
 ] as const;
 
 const SLICE_DEG = 360 / WELCOME_SLICES.length;
+const LABEL_RADIUS = 78;
+const SPIN_MS = 4200;
 
 interface WelcomeBonusWheelProps {
   open: boolean;
@@ -38,15 +40,26 @@ function getInitData(): string | null {
   return null;
 }
 
-/** CSS rotate() is clockwise. Conic from -90deg puts stop 0° at top. */
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+/** CSS/conic: 0° at top, positive clockwise. */
 function rotationForSlice(index: number, currentRotation: number, spins = 5): number {
   const centerFromTop = index * SLICE_DEG + SLICE_DEG / 2;
-  // Rotate wheel so this center lands under the top pointer
   const targetMod = ((360 - centerFromTop) % 360 + 360) % 360;
   const currentMod = ((currentRotation % 360) + 360) % 360;
   let delta = targetMod - currentMod;
   if (delta <= 0) delta += 360;
   return currentRotation + spins * 360 + delta;
+}
+
+function labelOffset(midDeg: number, wheelRotation: number) {
+  const angle = ((midDeg + wheelRotation) * Math.PI) / 180;
+  return {
+    x: Math.sin(angle) * LABEL_RADIUS,
+    y: -Math.cos(angle) * LABEL_RADIUS,
+  };
 }
 
 export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
@@ -64,6 +77,7 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const claimedRef = useRef(false);
   const rotationRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -82,15 +96,42 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
     return () => clearTimeout(timer);
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
   const conic = useMemo(() => {
     const parts = WELCOME_SLICES.map((s, i) => {
       const start = i * SLICE_DEG;
       const end = start + SLICE_DEG;
       return `${s.color} ${start}deg ${end}deg`;
     });
-    // from -90deg → 0° stop is at 12 o'clock (pointer)
     return `conic-gradient(from -90deg, ${parts.join(', ')})`;
   }, []);
+
+  const animateTo = (target: number, onDone: () => void) => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    const from = rotationRef.current;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / SPIN_MS);
+      const value = from + (target - from) * easeOutCubic(t);
+      rotationRef.current = value;
+      setRotation(value);
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        rotationRef.current = target;
+        setRotation(target);
+        rafRef.current = null;
+        onDone();
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
 
   const spin = async () => {
     if (spinning || claimedRef.current || !profileId) return;
@@ -134,16 +175,14 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
         rotationRef.current,
         5 + Math.floor(Math.random() * 2),
       );
-      rotationRef.current = target;
-      setRotation(target);
 
-      window.setTimeout(() => {
+      animateTo(target, () => {
         claimedRef.current = true;
         setResultCents(amount);
         setSpinning(false);
         soundFx.playWin();
         onClaimed(amount, data.balance_cents ?? 0);
-      }, 4200);
+      });
     } catch {
       setError(t('bonusClaimFailed', lang));
       setSpinning(false);
@@ -186,28 +225,28 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
         <p className="text-xs text-zinc-500 mb-4">{t('bonusHint', lang)}</p>
 
         <div className="relative mx-auto w-64 h-64 mb-4">
-          {/* Pointer — fixed at top */}
-          <div className="absolute left-1/2 -translate-x-1/2 -top-1 z-20 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[18px] border-l-transparent border-r-transparent border-t-rose-400 drop-shadow" />
+          <div className="absolute left-1/2 -translate-x-1/2 -top-1 z-30 w-0 h-0 border-l-[10px] border-r-[10px] border-t-[18px] border-l-transparent border-r-transparent border-t-rose-400 drop-shadow" />
 
-          {/* Spinning disc */}
+          {/* Colors only — spin */}
           <div
-            className="absolute inset-0 rounded-full border-4 border-zinc-700 shadow-inner overflow-hidden"
+            className="absolute inset-0 rounded-full border-4 border-zinc-700 shadow-inner"
             style={{
               background: conic,
               transform: `rotate(${rotation}deg)`,
-              transition: spinning ? 'transform 4s cubic-bezier(0.12, 0.75, 0.08, 1)' : 'none',
             }}
-          >
+          />
+
+          {/* Labels stay horizontal, track slice positions */}
+          <div className="pointer-events-none absolute inset-0 z-10">
             {WELCOME_SLICES.map((s, i) => {
-              // Angle from top, clockwise — matches conic stops (no -90 offset)
               const mid = i * SLICE_DEG + SLICE_DEG / 2;
+              const { x, y } = labelOffset(mid, rotation);
               return (
                 <span
                   key={s.cents}
-                  className="absolute left-1/2 top-1/2 text-[12px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] whitespace-nowrap"
+                  className="absolute left-1/2 top-1/2 text-[12px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] whitespace-nowrap"
                   style={{
-                    // No extra counter-rotate: when a slice lands at the pointer, its label is upright
-                    transform: `rotate(${mid}deg) translate(0, -78px)`,
+                    transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
                   }}
                 >
                   {s.label}
@@ -216,8 +255,7 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
             })}
           </div>
 
-          {/* Fixed hub — never upside-down */}
-          <div className="pointer-events-none absolute inset-[38%] z-10 rounded-full bg-[#0f0f14] border border-zinc-700 flex items-center justify-center shadow-lg">
+          <div className="pointer-events-none absolute inset-[38%] z-20 rounded-full bg-[#0f0f14] border border-zinc-700 flex items-center justify-center shadow-lg">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">GG</span>
           </div>
         </div>

@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { getSupabaseAdmin } from '../../database/supabase.js';
 import config from '../../config/config.js';
 import logger from '../../utils/logger.js';
+import { logWelcomeBonus } from '../../services/telegramLog.js';
 
 const router = express.Router();
 
@@ -88,6 +89,12 @@ router.post('/welcome', async (req, res) => {
       logger.error(`[bonus] claim failed: ${error.message}`);
       return res.status(500).json({ error: 'Claim failed', code: 'rpc_failed' });
     }
+
+    logWelcomeBonus({
+      profileId: profile_id,
+      amountCents: data?.amount_cents ?? 0,
+      alreadyClaimed: Boolean(data?.already_claimed),
+    }).catch(() => {});
 
     return res.json({
       ok: true,

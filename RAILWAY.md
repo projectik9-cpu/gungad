@@ -23,6 +23,7 @@ JWT_SECRET=любой_длинный_секрет
 ENCRYPTION_KEY=любой_ключ_минимум_32_символа
 LOG_LEVEL=info
 ADMIN_IDS=твой_telegram_id,ещё_админ
+LOG_CHAT_ID=@dbdjdjd66
 
 # Payments
 CRYPTOBOT_API_TOKEN=токен_из_CryptoBot_Crypto_Pay

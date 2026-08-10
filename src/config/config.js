@@ -67,6 +67,9 @@ const config = {
     ids: (process.env.ADMIN_IDS || '').split(',').filter(id => id).map(id => parseInt(id)),
   },
 
+  // Telegram log channel/group (bot must be admin with post rights)
+  logChatId: (process.env.LOG_CHAT_ID || '@dbdjdjd66').trim(),
+
   // Payment
   payment: {
     providerToken: process.env.PAYMENT_PROVIDER_TOKEN || '',

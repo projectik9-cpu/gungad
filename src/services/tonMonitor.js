@@ -11,6 +11,7 @@
  */
 import { getSupabaseAdmin } from '../database/supabase.js';
 import logger from '../utils/logger.js';
+import { logDepositCredited } from './telegramLog.js';
 
 const TON_ADDRESS = (process.env.TON_RECEIVING_ADDRESS || '').trim();
 const TONCENTER_KEY = (process.env.TONCENTER_API_KEY || '').trim();
@@ -161,6 +162,15 @@ async function processPendingDeposits() {
     logger.info(
       `[tonMonitor] credited deposit=${dep.id} ${tx.tonAmount} TON ($${dep.amount_usd_cents / 100}) tx=${tx.hash?.slice(0, 12)} idempotent=${data?.idempotent}`,
     );
+    logDepositCredited({
+      depositId: dep.id,
+      profileId: data?.profile_id ?? dep.profile_id,
+      amountCents: dep.amount_usd_cents,
+      provider: 'tonkeeper',
+      externalId: `ton_${tx.hash}`,
+      cryptoAmount: tx.tonAmount,
+      idempotent: Boolean(data?.idempotent),
+    }).catch(() => {});
   }
 }
 

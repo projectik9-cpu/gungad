@@ -9,10 +9,10 @@ import express from 'express';
 import { getSupabaseAdmin } from '../../database/supabase.js';
 import config from '../../config/config.js';
 import logger from '../../utils/logger.js';
+import { logSupportTicket } from '../../services/telegramLog.js';
 
 const router = express.Router();
 
-// Bot instance injected at server startup
 let _bot = null;
 export function setSupportBot(bot) { _bot = bot; }
 
@@ -33,7 +33,6 @@ router.post('/ticket', async (req, res) => {
     const sb = getSupabaseAdmin();
     if (!sb) return res.status(500).json({ error: 'Supabase not configured' });
 
-    // Attach profile info if available
     let profile = null;
     if (profile_id) {
       const { data } = await sb
@@ -60,7 +59,6 @@ router.post('/ticket', async (req, res) => {
       return res.status(500).json({ error: 'Не удалось отправить обращение' });
     }
 
-    // Forward to admins
     if (_bot && config.admin.ids.length > 0) {
       const userLabel = profile?.username
         ? `@${profile.username}`
@@ -76,14 +74,36 @@ router.post('/ticket', async (req, res) => {
         `Тикет: <code>${ticket.id}</code>`,
       ].join('\n');
 
+      const keyboard = {
+        inline_keyboard: [[
+          { text: '💬 Ответить', callback_data: `sup_reply_${ticket.id}` },
+          { text: '🔒 Закрыть', callback_data: `sup_close_${ticket.id}` },
+        ]],
+      };
+
       for (const adminId of config.admin.ids) {
         try {
-          await _bot.telegram.sendMessage(adminId, adminText, { parse_mode: 'HTML' });
+          const msg = await _bot.telegram.sendMessage(adminId, adminText, {
+            parse_mode: 'HTML',
+            reply_markup: keyboard,
+          });
+          await sb.from('gg_support_tickets')
+            .update({
+              admin_message_id: msg.message_id,
+              admin_telegram_id: adminId,
+            })
+            .eq('id', ticket.id);
         } catch (e) {
           logger.warn(`[support] notify admin ${adminId} failed: ${e?.message || e}`);
         }
       }
     }
+
+    logSupportTicket({
+      ticketId: ticket.id,
+      profile,
+      message: text,
+    }).catch(() => {});
 
     logger.info(`[support/ticket] created ${ticket.id} from profile=${profile_id ?? 'anon'}`);
     return res.json({ ok: true, ticket_id: ticket.id });

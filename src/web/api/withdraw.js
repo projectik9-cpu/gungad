@@ -13,6 +13,7 @@ import express from 'express';
 import { getSupabaseAdmin } from '../../database/supabase.js';
 import config from '../../config/config.js';
 import logger from '../../utils/logger.js';
+import { logWithdrawRequest } from '../../services/telegramLog.js';
 
 const router = express.Router();
 
@@ -95,10 +96,15 @@ router.post('/request', async (req, res) => {
       ].join('\n');
 
       const keyboard = {
-        inline_keyboard: [[
-          { text: '✅ Выплатил — подтвердить', callback_data: `wd_approve_${withdrawalId}` },
-          { text: '❌ Отклонить', callback_data: `wd_reject_${withdrawalId}` },
-        ]],
+        inline_keyboard: [
+          [
+            { text: '✅ Выплатил — подтвердить', callback_data: `wd_approve_${withdrawalId}` },
+            { text: '❌ Отклонить', callback_data: `wd_reject_${withdrawalId}` },
+          ],
+          [
+            { text: '✉️ Написать игроку', callback_data: `wd_msg_${withdrawalId}` },
+          ],
+        ],
       };
 
       for (const adminId of config.admin.ids) {
@@ -116,6 +122,14 @@ router.post('/request', async (req, res) => {
         }
       }
     }
+
+    logWithdrawRequest({
+      withdrawalId,
+      profileId: profile_id,
+      amountUsd,
+      asset: upperAsset,
+      address: String(address).trim(),
+    }).catch(() => {});
 
     logger.info(`[withdraw/request] created ${withdrawalId} profile=${profile_id} $${amountUsd} ${upperAsset}`);
     return res.json({ ok: true, withdrawal_id: withdrawalId, status: 'pending' });

@@ -18,6 +18,7 @@ import crypto from 'crypto';
 import express from 'express';
 import { getSupabaseAdmin } from '../../database/supabase.js';
 import logger from '../../utils/logger.js';
+import { logDepositCredited } from '../../services/telegramLog.js';
 
 const router = express.Router();
 
@@ -171,6 +172,15 @@ router.post('/webhook', async (req, res) => {
     }
 
     logger.info(`[cryptobot/webhook] credited deposit=${depositId} $${paidUsd} idempotent=${data?.idempotent}`);
+    logDepositCredited({
+      depositId,
+      profileId: data?.profile_id,
+      amountCents,
+      provider: 'cryptobot',
+      externalId: `cb_${invoice.invoice_id}`,
+      cryptoAmount: invoice.paid_amount != null ? Number(invoice.paid_amount) : null,
+      idempotent: Boolean(data?.idempotent),
+    }).catch(() => {});
     return res.json({ ok: true });
   } catch (err) {
     logger.error(`[cryptobot/webhook] ${err?.message || err}`);

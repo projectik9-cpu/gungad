@@ -10,6 +10,7 @@
  */
 import logger from '../../utils/logger.js';
 import { getSupabaseAdmin, ensureGgProfile } from '../../database/supabase.js';
+import { logStarsTopup } from '../../services/telegramLog.js';
 
 const STARS_TO_CENTS = 1.3; // 1 Star = $0.013 → in cents: 1.3 cents
 
@@ -75,6 +76,13 @@ export async function successfulPaymentHandler(ctx) {
 
     logger.info('[stars] credited profile=%s stars=%d usd_cents=%d idempotent=%s',
       profileId, starsAmount, usdCents, data?.idempotent);
+
+    logStarsTopup({
+      profileId,
+      starsAmount,
+      usdCents,
+      idempotent: Boolean(data?.idempotent),
+    }).catch(() => {});
 
     // Notify user
     const usdFormatted = (usdCents / 100).toFixed(2);

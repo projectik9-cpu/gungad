@@ -7,6 +7,7 @@
  */
 import { getSupabaseAdmin } from '../database/supabase.js';
 import logger from '../utils/logger.js';
+import { logDepositCredited } from './telegramLog.js';
 
 const API_TOKEN = (process.env.CRYPTOBOT_API_TOKEN || '').trim();
 const CRYPTOBOT_API = 'https://pay.crypt.bot/api';
@@ -91,6 +92,15 @@ async function reconcile() {
     logger.info(
       `[cryptobotReconcile] credited deposit=${dep.id} $${paidUsd} invoice=${inv.invoice_id} idempotent=${data?.idempotent}`,
     );
+    logDepositCredited({
+      depositId: dep.id,
+      profileId: data?.profile_id ?? dep.profile_id,
+      amountCents,
+      provider: 'cryptobot',
+      externalId: `cb_${inv.invoice_id}`,
+      cryptoAmount: inv.paid_amount != null ? Number(inv.paid_amount) : null,
+      idempotent: Boolean(data?.idempotent),
+    }).catch(() => {});
   }
 }
 

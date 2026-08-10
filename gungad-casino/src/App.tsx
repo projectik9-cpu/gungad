@@ -14,6 +14,7 @@ import { DepositModal } from './components/DepositModal';
 import { SupportModal } from './components/SupportModal';
 import { ProfileModal } from './components/ProfileModal';
 import { ProvablyFairModal } from './components/ProvablyFairModal';
+import { WelcomeBonusWheel } from './components/WelcomeBonusWheel';
 import { AgeGate } from './components/AgeGate';
 import { RevolverLogo } from './components/RevolverLogo';
 import { t } from './translations';
@@ -100,7 +101,7 @@ function buildUserProfile(
 }
 
 export default function App() {
-  const { session, status, updateBalance } = useGgSession();
+  const { session, status, updateBalance, setWelcomeBonusClaimed } = useGgSession();
   const { version: ratesVersion } = useLiveRates();
   const isLive = status === 'live';
 
@@ -186,6 +187,7 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [provablyFairOpen, setProvablyFairOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [bonusOpen, setBonusOpen] = useState(false);
 
   // Close all modals helper — prevents stacking
   const closeAllModals = () => {
@@ -193,11 +195,13 @@ export default function App() {
     setProfileOpen(false);
     setProvablyFairOpen(false);
     setSupportOpen(false);
+    setBonusOpen(false);
   };
   const openDeposit = () => { closeAllModals(); setDepositOpen(true); };
   const openProfile = () => { closeAllModals(); setProfileOpen(true); };
   const openProvablyFair = () => { closeAllModals(); setProvablyFairOpen(true); };
   const openSupport = () => { closeAllModals(); setSupportOpen(true); };
+  const openBonus = () => { closeAllModals(); setBonusOpen(true); };
 
   const onlineCount = useGgOnline(
     session?.profile_id ?? null,
@@ -310,6 +314,9 @@ export default function App() {
           sessionStatus={status}
           activeTab={activeTab}
           activeGameId={activeGameId}
+          telegramId={session?.telegram_id ?? null}
+          welcomeBonusAvailable={Boolean(isLive && session?.welcome_bonus_available)}
+          onOpenBonus={openBonus}
           onSelectTab={(tKey) => {
             if (tKey === 'games') { soundFx.stopAllFx(); setActiveGameId(null); setActiveTab('games'); }
             else if (tKey === 'crash') { handleSelectGame('crash'); }
@@ -447,6 +454,18 @@ export default function App() {
         onClose={() => setSupportOpen(false)}
         lang={lang}
         profileId={session?.profile_id ?? null}
+      />
+      <WelcomeBonusWheel
+        open={bonusOpen}
+        lang={lang}
+        profileId={session?.profile_id ?? null}
+        onClose={() => setBonusOpen(false)}
+        onClaimed={(amountCents, balanceCents) => {
+          setWelcomeBonusClaimed();
+          if (balanceCents > 0 || amountCents > 0) {
+            handleBalanceUpdate(balanceCents);
+          }
+        }}
       />
     </div>
     {!legalOk && (

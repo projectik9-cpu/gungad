@@ -44,6 +44,7 @@ export interface GgProfile {
   is_blocked: boolean;
   is_admin: boolean;
   referrer_telegram_id: number | null;
+  welcome_bonus_claimed_at: string | null;
   created_at: string;
   updated_at: string;
   last_seen_at: string;
@@ -124,8 +125,17 @@ export interface Database {
           p_first_name?: string | null;
           p_last_name?: string | null;
           p_language_code?: string | null;
+          p_referrer_telegram_id?: number | null;
         };
         Returns: string;
+      };
+      gg_claim_welcome_bonus: {
+        Args: { p_profile_id: string };
+        Returns: {
+          already_claimed: boolean;
+          amount_cents: number;
+          balance_cents: number;
+        };
       };
       gg_heartbeat: {
         Args: {

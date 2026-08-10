@@ -26,6 +26,9 @@ interface HeaderProps {
   sessionStatus?: 'live' | 'demo' | 'loading' | 'error';
   activeTab?: string;
   activeGameId?: string | null;
+  telegramId?: number | null;
+  welcomeBonusAvailable?: boolean;
+  onOpenBonus?: () => void;
 }
 
 const LANG_CODES: Record<Language, string> = {
@@ -54,6 +57,9 @@ export const Header: React.FC<HeaderProps> = ({
   sessionStatus = 'loading',
   activeTab = 'games',
   activeGameId = null,
+  telegramId = null,
+  welcomeBonusAvailable = false,
+  onOpenBonus,
 }) => {
   const [langOpen, setLangOpen] = useState(false);
   const [currOpen, setCurrOpen] = useState(false);
@@ -96,7 +102,15 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Left: menu (desktop) + logo */}
           <div className="flex items-center gap-1.5 shrink-0 min-w-0">
             <div className="hidden md:block">
-              <SettingsMenu lang={lang} playMode={playMode} onToggleDemo={onToggleDemo} onOpenSupport={onOpenSupport} />
+              <SettingsMenu
+                lang={lang}
+                playMode={playMode}
+                onToggleDemo={onToggleDemo}
+                onOpenSupport={onOpenSupport}
+                telegramId={telegramId}
+                welcomeBonusAvailable={welcomeBonusAvailable}
+                onOpenBonus={onOpenBonus}
+              />
             </div>
             <div className="sm:hidden">
               <RevolverLogo size="sm" onClick={() => { soundFx.playClick(); onCloseModals?.(); onSelectTab('games'); }} />
@@ -223,6 +237,9 @@ export const Header: React.FC<HeaderProps> = ({
             onOpenSupport={onOpenSupport}
             navItem
             label={t('menu', lang)}
+            telegramId={telegramId}
+            welcomeBonusAvailable={welcomeBonusAvailable}
+            onOpenBonus={onOpenBonus}
           />
 
           {/* Home */}

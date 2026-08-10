@@ -19,6 +19,8 @@ export interface GgSessionData {
   total_wagered_cents: number;
   total_won_cents: number;
   total_lost_cents: number;
+  telegram_id?: number | null;
+  welcome_bonus_available?: boolean;
 }
 
 export type SessionStatus = 'loading' | 'demo' | 'live' | 'error';
@@ -30,6 +32,7 @@ export interface UseGgSessionResult {
   statusDetail: string | null;
   refreshWallet: () => Promise<void>;
   updateBalance: (newCents: number) => void;
+  setWelcomeBonusClaimed: () => void;
 }
 
 function getTelegramWebApp(): any | null {
@@ -107,6 +110,10 @@ export function useGgSession(): UseGgSessionResult {
     setSession((prev) => (prev ? { ...prev, balance_cents: newCents } : null));
   }, []);
 
+  const setWelcomeBonusClaimed = useCallback(() => {
+    setSession((prev) => (prev ? { ...prev, welcome_bonus_available: false } : null));
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -172,5 +179,5 @@ export function useGgSession(): UseGgSessionResult {
     };
   }, []);
 
-  return { session, status, statusDetail, refreshWallet, updateBalance };
+  return { session, status, statusDetail, refreshWallet, updateBalance, setWelcomeBonusClaimed };
 }

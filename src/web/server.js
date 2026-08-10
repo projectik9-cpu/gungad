@@ -13,6 +13,7 @@ import depositCryptoBotRouter from './api/depositCryptoBot.js';
 import depositTonRouter from './api/depositTon.js';
 import withdrawRouter, { setWithdrawBot } from './api/withdraw.js';
 import supportRouter, { setSupportBot } from './api/support.js';
+import bonusRouter from './api/bonus.js';
 
 export { setStarsBot, setWithdrawBot, setSupportBot };
 
@@ -194,6 +195,7 @@ app.use('/api/deposit/cryptobot', depositCryptoBotRouter);
 app.use('/api/deposit/ton',       depositTonRouter);
 app.use('/api/withdraw',  withdrawRouter);
 app.use('/api/support',   supportRouter);
+app.use('/api/bonus',     bonusRouter);
 
 // Обработка 404
 app.use((req, res) => {

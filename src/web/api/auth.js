@@ -5,7 +5,12 @@
  */
 import crypto from 'crypto';
 import express from 'express';
-import { getSupabaseAdmin, ensureGgProfile, getSupabaseDiag } from '../../database/supabase.js';
+import {
+  getSupabaseAdmin,
+  ensureGgProfile,
+  getSupabaseDiag,
+  parseReferrerTelegramId,
+} from '../../database/supabase.js';
 import config from '../../config/config.js';
 import logger from '../../utils/logger.js';
 
@@ -68,7 +73,8 @@ function validateInitData(initDataRaw) {
     if (!userRaw) return { error: 'user_missing' };
     const user = JSON.parse(userRaw);
     if (!user?.id) return { error: 'user_id_missing' };
-    return { user };
+    const startParam = params.get('start_param') || null;
+    return { user, startParam };
   } catch (e) {
     logger.warn(`[auth] validateInitData error: ${e?.message || e}`);
     return { error: 'validate_exception' };
@@ -102,8 +108,9 @@ router.post('/', async (req, res) => {
       });
     }
     const tgUser = validated.user;
+    const referrerId = parseReferrerTelegramId(validated.startParam);
 
-    const profileId = await ensureGgProfile(tgUser);
+    const profileId = await ensureGgProfile(tgUser, referrerId);
     if (!profileId) {
       return res.status(500).json({ error: 'Failed to create profile', code: 'ensure_profile_failed' });
     }
@@ -121,7 +128,10 @@ router.post('/', async (req, res) => {
 
     // New wallets start at 0 — no auto demo credits (user opts into demo in the Mini App)
 
-    logger.info(`[auth] ok telegram_id=${tgUser.id} profile=${profileId} balance=${data?.balance_cents}`);
+    logger.info(
+      `[auth] ok telegram_id=${tgUser.id} profile=${profileId} balance=${data?.balance_cents}` +
+        (referrerId ? ` ref=${referrerId}` : ''),
+    );
     return res.json({
       ok: true,
       profile_id: profileId,
@@ -134,6 +144,8 @@ router.post('/', async (req, res) => {
       total_wagered_cents: data?.total_wagered_cents ?? 0,
       total_won_cents: data?.total_won_cents ?? 0,
       total_lost_cents: data?.total_lost_cents ?? 0,
+      telegram_id: data?.telegram_id ?? tgUser.id,
+      welcome_bonus_available: data?.welcome_bonus_available !== false,
     });
   } catch (err) {
     const detail = String(err?.message || err).slice(0, 160);

@@ -1,16 +1,18 @@
 import logger from '../../utils/logger.js';
 import { openCasinoKeyboard, removeReplyKeyboard } from '../keyboards.js';
-import { ensureGgProfile } from '../../database/supabase.js';
+import { ensureGgProfile, parseReferrerTelegramId } from '../../database/supabase.js';
 
 /**
  * Обработчик команды /start
+ * Supports deep link: /start ref{telegram_id}
  */
 export async function startHandler(ctx) {
   try {
     const telegramUser = ctx.from;
+    const referrerId = parseReferrerTelegramId(ctx.startPayload);
 
     // Создаём / обновляем профиль в Supabase (gg_profiles + wallet)
-    ensureGgProfile(telegramUser).catch((err) => {
+    ensureGgProfile(telegramUser, referrerId).catch((err) => {
       logger.warn('ensureGgProfile on /start failed', err?.message || err);
     });
 
@@ -34,7 +36,10 @@ export async function startHandler(ctx) {
       reply_markup: openCasinoKeyboard().reply_markup,
     });
 
-    logger.info(`✅ Пользователь ${telegramUser.id} (@${telegramUser.username}) запустил бота`);
+    logger.info(
+      `✅ Пользователь ${telegramUser.id} (@${telegramUser.username}) запустил бота` +
+        (referrerId ? ` ref=${referrerId}` : ''),
+    );
   } catch (error) {
     logger.logError(error, 'startHandler');
     await ctx.reply('❌ Произошла ошибка. Попробуйте позже.');

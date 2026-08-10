@@ -62,18 +62,33 @@ export function getSupabaseDiag() {
   };
 }
 
+/** Parse `ref123456` start payload → telegram id or null */
+export function parseReferrerTelegramId(payload) {
+  if (payload == null) return null;
+  const raw = String(payload).trim();
+  const m = /^ref(\d+)$/i.exec(raw);
+  if (!m) return null;
+  const id = Number(m[1]);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
 /** Upsert Telegram user into gg_profiles + empty wallet */
-export async function ensureGgProfile(telegramUser) {
+export async function ensureGgProfile(telegramUser, referrerTelegramId = null) {
   const sb = getSupabaseAdmin();
   if (!sb) return null;
 
-  const { data, error } = await sb.rpc('gg_ensure_profile', {
+  const params = {
     p_telegram_id: telegramUser.id,
     p_username: telegramUser.username ?? null,
     p_first_name: telegramUser.first_name ?? null,
     p_last_name: telegramUser.last_name ?? null,
     p_language_code: telegramUser.language_code ?? 'ru',
-  });
+  };
+  if (referrerTelegramId != null) {
+    params.p_referrer_telegram_id = referrerTelegramId;
+  }
+
+  const { data, error } = await sb.rpc('gg_ensure_profile', params);
 
   if (error) {
     logger.error(`[supabase] gg_ensure_profile failed: ${error.message}`);
@@ -93,4 +108,4 @@ export async function getOnlinePlayersCount() {
   return data?.online_count ?? 0;
 }
 
-export default { getSupabaseAdmin, ensureGgProfile, getOnlinePlayersCount };
+export default { getSupabaseAdmin, ensureGgProfile, parseReferrerTelegramId, getOnlinePlayersCount };

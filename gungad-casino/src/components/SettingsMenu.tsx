@@ -15,9 +15,13 @@ import {
   ChevronRight,
   ChevronLeft,
   Menu,
+  Users,
+  Gift,
+  Share2,
 } from 'lucide-react';
 
 const SUPPORT_URL = 'https://t.me/gungad_bot';
+const BOT_USERNAME = 'gungad_bot';
 
 interface SettingsMenuProps {
   lang: Language;
@@ -28,6 +32,9 @@ interface SettingsMenuProps {
   /** Bottom-nav trigger style */
   navItem?: boolean;
   label?: string;
+  telegramId?: number | null;
+  welcomeBonusAvailable?: boolean;
+  onOpenBonus?: () => void;
 }
 
 function openSupport() {
@@ -43,6 +50,33 @@ function openSupport() {
   window.open(SUPPORT_URL, '_blank', 'noopener,noreferrer');
 }
 
+function shareReferralLink(telegramId: number, lang: Language) {
+  const link = `https://t.me/${BOT_USERNAME}?start=ref${telegramId}`;
+  const text = t('referralShareText', lang);
+  const shareUrl =
+    `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+  try {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(shareUrl);
+      return;
+    }
+  } catch {
+    /* ignore */
+  }
+  window.open(shareUrl, '_blank', 'noopener,noreferrer');
+}
+
+function NotifBadge({ className = '' }: { className?: string }) {
+  return (
+    <span
+      className={`absolute flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-black leading-none ring-2 ring-[#0a0a0d] ${className}`}
+    >
+      1
+    </span>
+  );
+}
+
 export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   lang,
   playMode,
@@ -50,17 +84,19 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   onOpenSupport,
   navItem = false,
   label,
+  telegramId = null,
+  welcomeBonusAvailable = false,
+  onOpenBonus,
 }) => {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [entered, setEntered] = useState(false);
-  const [panel, setPanel] = useState<'root' | 'settings'>('root');
+  const [panel, setPanel] = useState<'root' | 'settings' | 'referral'>('root');
   const [soundMuted, setSoundMuted] = useState(soundFx.getMuted());
   const [musicMuted, setMusicMuted] = useState(soundFx.getMusicMuted());
   const [volume, setVolume] = useState(soundFx.getVolume());
   const [musicVolume, setMusicVolume] = useState(soundFx.getMusicVolume());
 
-  // Enter / exit animation: keep portal mounted until slide-out finishes
   useEffect(() => {
     if (open) {
       setMounted(true);
@@ -86,7 +122,6 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     };
   }, []);
 
-  // Escape closes drawer
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -109,27 +144,30 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     <button
       type="button"
       onClick={openDrawer}
-      className={`flex w-full flex-col items-center justify-center gap-0.5 min-h-[52px] touch-manipulation select-none ${
+      className={`relative flex w-full flex-col items-center justify-center gap-0.5 min-h-[52px] touch-manipulation select-none ${
         open ? 'text-rose-400' : 'text-zinc-400'
       }`}
       aria-label={t('menu', lang)}
     >
-      <Menu className="w-5 h-5" />
+      <span className="relative inline-flex">
+        <Menu className="w-5 h-5" />
+        {welcomeBonusAvailable && <NotifBadge className="-top-2 -right-3" />}
+      </span>
       <span className="text-[10px] font-semibold leading-none">{label ?? t('menu', lang)}</span>
     </button>
   ) : (
     <button
       type="button"
       onClick={openDrawer}
-      className="flex items-center justify-center w-8 h-8 text-zinc-300 hover:text-white shrink-0 touch-manipulation"
+      className="relative flex items-center justify-center w-8 h-8 text-zinc-300 hover:text-white shrink-0 touch-manipulation"
       aria-label={t('menu', lang)}
       title={t('menu', lang)}
     >
       <Menu className="w-5 h-5" />
+      {welcomeBonusAvailable && <NotifBadge className="-top-0.5 -right-0.5" />}
     </button>
   );
 
-  // Portal to body — nav has backdrop-filter which breaks position:fixed
   const drawer =
     mounted &&
     createPortal(
@@ -153,7 +191,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         >
           <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-800/60 shrink-0">
             <span className="text-sm font-bold text-white tracking-wide uppercase">
-              {panel === 'settings' ? t('settings', lang) : 'GunGad'}
+              {panel === 'settings'
+                ? t('settings', lang)
+                : panel === 'referral'
+                  ? t('referralTitle', lang)
+                  : 'GunGad'}
             </span>
             <button
               type="button"
@@ -179,6 +221,42 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                   {t('settings', lang)}
                 </span>
                 <ChevronRight className="w-4 h-4 text-zinc-600" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setPanel('referral');
+                }}
+                className="flex items-center justify-between w-full px-4 py-3.5 rounded-xl text-sm font-semibold text-zinc-200 hover:bg-zinc-800/70 active:bg-zinc-800 transition-colors"
+              >
+                <span className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-emerald-400" />
+                  {t('referralTitle', lang)}
+                </span>
+                <ChevronRight className="w-4 h-4 text-zinc-600" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  if (onOpenBonus) onOpenBonus();
+                  closeDrawer();
+                }}
+                className="relative flex items-center gap-3 w-full px-4 py-3.5 rounded-xl text-sm font-semibold text-zinc-200 hover:bg-zinc-800/70 active:bg-zinc-800 transition-colors"
+              >
+                <span className="relative inline-flex">
+                  <Gift className="w-5 h-5 text-rose-400" />
+                  {welcomeBonusAvailable && <NotifBadge className="-top-2 -right-2" />}
+                </span>
+                {t('bonusMenu', lang)}
+                {welcomeBonusAvailable && (
+                  <span className="ml-auto text-[10px] font-bold text-red-400 bg-red-950/50 px-2 py-0.5 rounded-full ring-1 ring-red-500/60">
+                    1
+                  </span>
+                )}
               </button>
 
               <button
@@ -223,6 +301,47 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                 )}
               </button>
             </nav>
+          )}
+
+          {panel === 'referral' && (
+            <div className="flex flex-col gap-4 p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setPanel('root');
+                }}
+                className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 self-start"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                {t('menu', lang)}
+              </button>
+
+              <div className="flex flex-col gap-3 bg-[#0a0a0d] border border-zinc-800 rounded-xl p-4">
+                <p className="text-sm font-semibold text-zinc-200">{t('referralTitle', lang)}</p>
+                <p className="text-xs text-zinc-400 leading-relaxed">{t('referralDesc', lang)}</p>
+                {telegramId ? (
+                  <>
+                    <p className="text-[10px] font-mono text-zinc-600 break-all">
+                      {`https://t.me/${BOT_USERNAME}?start=ref${telegramId}`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        shareReferralLink(telegramId, lang);
+                      }}
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-bold touch-manipulation"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      {t('referralShare', lang)}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-xs text-amber-400/90">{t('referralNeedTelegram', lang)}</p>
+                )}
+              </div>
+            </div>
           )}
 
           {panel === 'settings' && (

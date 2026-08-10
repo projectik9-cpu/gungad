@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Language } from '../types';
 import { t } from '../translations';
@@ -6,6 +6,15 @@ import { soundFx } from '../utils/sound';
 import { X, LifeBuoy, Loader2, Send } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
+
+interface SupportTicket {
+  id: string;
+  message: string;
+  status: string;
+  reply_text: string | null;
+  replied_at: string | null;
+  created_at: string;
+}
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -19,6 +28,26 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, lan
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !profileId) return;
+    let cancelled = false;
+    setLoadingTickets(true);
+    fetch(`${API_BASE}/api/support/tickets?profile_id=${encodeURIComponent(profileId)}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json?.ok && Array.isArray(json.tickets)) {
+          setTickets(json.tickets);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingTickets(false);
+      });
+    return () => { cancelled = true; };
+  }, [isOpen, profileId, sent]);
 
   if (!isOpen) return null;
 
@@ -56,6 +85,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, lan
     onClose();
   };
 
+  const replied = tickets.filter((t) => t.reply_text);
+
   return createPortal(
     <div
       className="fixed inset-0 z-[550] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
@@ -64,10 +95,10 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, lan
       aria-modal="true"
     >
       <div
-        className="relative w-full sm:max-w-md bg-[#0e0e12] border border-sky-900/50 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col text-zinc-100 overflow-hidden"
+        className="relative w-full sm:max-w-md bg-[#0e0e12] border border-sky-900/50 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col text-zinc-100 overflow-hidden max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0">
           <div className="flex items-center gap-2">
             <LifeBuoy className="w-5 h-5 text-sky-400" />
             <h3 className="font-display font-black text-lg uppercase tracking-wider text-white">
@@ -83,7 +114,28 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, lan
           </button>
         </div>
 
-        <div className="px-5 py-4 flex flex-col gap-3 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
+        <div className="px-5 py-4 flex flex-col gap-3 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] overflow-y-auto">
+          {replied.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Ответы поддержки</p>
+              {replied.slice(0, 5).map((ticket) => (
+                <div
+                  key={ticket.id}
+                  className="rounded-xl border border-emerald-900/50 bg-emerald-950/40 p-3 text-sm"
+                >
+                  <p className="text-zinc-400 text-xs mb-1.5 line-clamp-2">{ticket.message}</p>
+                  <p className="text-emerald-300 font-medium whitespace-pre-wrap">{ticket.reply_text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {loadingTickets && replied.length === 0 && (
+            <div className="flex justify-center py-2 text-zinc-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </div>
+          )}
+
           {sent ? (
             <div className="p-4 bg-emerald-950 border border-emerald-600 text-emerald-300 text-sm font-bold rounded-xl text-center">
               ✅ {t('supportSent', lang)}

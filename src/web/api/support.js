@@ -4,6 +4,9 @@
  * POST /api/support/ticket
  *   Body: { profile_id, message }
  *   Saves ticket in gg_support_tickets, forwards to admins in Telegram.
+ *
+ * GET /api/support/tickets?profile_id=
+ *   Returns recent tickets + admin replies for the player inbox.
  */
 import express from 'express';
 import { getSupabaseAdmin } from '../../database/supabase.js';
@@ -17,6 +20,35 @@ let _bot = null;
 export function setSupportBot(bot) { _bot = bot; }
 
 const MAX_MESSAGE_LEN = 2000;
+
+router.get('/tickets', async (req, res) => {
+  try {
+    const profileId = String(req.query.profile_id || '').trim();
+    if (!profileId) {
+      return res.status(400).json({ error: 'profile_id required' });
+    }
+
+    const sb = getSupabaseAdmin();
+    if (!sb) return res.status(500).json({ error: 'Supabase not configured' });
+
+    const { data, error } = await sb
+      .from('gg_support_tickets')
+      .select('id, message, status, reply_text, replied_at, created_at')
+      .eq('profile_id', profileId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      logger.error(`[support/tickets] ${error.message}`);
+      return res.status(500).json({ error: 'Не удалось загрузить обращения' });
+    }
+
+    return res.json({ ok: true, tickets: data || [] });
+  } catch (err) {
+    logger.error(`[support/tickets] ${err?.message || err}`);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.post('/ticket', async (req, res) => {
   try {
@@ -72,6 +104,8 @@ router.post('/ticket', async (req, res) => {
         text,
         '',
         `Тикет: <code>${ticket.id}</code>`,
+        '',
+        '<i>Ответь кнопкой «Ответить», реплаем на это сообщение, или /reply UUID текст</i>',
       ].join('\n');
 
       const keyboard = {

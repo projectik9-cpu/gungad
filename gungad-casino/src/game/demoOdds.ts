@@ -24,20 +24,21 @@ export function blackjackNaturalMult(isDemo: boolean): number {
 /** Soften early crash buckets in demo (~103% feel vs ~5% edge). */
 export function generateCrashPoint(isDemo = false): number {
   const rand = Math.random();
+  let point: number;
   if (isDemo) {
-    if (rand < 0.04) return parseFloat((1.00 + Math.random() * 0.04).toFixed(2));
-    if (rand < 0.45) return parseFloat((1.01 + Math.random() * 0.49).toFixed(2));
-    if (rand < 0.68) return parseFloat((1.5 + Math.random() * 0.5).toFixed(2));
-    if (rand < 0.86) return parseFloat((2.0 + Math.random() * 3.0).toFixed(2));
-    if (rand < 0.95) return parseFloat((5.0 + Math.random() * 5.0).toFixed(2));
-    return parseFloat((10.0 + Math.random() * 90.0).toFixed(2));
-  }
-  if (rand < 0.08) return parseFloat((1.00 + Math.random() * 0.04).toFixed(2));
-  if (rand < 0.55) return parseFloat((1.01 + Math.random() * 0.49).toFixed(2));
-  if (rand < 0.75) return parseFloat((1.5 + Math.random() * 0.5).toFixed(2));
-  if (rand < 0.90) return parseFloat((2.0 + Math.random() * 3.0).toFixed(2));
-  if (rand < 0.97) return parseFloat((5.0 + Math.random() * 5.0).toFixed(2));
-  return parseFloat((10.0 + Math.random() * 90.0).toFixed(2));
+    if (rand < 0.04) point = 1.00 + Math.random() * 0.04;
+    else if (rand < 0.45) point = 1.01 + Math.random() * 0.49;
+    else if (rand < 0.68) point = 1.5 + Math.random() * 0.5;
+    else if (rand < 0.86) point = 2.0 + Math.random() * 3.0;
+    else if (rand < 0.95) point = 5.0 + Math.random() * 5.0;
+    else point = 10.0 + Math.random() * 40.0; // cap ~50x demo
+  } else if (rand < 0.08) point = 1.00 + Math.random() * 0.04;
+  else if (rand < 0.55) point = 1.01 + Math.random() * 0.49;
+  else if (rand < 0.75) point = 1.5 + Math.random() * 0.5;
+  else if (rand < 0.90) point = 2.0 + Math.random() * 3.0;
+  else if (rand < 0.97) point = 5.0 + Math.random() * 5.0;
+  else point = 10.0 + Math.random() * 40.0; // cap ~50x real
+  return parseFloat(Math.min(50, Math.max(1, point)).toFixed(2));
 }
 
 /** Plinko multipliers — demo bumps mid buckets slightly. */

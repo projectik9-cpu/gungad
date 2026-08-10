@@ -34,14 +34,26 @@ async function notifyUser(bot, sb, profileId, text) {
   return false;
 }
 
+async function resolveTicketTelegramId(sb, ticket) {
+  if (ticket?.telegram_id) return Number(ticket.telegram_id);
+  if (!ticket?.profile_id) return null;
+  const { data: profile } = await sb
+    .from('gg_profiles')
+    .select('telegram_id')
+    .eq('id', ticket.profile_id)
+    .maybeSingle();
+  return profile?.telegram_id ? Number(profile.telegram_id) : null;
+}
+
 async function notifyUserByTelegramId(bot, telegramId, text) {
-  if (!telegramId) return false;
+  if (!telegramId) return { ok: false, reason: 'no_telegram_id' };
   try {
     await bot.telegram.sendMessage(telegramId, text, { parse_mode: 'HTML' });
-    return true;
+    return { ok: true };
   } catch (e) {
-    logger.warn(`[admin] notify tg ${telegramId} failed: ${e?.message || e}`);
-    return false;
+    const reason = e?.response?.description || e?.message || String(e);
+    logger.warn(`[admin] notify tg ${telegramId} failed: ${reason}`);
+    return { ok: false, reason };
   }
 }
 
@@ -51,6 +63,77 @@ function askForceReply(ctx, prompt, pending) {
     parse_mode: 'HTML',
     ...Markup.forceReply(),
   });
+}
+
+async function deliverSupportReply(bot, sb, ticket, text, adminId) {
+  const replyBody = String(text || '').slice(0, 4000);
+
+  // Always persist first — player can read it in Mini App even if TG DM fails
+  await sb.from('gg_support_tickets').update({
+    status: 'replied',
+    replied_at: new Date().toISOString(),
+    reply_text: replyBody,
+    admin_telegram_id: adminId,
+  }).eq('id', ticket.id);
+
+  const tgId = await resolveTicketTelegramId(sb, ticket);
+  if (tgId && !ticket.telegram_id) {
+    await sb.from('gg_support_tickets')
+      .update({ telegram_id: tgId })
+      .eq('id', ticket.id)
+      .catch(() => {});
+  }
+
+  const send = await notifyUserByTelegramId(
+    bot,
+    tgId,
+    `💬 <b>Ответ поддержки GunGad</b>\n\n${escapeHtml(replyBody)}\n\n<code>Тикет ${ticket.id}</code>`,
+  );
+
+  return send;
+}
+
+/**
+ * Resolve pending admin action from memory, reply-to ticket, or awaiting_admin_reply row.
+ */
+async function resolvePendingAction(ctx, sb) {
+  const fromId = ctx.from.id;
+  const pending = pendingAdminReplies.get(fromId);
+  if (pending) {
+    pendingAdminReplies.delete(fromId);
+    return pending;
+  }
+
+  const replyToId = ctx.message?.reply_to_message?.message_id;
+  if (replyToId) {
+    const { data: byMsg } = await sb
+      .from('gg_support_tickets')
+      .select('id, telegram_id, profile_id, message, status')
+      .eq('admin_message_id', replyToId)
+      .maybeSingle();
+    if (byMsg) return { kind: 'sup_reply', id: byMsg.id, ticket: byMsg };
+
+    // Withdrawal message reply-to
+    const { data: wd } = await sb
+      .from('gg_withdrawals')
+      .select('id')
+      .eq('admin_message_id', replyToId)
+      .maybeSingle();
+    if (wd) return { kind: 'wd_msg', id: wd.id };
+  }
+
+  // Durable fallback after bot restart: admin clicked Reply earlier
+  const { data: awaiting } = await sb
+    .from('gg_support_tickets')
+    .select('id, telegram_id, profile_id, message, status')
+    .eq('admin_telegram_id', fromId)
+    .eq('status', 'awaiting_admin_reply')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (awaiting) return { kind: 'sup_reply', id: awaiting.id, ticket: awaiting };
+
+  return null;
 }
 
 export function registerAdminHandlers(bot) {
@@ -151,10 +234,22 @@ export function registerAdminHandlers(bot) {
         return ctx.answerCbQuery('Нет прав', { show_alert: true });
       }
       const ticketId = ctx.match[1];
+      const sb = getSupabaseAdmin();
+      if (sb) {
+        await sb.from('gg_support_tickets').update({
+          status: 'awaiting_admin_reply',
+          admin_telegram_id: ctx.from.id,
+        }).eq('id', ticketId);
+      }
       await ctx.answerCbQuery();
       const prompt = await askForceReply(
         ctx,
-        `💬 Ответ на тикет <code>${ticketId}</code>\nНапиши сообщение игроку:`,
+        [
+          `💬 Ответ на тикет <code>${ticketId}</code>`,
+          'Напиши сообщение игроку следующим сообщением.',
+          'Можно также ответить реплаем на само сообщение с тикетом.',
+          `Или командой: <code>/reply ${ticketId} текст</code>`,
+        ].join('\n'),
         { kind: 'sup_reply', id: ticketId },
       );
       const entry = pendingAdminReplies.get(ctx.from.id);
@@ -188,26 +283,68 @@ export function registerAdminHandlers(bot) {
       ctx.answerCbQuery('Ошибка').catch(() => {});
     }
   });
+
+  // ── /reply TICKET_ID text… ───────────────────────────────────────────────
+  bot.command('reply', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) return;
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Команду /reply используй в ЛС с ботом.');
+        return;
+      }
+      const raw = (ctx.message?.text || '').trim();
+      const m = raw.match(/^\/reply(?:@\w+)?\s+([0-9a-f-]{36})\s+([\s\S]+)$/i);
+      if (!m) {
+        await ctx.reply('Использование: /reply TICKET_UUID текст ответа');
+        return;
+      }
+      const ticketId = m[1];
+      const body = m[2].trim();
+      const sb = getSupabaseAdmin();
+      if (!sb) {
+        await ctx.reply('БД недоступна');
+        return;
+      }
+      const { data: ticket } = await sb
+        .from('gg_support_tickets')
+        .select('id, telegram_id, profile_id, message')
+        .eq('id', ticketId)
+        .maybeSingle();
+      if (!ticket) {
+        await ctx.reply('Тикет не найден');
+        return;
+      }
+      const send = await deliverSupportReply(bot, sb, ticket, body, ctx.from.id);
+      if (send.ok) {
+        await ctx.reply('✅ Ответ отправлен игроку в Telegram и сохранён в тикете.');
+      } else {
+        await ctx.reply(
+          `⚠️ Ответ сохранён в тикете (игрок увидит в приложении), но Telegram DM не ушёл: ${escapeHtml(send.reason || 'unknown')}\nЧастая причина: игрок не нажимал /start у бота.`,
+          { parse_mode: 'HTML' },
+        );
+      }
+    } catch (e) {
+      logger.error(`[admin] /reply: ${e?.message || e}`);
+      await ctx.reply('Ошибка /reply').catch(() => {});
+    }
+  });
 }
 
 /**
- * Handle admin ForceReply texts. Returns true if consumed.
+ * Handle admin ForceReply / reply-to-ticket texts. Returns true if consumed.
  * Must run before catch-all message handler.
  */
 export async function handleAdminReplyMessage(ctx, bot) {
   if (!ctx.from || !isAdmin(ctx)) return false;
+  if (ctx.chat?.type !== 'private') return false;
   const text = ctx.message?.text;
   if (!text || text.startsWith('/')) return false;
 
-  const pending = pendingAdminReplies.get(ctx.from.id);
-  if (!pending) return false;
-
-  pendingAdminReplies.delete(ctx.from.id);
   const sb = getSupabaseAdmin();
-  if (!sb) {
-    await ctx.reply('БД недоступна');
-    return true;
-  }
+  if (!sb) return false;
+
+  const pending = await resolvePendingAction(ctx, sb);
+  if (!pending) return false;
 
   try {
     if (pending.kind === 'wd_reject') {
@@ -264,27 +401,29 @@ export async function handleAdminReplyMessage(ctx, bot) {
     }
 
     if (pending.kind === 'sup_reply') {
-      const { data: ticket } = await sb
-        .from('gg_support_tickets')
-        .select('id, telegram_id, profile_id, message')
-        .eq('id', pending.id)
-        .maybeSingle();
+      let ticket = pending.ticket;
+      if (!ticket) {
+        const { data } = await sb
+          .from('gg_support_tickets')
+          .select('id, telegram_id, profile_id, message')
+          .eq('id', pending.id)
+          .maybeSingle();
+        ticket = data;
+      }
       if (!ticket) {
         await ctx.reply('Тикет не найден');
         return true;
       }
-      const ok = await notifyUserByTelegramId(
-        bot,
-        ticket.telegram_id,
-        `💬 <b>Ответ поддержки GunGad</b>\n\n${escapeHtml(text)}`,
-      );
-      await sb.from('gg_support_tickets').update({
-        status: 'replied',
-        replied_at: new Date().toISOString(),
-        reply_text: text.slice(0, 4000),
-        admin_telegram_id: ctx.from.id,
-      }).eq('id', pending.id);
-      await ctx.reply(ok ? '✅ Ответ отправлен игроку' : '❌ Не удалось отправить (нет telegram_id?)');
+
+      const send = await deliverSupportReply(bot, sb, ticket, text, ctx.from.id);
+      if (send.ok) {
+        await ctx.reply('✅ Ответ отправлен игроку в Telegram и сохранён в тикете.');
+      } else {
+        await ctx.reply(
+          `⚠️ Ответ сохранён в тикете (игрок увидит в поддержке в приложении), но в Telegram не дошло: <code>${escapeHtml(send.reason || 'unknown')}</code>\nЧастая причина: игрок не писал /start боту.`,
+          { parse_mode: 'HTML' },
+        );
+      }
       return true;
     }
   } catch (e) {

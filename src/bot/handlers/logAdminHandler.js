@@ -528,7 +528,7 @@ async function cmdTickets(ctx) {
   const sb = getSupabaseAdmin();
   const { data } = await sb
     .from('gg_support_tickets')
-    .select('id, status, message, admin_reply, created_at, updated_at')
+    .select('id, status, message, reply_text, created_at, replied_at')
     .eq('profile_id', profile.id)
     .order('created_at', { ascending: false })
     .limit(15);
@@ -537,7 +537,7 @@ async function cmdTickets(ctx) {
     lines.push(
       `${escapeHtml(t.status)} <code>${t.id}</code> · ${fmtTs(t.created_at)}`,
       escapeHtml((t.message || '').slice(0, 200)),
-      t.admin_reply ? `↳ ${escapeHtml(String(t.admin_reply).slice(0, 200))}` : null,
+      t.reply_text ? `↳ ${escapeHtml(String(t.reply_text).slice(0, 200))}` : null,
       '',
     );
   }

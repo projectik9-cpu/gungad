@@ -161,7 +161,7 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
 
       if (data.already_claimed) {
         claimedRef.current = true;
-        onClaimed(0, data.balance_cents ?? 0);
+        onClaimed(0, 0);
         setError(t('bonusAlreadyClaimed', lang));
         setSpinning(false);
         return;

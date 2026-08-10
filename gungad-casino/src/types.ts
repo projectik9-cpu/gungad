@@ -55,6 +55,8 @@ export interface BetHistoryItem {
   currency: Currency;
   clientSeed?: string;
   serverSeedHash?: string;
+  /** When true, money already moved via place/resolve — skip one-shot settle */
+  serverSettled?: boolean;
 }
 
 export interface LiveFeedItem {

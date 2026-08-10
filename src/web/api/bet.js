@@ -1,36 +1,34 @@
 /**
- * POST /api/bet
- * Atomically settles a game bet via gg_settle_bet RPC (service_role).
- * Body: { profile_id, game_id, bet_cents, payout_cents, multiplier, status,
- *         result, idempotency_key, client_seed, server_seed_hash, server_seed }
+ * Bet API
+ *   POST /api/bet         — one-shot settle (non-crash games)
+ *   POST /api/bet/place   — debit + open pending bet (crash)
+ *   POST /api/bet/resolve — resolve pending bet (crash cashout/loss)
  *
- * The client MUST NOT send payout amount — server calculates it from game result.
- * This route is the single source of truth for balance changes.
- *
- * NOTE: client sends game outcome params; server verifies and calculates payout.
- * For full provably-fair: server generates seeds. For now we accept client seeds
- * and store for audit. Balance calculation is server-side only.
+ * All routes require initData and verify profile ownership.
  */
 import express from 'express';
 import { getSupabaseAdmin } from '../../database/supabase.js';
 import logger from '../../utils/logger.js';
+import { assertProfileOwnership } from './telegramAuth.js';
 
 const router = express.Router();
 
 const VALID_GAMES = ['crash', 'roulette', 'blackjack', 'coinflip', 'dice', 'mines', 'plinko', 'slots'];
 const VALID_STATUSES = ['won', 'lost', 'push', 'cashed_out'];
+const VALID_RESOLVE_STATUSES = ['won', 'lost', 'push', 'cashed_out', 'cancelled'];
 
-// Basic sanity — bet limits in cents ($0.01 to $10,000)
 const MIN_BET_CENTS = 1;
 const MAX_BET_CENTS = 1_000_000;
 
+/** POST /api/bet — one-shot settle for games that finish in one request */
 router.post('/', async (req, res) => {
   try {
     const {
       profile_id,
+      initData,
       game_id,
       bet_cents,
-      payout_cents,    // 0 for loss; full payout (stake+profit) for win
+      payout_cents,
       multiplier,
       status,
       result,
@@ -38,14 +36,22 @@ router.post('/', async (req, res) => {
       client_seed,
       server_seed_hash,
       server_seed,
-    } = req.body;
+    } = req.body || {};
 
-    // --- Validation --------------------------------------------------------
-    if (!profile_id || typeof profile_id !== 'string') {
-      return res.status(400).json({ error: 'profile_id required' });
+    const auth = await assertProfileOwnership(profile_id, initData);
+    if (!auth.ok) {
+      return res.status(auth.status).json({ error: auth.error, code: auth.code });
     }
+
     if (!VALID_GAMES.includes(game_id)) {
       return res.status(400).json({ error: `Invalid game_id: ${game_id}` });
+    }
+    // Crash must use place/resolve so stake is locked before outcome
+    if (game_id === 'crash') {
+      return res.status(400).json({
+        error: 'Crash must use /api/bet/place and /api/bet/resolve',
+        code: 'use_place_resolve',
+      });
     }
     if (!Number.isInteger(bet_cents) || bet_cents < MIN_BET_CENTS || bet_cents > MAX_BET_CENTS) {
       return res.status(400).json({ error: `bet_cents must be integer ${MIN_BET_CENTS}–${MAX_BET_CENTS}` });
@@ -60,13 +66,11 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'multiplier must be non-negative number' });
     }
 
-    // Sanity: payout cannot exceed bet × some max multiplier (e.g. 10,000x)
     const MAX_MULTIPLIER = 10_000;
     if (payout_cents > bet_cents * MAX_MULTIPLIER) {
       return res.status(400).json({ error: 'payout_cents exceeds maximum allowed' });
     }
 
-    // --- Call atomic RPC ---------------------------------------------------
     const sb = getSupabaseAdmin();
     const { data, error } = await sb.rpc('gg_settle_bet', {
       p_profile_id:        profile_id,
@@ -94,6 +98,108 @@ router.post('/', async (req, res) => {
     return res.json({ ok: true, ...data });
   } catch (err) {
     logger.error('[bet] Unexpected error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** POST /api/bet/place — debit available balance, open pending bet */
+router.post('/place', async (req, res) => {
+  try {
+    const { profile_id, initData, game_id, bet_cents, idempotency_key } = req.body || {};
+
+    const auth = await assertProfileOwnership(profile_id, initData);
+    if (!auth.ok) {
+      return res.status(auth.status).json({ error: auth.error, code: auth.code });
+    }
+
+    if (!VALID_GAMES.includes(game_id)) {
+      return res.status(400).json({ error: `Invalid game_id: ${game_id}` });
+    }
+    if (!Number.isInteger(bet_cents) || bet_cents < MIN_BET_CENTS || bet_cents > MAX_BET_CENTS) {
+      return res.status(400).json({ error: `bet_cents must be integer ${MIN_BET_CENTS}–${MAX_BET_CENTS}` });
+    }
+
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb.rpc('gg_place_bet', {
+      p_profile_id:      profile_id,
+      p_game_id:         game_id,
+      p_bet_cents:       bet_cents,
+      p_idempotency_key: idempotency_key ?? null,
+    });
+
+    if (error) {
+      logger.warn('[bet/place] error: %s', error.message);
+      if (error.message?.includes('Insufficient balance')) {
+        return res.status(402).json({ error: 'Insufficient balance', code: 'insufficient' });
+      }
+      if (error.message?.includes('Open bet already exists')) {
+        return res.status(409).json({ error: 'Open bet already exists', code: 'open_bet_exists' });
+      }
+      return res.status(500).json({ error: 'Failed to place bet', detail: error.message });
+    }
+
+    logger.info('[bet/place] profile=%s game=%s bet=%d id=%s', profile_id, game_id, bet_cents, data?.bet_id);
+    return res.json({ ok: true, ...data });
+  } catch (err) {
+    logger.error('[bet/place] Unexpected error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/** POST /api/bet/resolve — cashout or mark lost; server computes payout from multiplier */
+router.post('/resolve', async (req, res) => {
+  try {
+    const { profile_id, initData, bet_id, status, multiplier, result } = req.body || {};
+
+    const auth = await assertProfileOwnership(profile_id, initData);
+    if (!auth.ok) {
+      return res.status(auth.status).json({ error: auth.error, code: auth.code });
+    }
+
+    if (!bet_id || typeof bet_id !== 'string') {
+      return res.status(400).json({ error: 'bet_id required' });
+    }
+    if (!VALID_RESOLVE_STATUSES.includes(status)) {
+      return res.status(400).json({ error: `Invalid status: ${status}` });
+    }
+
+    const mult = typeof multiplier === 'number' ? multiplier : 0;
+    if (status === 'cashed_out' || status === 'won') {
+      if (!(mult >= 1 && mult <= 1000)) {
+        return res.status(400).json({ error: 'multiplier must be between 1 and 1000' });
+      }
+    }
+
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb.rpc('gg_resolve_bet', {
+      p_profile_id: profile_id,
+      p_bet_id:     bet_id,
+      p_status:     status,
+      p_multiplier: mult,
+      p_result:     result ?? {},
+    });
+
+    if (error) {
+      logger.warn('[bet/resolve] error: %s', error.message);
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: 'Bet not found' });
+      }
+      if (error.message?.includes('does not belong')) {
+        return res.status(403).json({ error: 'Bet ownership mismatch' });
+      }
+      if (error.message?.includes('Invalid multiplier')) {
+        return res.status(400).json({ error: 'Invalid multiplier' });
+      }
+      return res.status(500).json({ error: 'Failed to resolve bet', detail: error.message });
+    }
+
+    logger.info(
+      '[bet/resolve] profile=%s bet=%s status=%s payout=%s',
+      profile_id, bet_id, status, data?.payout_cents,
+    );
+    return res.json({ ok: true, ...data });
+  } catch (err) {
+    logger.error('[bet/resolve] Unexpected error', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

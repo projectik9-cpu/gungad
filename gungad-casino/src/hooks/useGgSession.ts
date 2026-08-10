@@ -11,6 +11,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.r
 export interface GgSessionData {
   profile_id: string;
   balance_cents: number;
+  locked_cents: number;
   stars_balance: number;
   vip_level: number;
   vip_xp: number;
@@ -31,7 +32,7 @@ export interface UseGgSessionResult {
   /** Why demo/error — for UI badge tooltip */
   statusDetail: string | null;
   refreshWallet: () => Promise<void>;
-  updateBalance: (newCents: number) => void;
+  updateBalance: (newCents: number, lockedCents?: number) => void;
   setWelcomeBonusClaimed: () => void;
 }
 
@@ -106,8 +107,16 @@ export function useGgSession(): UseGgSessionResult {
     await fetchWallet(session.profile_id);
   }, [session?.profile_id, fetchWallet]);
 
-  const updateBalance = useCallback((newCents: number) => {
-    setSession((prev) => (prev ? { ...prev, balance_cents: newCents } : null));
+  const updateBalance = useCallback((newCents: number, lockedCents?: number) => {
+    setSession((prev) =>
+      prev
+        ? {
+            ...prev,
+            balance_cents: newCents,
+            ...(typeof lockedCents === 'number' ? { locked_cents: lockedCents } : {}),
+          }
+        : null,
+    );
   }, []);
 
   const setWelcomeBonusClaimed = useCallback(() => {
@@ -162,7 +171,10 @@ export function useGgSession(): UseGgSessionResult {
           return;
         }
         if (cancelled) return;
-        setSession(data);
+        setSession({
+          ...data,
+          locked_cents: Number(data.locked_cents) || 0,
+        });
         setStatus('live');
         setStatusDetail(null);
       } catch (err) {

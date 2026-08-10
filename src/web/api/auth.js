@@ -1,9 +1,8 @@
 /**
  * POST /api/auth
  * Validates Telegram WebApp initData (HMAC), ensures profile in gg_profiles,
- * returns { profile_id, balance_cents, stars_balance, vip_level, vip_xp, username, first_name }
+ * returns { profile_id, balance_cents, locked_cents, stars_balance, vip_level, vip_xp, username, first_name }
  */
-import crypto from 'crypto';
 import express from 'express';
 import {
   getSupabaseAdmin,
@@ -13,73 +12,9 @@ import {
 } from '../../database/supabase.js';
 import config from '../../config/config.js';
 import logger from '../../utils/logger.js';
+import { validateInitData } from './telegramAuth.js';
 
 const router = express.Router();
-
-/**
- * Validate Telegram Mini App initData signature.
- * Returns { user } or { error }.
- */
-function validateInitData(initDataRaw) {
-  try {
-    if (!initDataRaw || typeof initDataRaw !== 'string') {
-      return { error: 'empty_init_data' };
-    }
-
-    const botToken = config.telegram.botToken;
-    if (!botToken) {
-      return { error: 'bot_token_missing' };
-    }
-
-    const params = new URLSearchParams(initDataRaw);
-    const hash = params.get('hash');
-    if (!hash) return { error: 'hash_missing' };
-
-    // data_check_string: all fields except hash, sorted by key, key=value\n
-    const pairs = [];
-    for (const [key, value] of params.entries()) {
-      if (key === 'hash') continue;
-      pairs.push([key, value]);
-    }
-    pairs.sort((a, b) => a[0].localeCompare(b[0]));
-    const checkString = pairs.map(([k, v]) => `${k}=${v}`).join('\n');
-
-    // secret_key = HMAC_SHA256(key="WebAppData", msg=bot_token)
-    const secretKey = crypto
-      .createHmac('sha256', 'WebAppData')
-      .update(botToken)
-      .digest();
-
-    const expectedHash = crypto
-      .createHmac('sha256', secretKey)
-      .update(checkString)
-      .digest('hex');
-
-    // timing-safe compare
-    const a = Buffer.from(expectedHash, 'utf8');
-    const b = Buffer.from(hash, 'utf8');
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-      logger.warn(`[auth] hash mismatch tokenLen=${botToken.length} checkLen=${checkString.length}`);
-      return { error: 'hash_mismatch' };
-    }
-
-    const authDate = parseInt(params.get('auth_date') || '0', 10);
-    if (Date.now() / 1000 - authDate > 86400) {
-      // 24h soft reject — Telegram can keep WebApp open a while
-      logger.warn(`[auth] initData old, auth_date=${authDate}`);
-    }
-
-    const userRaw = params.get('user');
-    if (!userRaw) return { error: 'user_missing' };
-    const user = JSON.parse(userRaw);
-    if (!user?.id) return { error: 'user_id_missing' };
-    const startParam = params.get('start_param') || null;
-    return { user, startParam };
-  } catch (e) {
-    logger.warn(`[auth] validateInitData error: ${e?.message || e}`);
-    return { error: 'validate_exception' };
-  }
-}
 
 /** Quick health for debugging from WebApp */
 router.get('/ping', (req, res) => {
@@ -136,6 +71,7 @@ router.post('/', async (req, res) => {
       ok: true,
       profile_id: profileId,
       balance_cents: data?.balance_cents ?? 0,
+      locked_cents: data?.locked_cents ?? 0,
       stars_balance: data?.stars_balance ?? 0,
       vip_level: data?.vip_level ?? 1,
       vip_xp: data?.vip_xp ?? 0,

@@ -101,7 +101,7 @@ function buildUserProfile(
 }
 
 export default function App() {
-  const { session, status, updateBalance, setWelcomeBonusClaimed } = useGgSession();
+  const { session, status, updateBalance, setWelcomeBonusClaimed, refreshWallet } = useGgSession();
   const { version: ratesVersion } = useLiveRates();
   const isLive = status === 'live';
 
@@ -111,6 +111,7 @@ export default function App() {
 
   // Real wallet (server) — default 0, never auto-demo
   const [balanceCents, setBalanceCents] = useState(0);
+  const [lockedCents, setLockedCents] = useState(0);
 
   // Separate demo wallet
   const [demoBalanceCents, setDemoBalanceCents] = useState(() => {
@@ -136,38 +137,43 @@ export default function App() {
   useEffect(() => {
     if (isLive && session && playMode === 'real') {
       setBalanceCents(session.balance_cents);
+      setLockedCents(session.locked_cents ?? 0);
     }
-  }, [isLive, session?.balance_cents, playMode]);
+  }, [isLive, session?.balance_cents, session?.locked_cents, playMode]);
 
-  const displayBalanceCents = playMode === 'demo' ? demoBalanceCents : balanceCents;
+  // Spendable balance for UI / bets (withdrawal locks are not bettable)
+  const availableCents = playMode === 'demo'
+    ? demoBalanceCents
+    : Math.max(0, balanceCents - lockedCents);
 
-  const handleBalanceUpdate = useCallback((newCents: number) => {
+  const handleBalanceUpdate = useCallback((newCents: number, nextLocked?: number) => {
     const next = Math.max(0, newCents);
     if (playMode === 'demo') {
       setDemoBalanceCents(next);
       return;
     }
     setBalanceCents(next);
-    updateBalance(next);
+    if (typeof nextLocked === 'number') setLockedCents(Math.max(0, nextLocked));
+    updateBalance(next, nextLocked);
   }, [playMode, updateBalance]);
 
-  const { settleBet, refillDemo } = useGgBalance(
+  const { settleBet, placeBet, resolveBet, refillDemo } = useGgBalance(
     session,
     status,
     handleBalanceUpdate,
-    { playMode, balanceCents: displayBalanceCents },
+    { playMode, balanceCents: availableCents },
   );
 
   const [extraStats, setExtraStats] = useState({ betsCount: 0, winsCount: 0 });
   const useLiveProfile = isLive && playMode === 'real';
   const user: UserProfile = useMemo(() => {
-    const profile = buildUserProfile(session, useLiveProfile, displayBalanceCents);
+    const profile = buildUserProfile(session, useLiveProfile, availableCents);
     return {
       ...profile,
       totalBetsCount: extraStats.betsCount,
       totalWinsCount: extraStats.winsCount,
     };
-  }, [session, useLiveProfile, displayBalanceCents, extraStats]);
+  }, [session, useLiveProfile, availableCents, extraStats]);
 
   const [currency, setCurrency] = useState<Currency>(() =>
     (localStorage.getItem('gungad_currency') as Currency) || 'USD',
@@ -221,6 +227,9 @@ export default function App() {
       winsCount: item.win ? prev.winsCount + 1 : prev.winsCount,
     }));
 
+    // Crash (and any serverSettled flow) already moved money via place/resolve
+    if (item.serverSettled || item.gameId === 'crash') return;
+
     // Real money settle only when live + real play mode
     if (playMode === 'real' && isLive && session?.profile_id) {
       settleBet({
@@ -233,10 +242,14 @@ export default function App() {
         client_seed: item.clientSeed,
         server_seed_hash: item.serverSeedHash,
       }).then(res => {
-        if (res.ok) handleBalanceUpdate(res.balance_cents);
+        if (res.ok) {
+          handleBalanceUpdate(res.balance_cents, res.locked_cents);
+        } else {
+          void refreshWallet();
+        }
       });
     }
-  }, [playMode, isLive, session?.profile_id, settleBet, handleBalanceUpdate]);
+  }, [playMode, isLive, session?.profile_id, settleBet, handleBalanceUpdate, refreshWallet]);
 
   const handleRefillDemo = useCallback(async () => {
     if (playMode !== 'demo') return;
@@ -250,8 +263,10 @@ export default function App() {
     setPlayMode(prev => {
       if (prev === 'demo') {
         // Exit demo → restore real balance
-        if (isLive && session) setBalanceCents(session.balance_cents);
-        else setBalanceCents(0);
+        if (isLive && session) {
+          setBalanceCents(session.balance_cents);
+          setLockedCents(session.locked_cents ?? 0);
+        } else setBalanceCents(0);
         return 'real';
       }
       // Enter demo — ensure starting credits if empty
@@ -287,6 +302,13 @@ export default function App() {
     onUpdateBalance: handleUpdateBalance,
     onAddHistory:    handleAddBetHistory,
   }), [user, currency, lang, playMode, handleUpdateBalance, handleAddBetHistory]);
+
+  const crashProps = useMemo(() => ({
+    ...gameProps,
+    placeBet,
+    resolveBet,
+    onRefreshWallet: refreshWallet,
+  }), [gameProps, placeBet, resolveBet, refreshWallet]);
 
   return (
     <>
@@ -397,7 +419,7 @@ export default function App() {
 
           {activeTab === 'games' && <GamesGrid onSelectGame={handleSelectGame} lang={lang} />}
 
-          {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...gameProps} />}
+          {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...crashProps} />}
           {activeTab === 'game' && activeGameId === 'roulette'  && <RouletteGame  {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'blackjack' && <BlackjackGame {...gameProps} />}
           {activeTab === 'game' && activeGameId === 'coinflip'  && <CoinFlipGame  {...gameProps} />}
@@ -462,7 +484,8 @@ export default function App() {
         onClose={() => setBonusOpen(false)}
         onClaimed={(amountCents, balanceCents) => {
           setWelcomeBonusClaimed();
-          if (balanceCents > 0 || amountCents > 0) {
+          // Only sync balance on a real grant — already_claimed must not restore UI balance
+          if (amountCents > 0) {
             handleBalanceUpdate(balanceCents);
           }
         }}

@@ -1,6 +1,31 @@
+import { createReadStream, existsSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import logger from '../../utils/logger.js';
 import { openCasinoKeyboard, removeReplyKeyboard } from '../keyboards.js';
 import { ensureGgProfile, getSupabaseAdmin, parseReferrerTelegramId } from '../../database/supabase.js';
+
+const WELCOME_IMAGE = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../assets/casino-welcome-gungad.png',
+);
+
+function escapeHtml(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function welcomeCaption(firstName) {
+  const name = escapeHtml(firstName || 'игрок');
+  return [
+    `Привет, <b>${name}</b>.`,
+    '',
+    'Добро пожаловать в <b>GunGad</b>.',
+    'Открой казино кнопкой ниже.',
+  ].join('\n');
+}
 
 /**
  * Обработчик команды /start
@@ -11,7 +36,6 @@ export async function startHandler(ctx) {
     const telegramUser = ctx.from;
     const referrerId = parseReferrerTelegramId(ctx.startPayload);
 
-    // Создаём / обновляем профиль в Supabase (gg_profiles + wallet)
     ensureGgProfile(telegramUser, referrerId)
       .then((profileId) => {
         if (!profileId) return;
@@ -27,25 +51,32 @@ export async function startHandler(ctx) {
         logger.warn('ensureGgProfile on /start failed', err?.message || err);
       });
 
-    const welcomeMessage = `
-🎰 <b>Добро пожаловать в GunGad Casino!</b> 🎰
+    const caption = welcomeCaption(telegramUser.first_name);
+    const keyboard = openCasinoKeyboard().reply_markup;
 
-Привет, <b>${telegramUser.first_name || 'игрок'}</b>! 👋
-
-Мы рады видеть тебя в нашем казино!
-
-<b>Нажми на кнопку ниже, чтобы открыть казино!</b> ⬇️
-    `.trim();
-
-    // Убираем старую reply-клавиатуру (Баланс/Профиль и т.д.)
-    await ctx.reply(welcomeMessage, {
-      parse_mode: 'HTML',
+    const stub = await ctx.reply('\u200b', {
       reply_markup: removeReplyKeyboard().reply_markup,
-    });
+    }).catch(() => null);
 
-    await ctx.reply('⬇️', {
-      reply_markup: openCasinoKeyboard().reply_markup,
-    });
+    if (existsSync(WELCOME_IMAGE)) {
+      await ctx.replyWithPhoto(
+        { source: createReadStream(WELCOME_IMAGE) },
+        {
+          caption,
+          parse_mode: 'HTML',
+          reply_markup: keyboard,
+        },
+      );
+    } else {
+      await ctx.reply(caption, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+      });
+    }
+
+    if (stub?.message_id) {
+      await ctx.deleteMessage(stub.message_id).catch(() => {});
+    }
 
     logger.info(
       `✅ Пользователь ${telegramUser.id} (@${telegramUser.username}) запустил бота` +

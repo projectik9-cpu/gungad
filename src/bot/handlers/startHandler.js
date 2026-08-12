@@ -1,6 +1,6 @@
 import logger from '../../utils/logger.js';
 import { openCasinoKeyboard, removeReplyKeyboard } from '../keyboards.js';
-import { ensureGgProfile, parseReferrerTelegramId } from '../../database/supabase.js';
+import { ensureGgProfile, getSupabaseAdmin, parseReferrerTelegramId } from '../../database/supabase.js';
 
 /**
  * Обработчик команды /start
@@ -12,9 +12,20 @@ export async function startHandler(ctx) {
     const referrerId = parseReferrerTelegramId(ctx.startPayload);
 
     // Создаём / обновляем профиль в Supabase (gg_profiles + wallet)
-    ensureGgProfile(telegramUser, referrerId).catch((err) => {
-      logger.warn('ensureGgProfile on /start failed', err?.message || err);
-    });
+    ensureGgProfile(telegramUser, referrerId)
+      .then((profileId) => {
+        if (!profileId) return;
+        const sb = getSupabaseAdmin();
+        if (!sb) return;
+        return sb
+          .from('gg_profiles')
+          .update({ bot_blocked_at: null, updated_at: new Date().toISOString() })
+          .eq('id', profileId)
+          .not('bot_blocked_at', 'is', null);
+      })
+      .catch((err) => {
+        logger.warn('ensureGgProfile on /start failed', err?.message || err);
+      });
 
     const welcomeMessage = `
 🎰 <b>Добро пожаловать в GunGad Casino!</b> 🎰

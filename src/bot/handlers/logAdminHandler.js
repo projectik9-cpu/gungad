@@ -16,6 +16,7 @@ import {
   fetchProfileByTelegramId,
   notifyLog,
 } from '../../services/telegramLog.js';
+import { runDailyBonusNotify } from '../../services/dailyBonusNotify.js';
 
 const TG_LIMIT = 3900;
 
@@ -159,6 +160,10 @@ const HELP_TEXT = `
 /stats — сводка казино
 /bigwins [n] — крупные выигрыши (профит ≥ $10)
 
+<b>Рассылка</b>
+/bonuspush — ежедневное уведомление про колесо (если ещё не уходило сегодня)
+/bonuspush force — отправить ещё раз сегодня
+
 <b>Прочее</b>
 /help — это меню
 /ping — проверка бота
@@ -174,6 +179,32 @@ async function cmdPing(ctx) {
   await replyChunks(
     ctx,
     `pong · chat=<code>${ctx.chat?.id}</code> · you=<code>${ctx.from?.id ?? 'channel'}</code>`,
+  );
+}
+
+async function cmdBonusPush(ctx) {
+  const force = parseCommand(getCommandText(ctx))?.arg0?.toLowerCase() === 'force';
+  await replyChunks(
+    ctx,
+    force
+      ? '📣 Принудительная рассылка колеса…'
+      : '📣 Рассылка колеса (если ещё не было сегодня)…',
+  );
+  const result = await runDailyBonusNotify({ telegram: ctx.telegram }, { force });
+  if (result?.skipped) {
+    await replyChunks(
+      ctx,
+      `Сегодня уже отправляли (<code>${escapeHtml(result.runDate || '')}</code>).\nПовтор: <code>/bonuspush force</code>`,
+    );
+    return;
+  }
+  if (!result?.ok) {
+    await replyChunks(ctx, `Не вышло: ${escapeHtml(result?.reason || 'unknown')}`);
+    return;
+  }
+  await replyChunks(
+    ctx,
+    `Готово · sent=<b>${result.sent ?? 0}</b> · skip=<b>${result.skipped ?? 0}</b> · fail=<b>${result.fail ?? 0}</b>`,
   );
 }
 
@@ -754,6 +785,7 @@ const COMMAND_MAP = {
   online: cmdOnline,
   stats: cmdStats,
   bigwins: cmdBigWins,
+  bonuspush: cmdBonusPush,
 };
 
 async function dispatchAdminCommand(ctx) {

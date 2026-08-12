@@ -3,6 +3,7 @@ import { registerHandlers } from './bot/handlers/index.js';
 import { startWebServer, setStarsBot, setWithdrawBot, setSupportBot } from './web/server.js';
 import { startTonMonitor } from './services/tonMonitor.js';
 import { startCryptoBotReconcile } from './services/cryptoBotReconcile.js';
+import { startDailyBonusNotify } from './services/dailyBonusNotify.js';
 import { setLogBot } from './services/telegramLog.js';
 import { maybeAnnounceCommandsOnline } from './bot/handlers/logAdminHandler.js';
 import { testConnection, syncDatabase } from './database/database.js';
@@ -86,6 +87,7 @@ async function startApplication() {
 
     logger.logBotStart();
     void maybeAnnounceCommandsOnline();
+    startDailyBonusNotify(bot);
 
     // Обработка завершения приложения
     process.once('SIGINT', () => gracefulShutdown('SIGINT'));

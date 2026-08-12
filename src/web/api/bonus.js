@@ -1,6 +1,6 @@
 /**
  * POST /api/bonus/welcome
- * One-time welcome wheel claim via gg_claim_welcome_bonus.
+ * Daily welcome wheel claim via gg_claim_welcome_bonus (once per Moscow day).
  * Body: { profile_id, initData }
  */
 import express from 'express';

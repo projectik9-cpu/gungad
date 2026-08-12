@@ -1,13 +1,14 @@
 /**
- * useGgOnline — real online player count via Railway API (service_role),
- * sends heartbeat every 15s. Presence is independent of demo/real play mode.
+ * useGgOnline — display count is a realistic 100–150 simulation (time-of-day).
+ * Heartbeat still writes real presence when the player is live.
  */
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type { GgGameId } from '../types/database';
+import { simulatedOnlineCount } from '../utils/simulatedOnline';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
 const HEARTBEAT_INTERVAL = 15_000;
-const ONLINE_POLL_INTERVAL = 15_000;
+const DISPLAY_TICK_MS = 2800;
 
 export function useGgOnline(
   profileId: string | null | undefined,
@@ -15,34 +16,13 @@ export function useGgOnline(
   activeGameId: GgGameId | null,
   isLive: boolean,
 ): number {
-  const [onlineCount, setOnlineCount] = useState<number>(isLive ? 1 : 0);
+  const [onlineCount, setOnlineCount] = useState<number>(() => simulatedOnlineCount());
   const heartbeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const liveRef = useRef(isLive);
-  liveRef.current = isLive;
-
-  const applyCount = useCallback((n: number) => {
-    // While live with a profile, never display below yourself
-    const floor = liveRef.current && profileId ? 1 : 0;
-    setOnlineCount(Math.max(floor, n));
-  }, [profileId]);
-
-  const fetchOnline = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/heartbeat/online`);
-      const json = await res.json().catch(() => ({}));
-      if (res.ok && json.ok && typeof json.online_count === 'number') {
-        applyCount(json.online_count);
-      }
-    } catch {
-      // keep last known
-    }
-  }, [applyCount]);
 
   const sendHeartbeat = useCallback(async () => {
     if (!profileId) return;
     try {
-      const res = await fetch(`${API_BASE}/api/heartbeat`, {
+      await fetch(`${API_BASE}/api/heartbeat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -51,47 +31,44 @@ export function useGgOnline(
           game_id: activeGameId ?? null,
         }),
       });
-      const json = await res.json().catch(() => ({}));
-      if (res.ok && json.ok && typeof json.online_count === 'number') {
-        applyCount(json.online_count);
-      } else if (res.ok) {
-        // Heartbeat wrote presence even if count missing — at least show self
-        applyCount(1);
-      }
     } catch {
       // ignore transient failures
     }
-  }, [profileId, sessionId, activeGameId, applyCount]);
+  }, [profileId, sessionId, activeGameId]);
 
   useEffect(() => {
-    if (!isLive || !profileId) {
-      setOnlineCount(0);
-      return;
-    }
+    const tick = () => {
+      const target = simulatedOnlineCount();
+      setOnlineCount((prev) => {
+        if (prev === target) return prev;
+        const dir = target > prev ? 1 : -1;
+        const delta = Math.min(2, Math.abs(target - prev));
+        return prev + dir * delta;
+      });
+    };
+    tick();
+    const displayTimer = setInterval(tick, DISPLAY_TICK_MS);
+    return () => clearInterval(displayTimer);
+  }, []);
 
-    setOnlineCount((n) => Math.max(1, n));
+  useEffect(() => {
+    if (!isLive || !profileId) return;
+
     sendHeartbeat();
-    fetchOnline();
-
-    pollTimer.current = setInterval(fetchOnline, ONLINE_POLL_INTERVAL);
     heartbeatTimer.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
 
     const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        sendHeartbeat();
-        fetchOnline();
-      }
+      if (document.visibilityState === 'visible') sendHeartbeat();
     };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
 
     return () => {
-      if (pollTimer.current) clearInterval(pollTimer.current);
       if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [isLive, profileId, fetchOnline, sendHeartbeat]);
+  }, [isLive, profileId, sendHeartbeat]);
 
   return onlineCount;
 }

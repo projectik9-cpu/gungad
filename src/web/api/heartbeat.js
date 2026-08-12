@@ -10,39 +10,13 @@
 import express from 'express';
 import { getSupabaseAdmin } from '../../database/supabase.js';
 import logger from '../../utils/logger.js';
+import { simulatedOnlineCount } from '../../utils/simulatedOnline.js';
 
 const router = express.Router();
 
-async function getOnlineCount(sb) {
-  // Prefer RPC (SECURITY DEFINER) — bypasses RLS
-  const { data: rpcCount, error: rpcErr } = await sb.rpc('gg_online_count');
-  if (!rpcErr && rpcCount != null) return Number(rpcCount) || 0;
-
-  // View fallback
-  const { data, error } = await sb.from('v_online_players_count').select('online_count').maybeSingle();
-  if (!error && data != null) return Number(data.online_count) || 0;
-  if (error) logger.warn(`[heartbeat] online view error: ${error.message}`);
-
-  // Direct table count — last resort (service_role bypasses RLS)
-  const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const { count, error: cntErr } = await sb
-    .from('gg_presence')
-    .select('*', { count: 'exact', head: true })
-    .gt('last_heartbeat_at', since);
-
-  if (cntErr) {
-    logger.warn(`[heartbeat] online count error: ${cntErr.message}`);
-    return 0;
-  }
-  return Number(count) || 0;
-}
-
 router.get('/online', async (_req, res) => {
   try {
-    const sb = getSupabaseAdmin();
-    if (!sb) return res.status(500).json({ error: 'Supabase not configured' });
-    const online_count = await getOnlineCount(sb);
-    return res.json({ ok: true, online_count });
+    return res.json({ ok: true, online_count: simulatedOnlineCount() });
   } catch (err) {
     logger.error(`[heartbeat/online] ${err?.message || err}`);
     res.status(500).json({ error: 'Internal server error' });
@@ -75,8 +49,7 @@ router.post('/', async (req, res) => {
       return res.status(500).json({ error: 'Heartbeat failed', detail: error.message });
     }
 
-    const online_count = await getOnlineCount(sb);
-    return res.json({ ok: true, online_count });
+    return res.json({ ok: true, online_count: simulatedOnlineCount() });
   } catch (err) {
     logger.error(`[heartbeat] Unexpected error: ${err?.message || err}`);
     res.status(500).json({ error: 'Internal server error' });

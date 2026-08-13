@@ -222,8 +222,12 @@ const stateHandler = async (req, res) => {
     if (!profileId) return;
     const tableId = req.body?.table_id || req.query.table_id;
     if (!tableId) return res.status(400).json({ error: 'table_id required' });
-    const [state, chat, spectators] = await Promise.all([
-      loadState(tableId),
+    const light = req.body?.light === true || req.query?.light === '1';
+    const state = await loadState(tableId);
+    if (light) {
+      return res.json({ ok: true, state: personalizedState(state, profileId) });
+    }
+    const [chat, spectators] = await Promise.all([
       chatMessages(tableId).catch(() => []),
       listSpectators(tableId).catch(() => []),
     ]);

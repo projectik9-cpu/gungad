@@ -20,7 +20,7 @@ export function legalActions(state, seat) {
   const stack = seat.stackCents || 0;
   const actions = [];
 
-  if (call > 0) actions.push({ type: 'fold' });
+  actions.push({ type: 'fold' });
 
   if (call === 0) {
     actions.push({ type: 'check' });

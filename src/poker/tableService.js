@@ -12,6 +12,7 @@ import {
   timeoutAction,
 } from './engine/flow.js';
 import { formatCard } from './engine/cards.js';
+import { describeHand, evalSeven } from './engine/eval.js';
 
 const SAVE_RETRIES = 8;
 
@@ -215,12 +216,12 @@ export async function playerAction(tableId, profileId, action) {
   });
   if (state.street === 'showdown' && !state.settled) {
     try {
-      await afterShowdownPersist(state);
+      return await afterShowdownPersist(state);
     } catch (e) {
       logger.warn('[poker] settle after action: %s', e.message);
     }
   }
-  return loadState(tableId);
+  return state;
 }
 
 export async function playerTimeout(tableId) {
@@ -312,7 +313,36 @@ export async function leaveTable({ profileId, tableId }) {
   } catch {
     /* seat already removed by RPC */
   }
+  await closeTableIfEmpty(tableId);
   return data;
+}
+
+async function closeTableIfEmpty(tableId) {
+  const client = sb();
+  const { data: seats } = await client
+    .from('gg_poker_seats')
+    .select('profile_id')
+    .eq('table_id', tableId);
+  if ((seats || []).length > 0) return;
+  await client.from('gg_poker_tables').update({ status: 'closed' }).eq('id', tableId).neq('status', 'closed');
+  await client.from('gg_poker_secrets').delete().eq('table_id', tableId);
+}
+
+export async function closeAbandonedTables() {
+  const client = sb();
+  const cutoff = new Date(Date.now() - 90_000).toISOString();
+  const { data: tables } = await client
+    .from('gg_poker_tables')
+    .select('id')
+    .neq('status', 'closed')
+    .lte('created_at', cutoff);
+  for (const t of tables || []) {
+    try {
+      await closeTableIfEmpty(t.id);
+    } catch (e) {
+      logger.warn('[poker] close empty %s: %s', t.id, e.message);
+    }
+  }
 }
 
 export async function sitOut({ profileId, tableId, sittingOut }) {
@@ -353,28 +383,30 @@ export async function listLobby() {
   const { data: stakes } = await client.from('gg_poker_stakes').select('*').order('sort_order');
   return {
     stakes: stakes || [],
-    tables: (tables || []).map((t) => {
-      const occ = byTable.get(t.id) || [];
-      const stacks = occ.map((s) => Number(s.stack_cents) || 0);
-      const avg = stacks.length ? Math.round(stacks.reduce((a, b) => a + b, 0) / stacks.length) : 0;
-      return {
-        id: t.id,
-        code: t.code,
-        stakeId: t.stake_id,
-        sbCents: t.sb_cents,
-        bbCents: t.bb_cents,
-        anteCents: t.ante_cents,
-        minBuyinCents: t.min_buyin_cents,
-        maxBuyinCents: t.max_buyin_cents,
-        maxSeats: t.max_seats,
-        occupied: occ.length,
-        status: t.status,
-        street: t.street,
-        avgStackCents: avg,
-        actionTimeoutSec: t.action_timeout_sec,
-        rakeBps: t.rake_bps,
-      };
-    }),
+    tables: (tables || [])
+      .map((t) => {
+        const occ = byTable.get(t.id) || [];
+        const stacks = occ.map((s) => Number(s.stack_cents) || 0);
+        const avg = stacks.length ? Math.round(stacks.reduce((a, b) => a + b, 0) / stacks.length) : 0;
+        return {
+          id: t.id,
+          code: t.code,
+          stakeId: t.stake_id,
+          sbCents: t.sb_cents,
+          bbCents: t.bb_cents,
+          anteCents: t.ante_cents,
+          minBuyinCents: t.min_buyin_cents,
+          maxBuyinCents: t.max_buyin_cents,
+          maxSeats: t.max_seats,
+          occupied: occ.length,
+          status: t.status,
+          street: t.street,
+          avgStackCents: avg,
+          actionTimeoutSec: t.action_timeout_sec,
+          rakeBps: t.rake_bps,
+        };
+      })
+      .filter((t) => t.occupied > 0),
   };
 }
 
@@ -552,9 +584,27 @@ export async function listSpectators(tableId) {
   return data || [];
 }
 
+function describeLiveHand(holeCards, board) {
+  if (!holeCards?.length) return { handName: null, handNameRu: null };
+  const cards = [...holeCards, ...(board || [])];
+  if (cards.length < 5) return { handName: null, handNameRu: null };
+  try {
+    const rank = evalSeven(cards).rank;
+    return {
+      handName: describeHand(rank, 'en'),
+      handNameRu: describeHand(rank, 'ru'),
+    };
+  } catch {
+    return { handName: null, handNameRu: null };
+  }
+}
+
 export function personalizedState(state, profileId, extras = {}) {
   const mine = state.seats.find((s) => s.profileId === profileId) || null;
   const showdown = state.street === 'showdown';
+  const investedTotal = (state.seats || []).reduce((s, x) => s + (x.investedCents || 0), 0);
+  const rakedTotal = (state.pots || []).reduce((s, p) => s + (p.amount || 0), 0);
+  const heroLive = describeLiveHand(mine?.holeCards, state.board);
   return {
     table: {
       id: state.id,
@@ -585,10 +635,13 @@ export function personalizedState(state, profileId, extras = {}) {
       serverSeedHash: state.serverSeedHash,
       serverSeed: showdown ? state.serverSeed : null,
       winners: state.winners,
-      potTotal: (state.pots || []).reduce((s, p) => s + (p.amount || 0), 0),
+      potTotal: showdown && rakedTotal > 0 ? rakedTotal : investedTotal,
+      investedTotal,
+      rakeCents: state.rakeCents || 0,
     },
     seats: state.seats.map((s) => {
-      const reveal = showdown && s.shown || s.profileId === profileId;
+      const reveal = (showdown && s.shown) || s.profileId === profileId;
+      const live = reveal ? describeLiveHand(s.holeCards, state.board) : { handName: null, handNameRu: null };
       return {
         seatNo: s.seatNo,
         profileId: s.profileId,
@@ -603,6 +656,8 @@ export function personalizedState(state, profileId, extras = {}) {
         shown: s.shown,
         holeCards: reveal ? s.holeCards : (s.holeCards?.length ? ['back', 'back'] : null),
         isActor: state.actorSeat === s.seatNo,
+        handName: live.handName,
+        handNameRu: live.handNameRu,
       };
     }),
     you: {
@@ -610,6 +665,8 @@ export function personalizedState(state, profileId, extras = {}) {
       seatNo: mine?.seatNo || null,
       holeCards: mine?.holeCards || null,
       legal: mine && state.actorSeat === mine.seatNo ? legalActions(state, mine) : [],
+      handName: heroLive.handName,
+      handNameRu: heroLive.handNameRu,
     },
     chat: extras.chat || [],
     spectators: extras.spectators || [],
@@ -655,5 +712,10 @@ export async function processDueTables() {
     } catch (e) {
       logger.warn('[poker] next hand table %s: %s', t.id, e.message);
     }
+  }
+  try {
+    await closeAbandonedTables();
+  } catch (e) {
+    logger.warn('[poker] close abandoned: %s', e.message);
   }
 }

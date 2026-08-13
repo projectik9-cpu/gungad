@@ -141,6 +141,9 @@ export function describeHand(rank, lang = 'en') {
   const names = lang === 'ru' ? CAT_NAME_RU : CAT_NAME_EN;
   const rn = lang === 'ru' ? RANK_NAME_RU : RANK_NAME;
   const catName = names[cat] || 'Hand';
+  if (cat === CAT.STRAIGHT_FLUSH && rank[1] === 12) {
+    return lang === 'ru' ? 'Роял-флеш' : 'Royal Flush';
+  }
   if (cat === CAT.STRAIGHT_FLUSH || cat === CAT.STRAIGHT) {
     return `${catName}, ${rn[rank[1]]}-high`;
   }

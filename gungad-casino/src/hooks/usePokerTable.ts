@@ -11,15 +11,25 @@ export function usePokerTable(
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
+  const acting = useRef(false);
+  const pollInflight = useRef(false);
 
-  const refresh = useCallback(async () => {
-    if (!tableId || !profileId) return;
+  const refresh = useCallback(async (light = true) => {
+    if (!tableId || !profileId || acting.current) return;
+    if (light && pollInflight.current) return;
+    if (light) pollInflight.current = true;
     try {
-      const json = await pokerFetch('/state', { profile_id: profileId, table_id: tableId });
-      if (mounted.current && json.state) setState(json.state);
+      const json = await pokerFetch('/state', {
+        profile_id: profileId,
+        table_id: tableId,
+        light,
+      });
+      if (mounted.current && json.state && !acting.current) setState(json.state);
       setError(null);
     } catch (e: any) {
       if (mounted.current) setError(e.message || 'Failed to load table');
+    } finally {
+      if (light) pollInflight.current = false;
     }
   }, [tableId, profileId]);
 
@@ -30,8 +40,8 @@ export function usePokerTable(
 
   useEffect(() => {
     if (!enabled || !tableId || !profileId) return;
-    void refresh();
-    const poll = setInterval(() => { void refresh(); }, 1200);
+    void refresh(false);
+    const poll = setInterval(() => { void refresh(true); }, 700);
     let channel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
     if (supabase) {
       channel = supabase
@@ -39,7 +49,7 @@ export function usePokerTable(
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'gg_poker_tables', filter: `id=eq.${tableId}` },
-          () => { void refresh(); },
+          () => { void refresh(true); },
         )
         .subscribe();
     }
@@ -50,7 +60,8 @@ export function usePokerTable(
   }, [enabled, tableId, profileId, refresh]);
 
   const act = useCallback(async (type: string, amountCents?: number) => {
-    if (!tableId || !profileId) return;
+    if (!tableId || !profileId || acting.current) return;
+    acting.current = true;
     setBusy(true);
     try {
       const json = await pokerFetch('/action', {
@@ -61,6 +72,7 @@ export function usePokerTable(
       });
       if (json.state) setState(json.state);
     } finally {
+      acting.current = false;
       setBusy(false);
     }
   }, [tableId, profileId]);

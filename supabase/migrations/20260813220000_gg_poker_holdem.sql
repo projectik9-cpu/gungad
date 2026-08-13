@@ -159,20 +159,7 @@ CREATE TRIGGER gg_poker_tables_updated_at
 BEFORE UPDATE ON public.gg_poker_tables
 FOR EACH ROW EXECUTE FUNCTION public.gg_set_updated_at();
 
--- Seed two cash tables per stake
-INSERT INTO public.gg_poker_tables (
-  code, stake_id, sb_cents, bb_cents, ante_cents,
-  min_buyin_cents, max_buyin_cents, max_seats,
-  rake_bps, rake_cap_cents, action_timeout_sec, status
-)
-SELECT
-  lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 6)),
-  s.id, s.sb_cents, s.bb_cents, s.ante_cents,
-  s.min_buyin_cents, s.max_buyin_cents, s.max_seats,
-  s.rake_bps, (s.rake_cap_bb * s.bb_cents)::bigint, s.action_timeout_sec, 'waiting'
-FROM public.gg_poker_stakes s
-CROSS JOIN generate_series(1, 2)
-ON CONFLICT (code) DO NOTHING;
+-- Tables are created by players from the Mini App lobby. Do not seed empty tables.
 
 -- Public snapshot (no secrets, no hole cards)
 CREATE OR REPLACE VIEW public.v_gg_poker_table_public

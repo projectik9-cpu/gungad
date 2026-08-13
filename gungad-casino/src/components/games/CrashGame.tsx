@@ -177,12 +177,47 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   };
 
   const multToXY = (m: number, width: number, height: number) => {
-    const startX = 36;
-    const startY = height - 36;
+    const startX = 28;
+    const startY = height * 0.78;
     const p = Math.min(0.97, Math.log(Math.max(1, m)) / Math.log(CRASH_VISUAL_MAX));
-    const x = startX + (width - 72) * p;
-    const y = startY - (height - 72) * p * 0.92;
+    const x = startX + (width - 56) * p;
+    const y = startY - (startY - height * 0.12) * p;
     return { x, y };
+  };
+
+  const drawRocket = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    angle: number,
+    color: string,
+  ) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(16, 0);
+    ctx.lineTo(-11, -8);
+    ctx.lineTo(-6, 0);
+    ctx.lineTo(-11, 8);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(-6, -3.5);
+    ctx.lineTo(-14, 0);
+    ctx.lineTo(-6, 3.5);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(251,191,36,0.9)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(2, 0, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.restore();
   };
 
   const arenaCssHeight = (arena: HTMLElement | null, fallbackW = 600) => {
@@ -266,7 +301,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
       // Fill under curve
       ctx.beginPath();
-      ctx.moveTo(points[0].x, height - 36);
+      ctx.moveTo(points[0].x, height * 0.82);
       ctx.lineTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) {
         const p0 = points[i - 1];
@@ -276,7 +311,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         ctx.quadraticCurveTo(p0.x, p0.y, cpx, cpy);
       }
       ctx.lineTo(tip.x, tip.y);
-      ctx.lineTo(tip.x, height - 36);
+      ctx.lineTo(tip.x, height * 0.82);
       ctx.closePath();
       const fill = ctx.createLinearGradient(0, tip.y, 0, height);
       fill.addColorStop(0, state === 'crashed' && !cashedMultRef.current ? 'rgba(127,29,29,0.35)' : 'rgba(244,63,94,0.28)');
@@ -330,24 +365,15 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         ctx.stroke();
       }
 
-      // Projectile tip
       if (state === 'running' || (state === 'cashed_out' && cashedMultRef.current > 0)) {
-        const pulse = 5 + Math.sin(Date.now() / 90) * 1.2;
+        const prev = points[Math.max(0, points.length - 2)];
+        const angle = Math.atan2(tip.y - prev.y, tip.x - prev.x);
+        const pulse = 10 + Math.sin(Date.now() / 90) * 2;
         ctx.beginPath();
-        ctx.arc(tip.x, tip.y, pulse + 4, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(244,63,94,0.2)';
+        ctx.arc(tip.x, tip.y, pulse + 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(244,63,94,0.18)';
         ctx.fill();
-        ctx.beginPath();
-        ctx.arc(tip.x, tip.y, pulse, 0, Math.PI * 2);
-        ctx.fillStyle = strokeCol;
-        ctx.shadowColor = strokeCol;
-        ctx.shadowBlur = 22;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.arc(tip.x, tip.y, 2.2, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
+        drawRocket(ctx, tip.x, tip.y, angle, strokeCol);
       }
     }
 
@@ -734,7 +760,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         {/* Arena */}
         <div
           ref={arenaRef}
-          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[min(48dvh,400px)] sm:h-[360px] lg:h-[min(52vh,560px)]"
+          className="relative z-0 rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[min(42dvh,360px)] sm:h-[360px] lg:h-[min(52vh,560px)]"
         >
           <canvas ref={canvasRef} className="w-full block" />
 
@@ -819,8 +845,8 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         </div>
       </div>
 
-      {/* Controls — sticky above mobile bottom nav so the rocket stays on screen */}
-      <div className="lg:col-span-4 flex flex-col gap-2 lg:gap-3 sticky bottom-[4.6rem] z-40 lg:static lg:bottom-auto bg-[#0a0a0a]/95 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none pt-1 pb-1 lg:pt-0 lg:pb-0">
+      {/* Controls sit below the arena so the rocket never flies behind the bet panel */}
+      <div className="lg:col-span-4 flex flex-col gap-2 lg:gap-3 relative z-10 bg-transparent pt-0 pb-2">
         <div className="rounded-2xl border border-rose-900/35 bg-gradient-to-b from-[#141018] to-[#0c0c10] p-1 red-border-glow">
           <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-2 sm:p-3">
             <BetControls

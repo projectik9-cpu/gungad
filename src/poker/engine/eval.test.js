@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { evalFive, evalSeven, compareRanks, CAT } from './eval.js';
+import { evalFive, evalSeven, compareRanks, CAT, describeHand } from './eval.js';
 import { buildPots, applyRake, splitPot } from './pots.js';
 import { shuffledDeck, seedHash, parseCard } from './cards.js';
 import {
@@ -35,9 +35,29 @@ describe('eval', () => {
     assert.ok(compareRanks(a, b) > 0);
   });
 
-  it('picks best 5 of 7', () => {
-    const r = evalSeven(['Ah', 'Ad', 'Kh', 'Kd', '2c', '3s', '4h']);
-    assert.equal(r.rank[0], CAT.TWO_PAIR);
+  it('names a royal flush', () => {
+    const r = evalFive(['Ah', 'Kh', 'Qh', 'Jh', 'Th']);
+    assert.equal(r[0], CAT.STRAIGHT_FLUSH);
+    assert.equal(r[1], 12);
+    assert.equal(describeHand(r, 'en'), 'Royal Flush');
+    assert.equal(describeHand(r, 'ru'), 'Роял-флеш');
+  });
+
+  it('makes full house from pocket sixes on 5-6-A-7-5', () => {
+    const r = evalSeven(['6h', '6d', '5c', '6s', 'Ah', '7d', '5s']);
+    assert.equal(r.rank[0], CAT.FULL_HOUSE);
+    assert.equal(r.rank[1], 4); // sixes
+    assert.equal(r.rank[2], 3); // fives
+  });
+
+  it('ranks 10-high straight over two pair on 3-8-T-6-9', () => {
+    const board = ['3s', '8s', 'Th', '6c', '9c'];
+    const straight = evalSeven(['Ac', '7h', ...board]);
+    const twoPair = evalSeven(['8h', '3h', ...board]);
+    assert.equal(straight.rank[0], CAT.STRAIGHT);
+    assert.equal(straight.rank[1], 8); // 10-high
+    assert.equal(twoPair.rank[0], CAT.TWO_PAIR);
+    assert.ok(compareRanks(straight.rank, twoPair.rank) > 0);
   });
 });
 
@@ -79,6 +99,18 @@ describe('pots', () => {
     assert.equal(awards[3] + awards[1], 5);
     assert.equal(awards[3], 3);
     assert.equal(awards[1], 2);
+  });
+
+  it('short all-in only contests the main pot', () => {
+    const pots = buildPots([
+      { seatNo: 1, invested: 200, folded: false },
+      { seatNo: 2, invested: 500, folded: false },
+      { seatNo: 3, invested: 500, folded: false },
+    ]);
+    assert.equal(pots[0].amount, 600);
+    assert.deepEqual(pots[0].eligibleSeats, [1, 2, 3]);
+    assert.equal(pots[1].amount, 600);
+    assert.deepEqual(pots[1].eligibleSeats, [2, 3]);
   });
 });
 
@@ -147,5 +179,26 @@ describe('flow', () => {
     const state = startHand(huTable());
     timeoutAction(state);
     assert.equal(state.street, 'showdown');
+  });
+
+  it('runs preflop flop turn river then showdown', () => {
+    const state = startHand(huTable());
+    assert.equal(state.street, 'preflop');
+    applyAction(state, { type: 'call', seatNo: state.actorSeat });
+    applyAction(state, { type: 'check', seatNo: state.actorSeat });
+    assert.equal(state.street, 'flop');
+    assert.equal(state.board.length, 3);
+    applyAction(state, { type: 'check', seatNo: state.actorSeat });
+    applyAction(state, { type: 'check', seatNo: state.actorSeat });
+    assert.equal(state.street, 'turn');
+    assert.equal(state.board.length, 4);
+    applyAction(state, { type: 'check', seatNo: state.actorSeat });
+    applyAction(state, { type: 'check', seatNo: state.actorSeat });
+    assert.equal(state.street, 'river');
+    assert.equal(state.board.length, 5);
+    applyAction(state, { type: 'check', seatNo: state.actorSeat });
+    applyAction(state, { type: 'check', seatNo: state.actorSeat });
+    assert.equal(state.street, 'showdown');
+    assert.ok(state.winners?.length);
   });
 });

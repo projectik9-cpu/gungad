@@ -6,23 +6,23 @@ import { soundFx } from '../../utils/sound';
 import { PokerCard } from './PokerCard';
 
 const POS6 = [
-  { left: '50%', top: '86%' },
-  { left: '10%', top: '68%' },
-  { left: '10%', top: '28%' },
-  { left: '50%', top: '8%' },
-  { left: '90%', top: '28%' },
-  { left: '90%', top: '68%' },
+  { left: '50%', top: '84%' },
+  { left: '18%', top: '66%' },
+  { left: '18%', top: '30%' },
+  { left: '50%', top: '12%' },
+  { left: '82%', top: '30%' },
+  { left: '82%', top: '66%' },
 ];
 const POS9 = [
-  { left: '50%', top: '88%' },
-  { left: '18%', top: '78%' },
-  { left: '6%', top: '52%' },
-  { left: '12%', top: '24%' },
-  { left: '38%', top: '8%' },
-  { left: '62%', top: '8%' },
-  { left: '88%', top: '24%' },
-  { left: '94%', top: '52%' },
-  { left: '82%', top: '78%' },
+  { left: '50%', top: '86%' },
+  { left: '22%', top: '76%' },
+  { left: '12%', top: '52%' },
+  { left: '18%', top: '26%' },
+  { left: '38%', top: '12%' },
+  { left: '62%', top: '12%' },
+  { left: '82%', top: '26%' },
+  { left: '88%', top: '52%' },
+  { left: '78%', top: '76%' },
 ];
 
 function seatStyle(maxSeats: number, visualIndex: number): React.CSSProperties {
@@ -63,16 +63,14 @@ export const PokerTableView: React.FC<PokerTableProps> = ({
 
   const mySeatNo = you?.seatNo;
   const maxSeats = table.maxSeats || 6;
+  const comboLang = lang === 'en' ? 'en' : 'ru';
   const ordered = useMemo(() => {
-    const seats = [...(state.seats || [])];
-    const byNo: Record<number, any> = {};
-    for (const s of seats) byNo[s.seatNo] = s;
-    const all = Array.from({ length: maxSeats }, (_, i) => byNo[i + 1] || { seatNo: i + 1, empty: true });
-    if (!mySeatNo) return all;
-    const idx = all.findIndex((s) => s.seatNo === mySeatNo);
-    if (idx < 0) return all;
-    return [...all.slice(idx), ...all.slice(0, idx)];
-  }, [state.seats, maxSeats, mySeatNo]);
+    const seats = [...(state.seats || [])].filter((s: any) => s?.profileId);
+    if (!mySeatNo) return seats;
+    const idx = seats.findIndex((s: any) => s.seatNo === mySeatNo);
+    if (idx < 0) return seats;
+    return [...seats.slice(idx), ...seats.slice(0, idx)];
+  }, [state.seats, mySeatNo]);
 
   const raiseSpec = (you?.legal || []).find((a: any) => a.type === 'bet' || a.type === 'raise');
   useEffect(() => {
@@ -140,9 +138,15 @@ export const PokerTableView: React.FC<PokerTableProps> = ({
         </div>
       </div>
 
-      <div className="relative w-full aspect-[4/5] sm:aspect-[16/10] max-h-[520px] rounded-[40%] bg-gradient-to-b from-emerald-950 to-emerald-950/40 border-[10px] border-rose-950 shadow-inner overflow-hidden">
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 z-10">
-          <div className="text-amber-300 font-mono font-bold text-sm">{t('pokerPot', lang)} {formatChips(table.potTotal || 0)}</div>
+      <div className="relative w-full aspect-[4/5] sm:aspect-[16/10] max-h-[520px] px-3">
+        <div className="absolute inset-2 sm:inset-3 rounded-[40%] bg-gradient-to-b from-emerald-950 to-emerald-950/40 border-[10px] border-rose-950 shadow-inner" />
+        <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5 z-10 pointer-events-none">
+          <div className="text-amber-300 font-mono font-bold text-sm">
+            {t('pokerPot', lang)} {formatChips(table.investedTotal || table.potTotal || 0)}
+          </div>
+          {table.street === 'showdown' && table.rakeCents > 0 && (
+            <div className="text-[10px] text-zinc-400 font-mono">{t('pokerRake', lang)} {formatChips(table.rakeCents)}</div>
+          )}
           <div className="flex gap-1">
             {(table.board || []).map((c: string, i: number) => <PokerCard key={`${c}-${i}`} code={c} animate />)}
             {Array.from({ length: Math.max(0, 5 - (table.board?.length || 0)) }).map((_, i) => (
@@ -153,30 +157,24 @@ export const PokerTableView: React.FC<PokerTableProps> = ({
           {table.winners?.length && table.street === 'showdown' && (
             <div className="text-[11px] text-amber-200 text-center max-w-[240px]">
               {table.winners.filter((w: any) => w.amount > 0).map((w: any) => (
-                <div key={w.seatNo}>{w.handNameRu || w.handName} · {formatChips(w.amount)}</div>
+                <div key={w.seatNo}>{(comboLang === 'ru' ? w.handNameRu : w.handName) || w.handName} · {formatChips(w.amount)}</div>
               ))}
             </div>
           )}
         </div>
 
         {ordered.map((seat: any, i: number) => {
-          if (seat.empty) {
-            return (
-              <div key={`e-${seat.seatNo}`} className="absolute w-16 text-center" style={seatStyle(maxSeats, i)}>
-                <div className="w-12 h-12 mx-auto rounded-full border border-dashed border-zinc-700 text-zinc-600 text-[10px] flex items-center justify-center">{seat.seatNo}</div>
-              </div>
-            );
-          }
           const name = seat.username ? `@${seat.username}` : (seat.firstName || 'Player');
           const badge = seat.seatNo === table.dealerSeat ? 'D' : seat.seatNo === table.sbSeat ? 'SB' : seat.seatNo === table.bbSeat ? 'BB' : '';
+          const seatCombo = comboLang === 'ru' ? seat.handNameRu : seat.handName;
           return (
-            <div key={seat.seatNo} className="absolute w-28 text-center" style={seatStyle(maxSeats, i)}>
-              <div className={`mx-auto w-14 h-14 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+            <div key={seat.seatNo} className="absolute w-24 sm:w-28 text-center z-20" style={seatStyle(maxSeats, i)}>
+              <div className={`mx-auto w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
                 seat.isActor ? 'border-amber-400 bg-amber-950 text-amber-200 shadow-[0_0_16px_rgba(251,191,36,0.6)]' : 'border-zinc-600 bg-zinc-900 text-white'
               } ${seat.folded ? 'opacity-40' : ''}`}>
                 {name.slice(0, 2).toUpperCase()}
               </div>
-              {badge && <span className="absolute -top-1 right-6 text-[9px] bg-rose-700 text-white px-1 rounded">{badge}</span>}
+              {badge && <span className="absolute -top-1 right-4 sm:right-6 text-[9px] bg-rose-700 text-white px-1 rounded">{badge}</span>}
               {seat.isActor && remain > 0 && (
                 <div className="text-[10px] text-amber-300 font-mono">{remain}s</div>
               )}
@@ -184,10 +182,13 @@ export const PokerTableView: React.FC<PokerTableProps> = ({
               <div className="text-[10px] font-mono text-emerald-300">{formatChips(seat.stackCents)}</div>
               {seat.betThisStreet > 0 && <div className="text-[10px] text-amber-400 font-mono">{formatChips(seat.betThisStreet)}</div>}
               {seat.allIn && <div className="text-[9px] text-rose-400 uppercase">all-in</div>}
+              {seatCombo && table.board?.length >= 3 && (
+                <div className="text-[9px] text-amber-200/90 leading-tight px-1">{seatCombo}</div>
+              )}
               {seat.holeCards && !(you?.seated && i === 0) && (
                 <div className="flex justify-center gap-0.5 mt-0.5">
                   {seat.holeCards.map((c: string, ci: number) => (
-                    <PokerCard key={ci} code={c} />
+                    <PokerCard key={ci} code={c} tiny />
                   ))}
                 </div>
               )}
@@ -241,8 +242,15 @@ export const PokerTableView: React.FC<PokerTableProps> = ({
       )}
 
       {you?.seated && you.holeCards && table.street !== 'idle' && (
-        <div className="flex justify-center gap-2">
-          {you.holeCards.map((c: string, i: number) => <PokerCard key={i} code={c} large animate />)}
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex justify-center gap-2">
+            {you.holeCards.map((c: string, i: number) => <PokerCard key={i} code={c} large animate />)}
+          </div>
+          {(comboLang === 'ru' ? you.handNameRu : you.handName) && table.board?.length >= 3 && (
+            <div className="text-[11px] text-amber-300 font-bold">
+              {comboLang === 'ru' ? you.handNameRu : you.handName}
+            </div>
+          )}
         </div>
       )}
 

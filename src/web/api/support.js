@@ -115,7 +115,8 @@ router.post('/ticket', async (req, res) => {
         ]],
       };
 
-      for (const adminId of config.admin.ids) {
+      const targets = [...new Set([...config.admin.ids, config.logChatId].filter(Boolean))];
+      for (const adminId of targets) {
         try {
           const msg = await _bot.telegram.sendMessage(adminId, adminText, {
             parse_mode: 'HTML',
@@ -124,7 +125,7 @@ router.post('/ticket', async (req, res) => {
           await sb.from('gg_support_tickets')
             .update({
               admin_message_id: msg.message_id,
-              admin_telegram_id: adminId,
+              admin_telegram_id: typeof adminId === 'number' ? adminId : null,
             })
             .eq('id', ticket.id);
         } catch (e) {

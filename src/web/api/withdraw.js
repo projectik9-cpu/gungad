@@ -107,13 +107,13 @@ router.post('/request', async (req, res) => {
         ],
       };
 
-      for (const adminId of config.admin.ids) {
+      const targets = [...new Set([...config.admin.ids, config.logChatId].filter(Boolean))];
+      for (const adminId of targets) {
         try {
           const msg = await _bot.telegram.sendMessage(adminId, text, {
             parse_mode: 'HTML',
             reply_markup: keyboard,
           });
-          // remember one admin_message_id (last)
           await sb.from('gg_withdrawals')
             .update({ admin_message_id: msg.message_id })
             .eq('id', withdrawalId);
@@ -161,6 +161,44 @@ router.get('/list', async (req, res) => {
     return res.json({ ok: true, withdrawals: data ?? [] });
   } catch (err) {
     logger.error(`[withdraw/list] ${err?.message || err}`);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/cancel', async (req, res) => {
+  try {
+    const { profile_id, withdrawal_id } = req.body || {};
+    if (!profile_id || !withdrawal_id) {
+      return res.status(400).json({ error: 'profile_id and withdrawal_id required' });
+    }
+    const sb = getSupabaseAdmin();
+    if (!sb) return res.status(500).json({ error: 'Supabase not configured' });
+
+    const { data, error } = await sb.rpc('gg_cancel_withdrawal', {
+      p_withdrawal_id: withdrawal_id,
+      p_profile_id: profile_id,
+    });
+    if (error) {
+      const msg = error.message || '';
+      if (/NOT_FOUND/i.test(msg)) return res.status(404).json({ error: 'Заявка не найдена' });
+      if (/ALREADY/i.test(msg) || /NOT_PENDING/i.test(msg)) {
+        return res.status(409).json({ error: 'Заявка уже обработана' });
+      }
+      logger.error(`[withdraw/cancel] ${msg}`);
+      return res.status(500).json({ error: 'Не удалось отменить заявку' });
+    }
+    if (data && data.ok === false) {
+      return res.status(409).json({ error: 'Заявка уже обработана', status: data.status });
+    }
+    logger.info(`[withdraw/cancel] ${withdrawal_id} profile=${profile_id}`);
+    return res.json({
+      ok: true,
+      status: 'cancelled',
+      balance_cents: data?.balance_cents,
+      amount_usd_cents: data?.amount_usd_cents,
+    });
+  } catch (err) {
+    logger.error(`[withdraw/cancel] ${err?.message || err}`);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

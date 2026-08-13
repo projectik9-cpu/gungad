@@ -93,8 +93,32 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
   const [withdrawSuccess, setWithdrawSuccess] = useState<boolean>(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [pendingWds, setPendingWds] = useState<Array<{
+    id: string;
+    amount_usd_cents: number;
+    asset: string;
+    status: string;
+  }>>([]);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const pollRef = useRef<number | null>(null);
+
+  const loadPendingWds = async () => {
+    if (!profileId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/withdraw/list?profile_id=${encodeURIComponent(profileId)}`);
+      const json = await res.json();
+      const rows = Array.isArray(json.withdrawals) ? json.withdrawals : [];
+      setPendingWds(rows.filter((w: { status: string }) => w.status === 'pending'));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen || tab !== 'withdraw' || !profileId) return;
+    void loadPendingWds();
+  }, [isOpen, tab, profileId]);
 
   // Poll deposit status (TON or Crypto Bot) while modal open
   useEffect(() => {
@@ -238,11 +262,37 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       setWithdrawSuccess(true);
       onUpdateBalance(Math.max(0, user.balanceUSD - withdrawAmountUSD));
       setWithdrawAddress('');
+      await loadPendingWds();
       setTimeout(() => setWithdrawSuccess(false), 6000);
     } catch {
       setWithdrawError(t('errorGeneric', lang));
     } finally {
       setWithdrawSubmitting(false);
+    }
+  };
+
+  const handleCancelWithdraw = async (id: string, amountCents: number) => {
+    if (!profileId || cancellingId) return;
+    soundFx.playClick();
+    setCancellingId(id);
+    setWithdrawError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/withdraw/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, withdrawal_id: id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setWithdrawError(json.error || t('errorGeneric', lang));
+        return;
+      }
+      setPendingWds((prev) => prev.filter((w) => w.id !== id));
+      onUpdateBalance(user.balanceUSD + amountCents / 100);
+    } catch {
+      setWithdrawError(t('errorGeneric', lang));
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -564,6 +614,27 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 />
                 <span className="text-[10px] text-zinc-500">{t('withdrawMinNote', lang)}</span>
               </div>
+
+              {pendingWds.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-zinc-400 uppercase">{t('pendingWithdrawals', lang)}</label>
+                  {pendingWds.map((w) => (
+                    <div key={w.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-mono text-white">${(w.amount_usd_cents / 100).toFixed(2)} · {w.asset}</div>
+                        <div className="text-[10px] text-zinc-500 truncate">{w.id.slice(0, 8)}…</div>
+                      </div>
+                      <button
+                        disabled={cancellingId === w.id}
+                        onClick={() => void handleCancelWithdraw(w.id, w.amount_usd_cents)}
+                        className="px-2.5 py-1.5 rounded-lg bg-zinc-800 text-rose-300 text-[11px] font-bold uppercase disabled:opacity-50"
+                      >
+                        {cancellingId === w.id ? '…' : t('cancelWithdraw', lang)}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {withdrawSuccess && (
                 <div className="p-3 bg-emerald-950 border border-emerald-600 text-emerald-300 text-xs font-bold rounded-xl text-center">

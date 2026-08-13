@@ -61,36 +61,38 @@ export function formatPlayerLine(profile, wallet) {
   return lines.join('\n');
 }
 
-export async function notifyLog(html) {
+export async function notifyLog(html, extra = {}) {
   const chatId = config.logChatId;
-  if (!_bot || !chatId) return;
+  if (!_bot || !chatId) return null;
   const text = String(html ?? '');
+  const opts = {
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...(extra.reply_markup ? { reply_markup: extra.reply_markup } : {}),
+  };
   try {
-    if (text.length <= TG_MSG_LIMIT) {
-      await _bot.telegram.sendMessage(chatId, text, {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      });
-      return;
+    if (text.length <= TG_MSG_LIMIT || extra.reply_markup) {
+      return await _bot.telegram.sendMessage(chatId, text.slice(0, TG_MSG_LIMIT), opts);
     }
-    // Split long analytics dumps
     let rest = text;
     let part = 1;
-    while (rest.length > 0) {
+    let last = null;
+    while (rest.length > 0 && part <= 8) {
       let chunk = rest.slice(0, TG_MSG_LIMIT);
       const cut = chunk.lastIndexOf('\n');
       if (cut > TG_MSG_LIMIT * 0.6) chunk = chunk.slice(0, cut);
-      await _bot.telegram.sendMessage(
+      last = await _bot.telegram.sendMessage(
         chatId,
         part === 1 ? chunk : `…(${part})\n${chunk}`,
-        { parse_mode: 'HTML', disable_web_page_preview: true },
+        opts,
       );
       rest = rest.slice(chunk.length);
       part += 1;
-      if (part > 8) break;
     }
+    return last;
   } catch (e) {
     logger.warn(`[telegramLog] send failed: ${e?.message || e}`);
+    return null;
   }
 }
 

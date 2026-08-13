@@ -14,7 +14,7 @@ import { logWithdrawProcessed, escapeHtml } from '../../services/telegramLog.js'
 const pendingAdminReplies = new Map();
 
 export function isAdmin(ctx) {
-  return config.admin.ids.includes(ctx.from?.id);
+  return config.admin.ids.includes(Number(ctx.from?.id));
 }
 
 async function notifyUser(bot, sb, profileId, text) {
@@ -105,21 +105,32 @@ async function resolvePendingAction(ctx, sb) {
   }
 
   const replyToId = ctx.message?.reply_to_message?.message_id;
-  if (replyToId) {
-    const { data: byMsg } = await sb
-      .from('gg_support_tickets')
-      .select('id, telegram_id, profile_id, message, status')
-      .eq('admin_message_id', replyToId)
-      .maybeSingle();
-    if (byMsg) return { kind: 'sup_reply', id: byMsg.id, ticket: byMsg };
+  const replyText = ctx.message?.reply_to_message?.text
+    || ctx.message?.reply_to_message?.caption
+    || '';
+  if (replyToId || replyText) {
+    const rejectM = replyText.match(/заявки\s+([0-9a-f-]{36})/i);
+    if (rejectM) return { kind: 'wd_reject', id: rejectM[1] };
+    const wdMsgM = replyText.match(/по выводу\s+([0-9a-f-]{36})/i);
+    if (wdMsgM) return { kind: 'wd_msg', id: wdMsgM[1] };
+    const ticketM = replyText.match(/тикет(?:а)?\s+([0-9a-f-]{36})/i);
+    if (ticketM) return { kind: 'sup_reply', id: ticketM[1] };
 
-    // Withdrawal message reply-to
-    const { data: wd } = await sb
-      .from('gg_withdrawals')
-      .select('id')
-      .eq('admin_message_id', replyToId)
-      .maybeSingle();
-    if (wd) return { kind: 'wd_msg', id: wd.id };
+    if (replyToId) {
+      const { data: byMsg } = await sb
+        .from('gg_support_tickets')
+        .select('id, telegram_id, profile_id, message, status')
+        .eq('admin_message_id', replyToId)
+        .maybeSingle();
+      if (byMsg) return { kind: 'sup_reply', id: byMsg.id, ticket: byMsg };
+
+      const { data: wd } = await sb
+        .from('gg_withdrawals')
+        .select('id')
+        .eq('admin_message_id', replyToId)
+        .maybeSingle();
+      if (wd) return { kind: 'wd_msg', id: wd.id };
+    }
   }
 
   // Durable fallback after bot restart: admin clicked Reply earlier
@@ -157,16 +168,18 @@ export function registerAdminHandlers(bot) {
         logger.error(`[admin] approve ${withdrawalId}: ${error.message}`);
         return ctx.answerCbQuery(`Ошибка: ${error.message.slice(0, 100)}`, { show_alert: true });
       }
-      if (!data.ok) {
-        return ctx.answerCbQuery(`Уже обработана (${data.status})`, { show_alert: true });
+      if (!data?.ok) {
+        return ctx.answerCbQuery(`Уже обработана (${data?.status || '?'})`, { show_alert: true });
       }
 
       const amountUsd = (data.amount_usd_cents / 100).toFixed(2);
+      await ctx.answerCbQuery('Заявка подтверждена ✅');
+      const doneLine = `\n\n✅ <b>ВЫПЛАЧЕНО</b> админом @${ctx.from.username ?? ctx.from.id}`;
       await ctx.editMessageText(
-        `${ctx.callbackQuery.message.text}\n\n✅ <b>ВЫПЛАЧЕНО</b> админом @${ctx.from.username ?? ctx.from.id}`,
+        `${ctx.callbackQuery?.message?.text || 'Заявка'}${doneLine}`,
         { parse_mode: 'HTML' },
       ).catch(() => {});
-      await ctx.answerCbQuery('Заявка подтверждена ✅');
+      await ctx.reply(`✅ Вывод <code>${withdrawalId}</code> подтверждён ($${amountUsd})`, { parse_mode: 'HTML' }).catch(() => {});
 
       await notifyUser(bot, sb, data.profile_id,
         `✅ <b>Вывод выполнен</b>\n\nСумма $${amountUsd} отправлена на ваш кошелёк. Спасибо за игру в GunGad!`);
@@ -288,11 +301,7 @@ export function registerAdminHandlers(bot) {
   bot.command('reply', async (ctx) => {
     try {
       if (!isAdmin(ctx)) return;
-      if (ctx.chat?.type !== 'private') {
-        await ctx.reply('Команду /reply используй в ЛС с ботом.');
-        return;
-      }
-      const raw = (ctx.message?.text || '').trim();
+      const raw = (ctx.message?.text || ctx.channelPost?.text || '').trim();
       const m = raw.match(/^\/reply(?:@\w+)?\s+([0-9a-f-]{36})\s+([\s\S]+)$/i);
       if (!m) {
         await ctx.reply('Использование: /reply TICKET_UUID текст ответа');
@@ -328,6 +337,86 @@ export function registerAdminHandlers(bot) {
       await ctx.reply('Ошибка /reply').catch(() => {});
     }
   });
+
+  bot.command('wdok', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) return;
+      const m = (ctx.message?.text || '').match(/^\/wdok(?:@\w+)?\s+([0-9a-f-]{36})/i);
+      if (!m) {
+        await ctx.reply('Использование: /wdok WITHDRAWAL_UUID');
+        return;
+      }
+      const sb = getSupabaseAdmin();
+      const { data, error } = await sb.rpc('gg_process_withdrawal', {
+        p_withdrawal_id: m[1],
+        p_action: 'approved',
+        p_admin_telegram_id: ctx.from.id,
+      });
+      if (error) {
+        await ctx.reply(`Ошибка: ${error.message.slice(0, 160)}`);
+        return;
+      }
+      if (!data?.ok) {
+        await ctx.reply(`Уже обработана (${data?.status || '?'})`);
+        return;
+      }
+      await ctx.reply(`✅ Вывод ${m[1]} подтверждён`);
+      await notifyUser(bot, sb, data.profile_id,
+        `✅ <b>Вывод выполнен</b>\n\nСумма $${(data.amount_usd_cents / 100).toFixed(2)} отправлена на ваш кошелёк.`);
+      logWithdrawProcessed({
+        withdrawalId: m[1],
+        profileId: data.profile_id,
+        amountCents: data.amount_usd_cents,
+        status: 'approved',
+        adminId: ctx.from.id,
+      }).catch(() => {});
+    } catch (e) {
+      logger.error(`[admin] /wdok: ${e?.message || e}`);
+    }
+  });
+
+  bot.command('wdno', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) return;
+      const m = (ctx.message?.text || '').match(/^\/wdno(?:@\w+)?\s+([0-9a-f-]{36})(?:\s+([\s\S]+))?/i);
+      if (!m) {
+        await ctx.reply('Использование: /wdno WITHDRAWAL_UUID [причина]');
+        return;
+      }
+      const reason = (m[2] || '').trim() === '-' || !(m[2] || '').trim() ? null : m[2].trim();
+      const sb = getSupabaseAdmin();
+      const { data, error } = await sb.rpc('gg_process_withdrawal', {
+        p_withdrawal_id: m[1],
+        p_action: 'rejected',
+        p_admin_telegram_id: ctx.from.id,
+        p_reason: reason,
+      });
+      if (error) {
+        await ctx.reply(`Ошибка: ${error.message.slice(0, 160)}`);
+        return;
+      }
+      if (!data?.ok) {
+        await ctx.reply(`Уже обработана (${data?.status || '?'})`);
+        return;
+      }
+      const amountUsd = (data.amount_usd_cents / 100).toFixed(2);
+      const userText = reason
+        ? `❌ <b>Вывод отклонён</b>\n\nЗаявка на $${amountUsd} отклонена.\nПричина: ${escapeHtml(reason)}\n\nСредства возвращены на баланс.`
+        : `❌ <b>Вывод отклонён</b>\n\nЗаявка на $${amountUsd} отклонена, средства возвращены на баланс.`;
+      await notifyUser(bot, sb, data.profile_id, userText);
+      logWithdrawProcessed({
+        withdrawalId: m[1],
+        profileId: data.profile_id,
+        amountCents: data.amount_usd_cents,
+        status: 'rejected',
+        adminId: ctx.from.id,
+        reason,
+      }).catch(() => {});
+      await ctx.reply('❌ Заявка отклонена, средства возвращены игроку.');
+    } catch (e) {
+      logger.error(`[admin] /wdno: ${e?.message || e}`);
+    }
+  });
 }
 
 /**
@@ -336,7 +425,6 @@ export function registerAdminHandlers(bot) {
  */
 export async function handleAdminReplyMessage(ctx, bot) {
   if (!ctx.from || !isAdmin(ctx)) return false;
-  if (ctx.chat?.type !== 'private') return false;
   const text = ctx.message?.text;
   if (!text || text.startsWith('/')) return false;
 

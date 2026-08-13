@@ -32,21 +32,23 @@ export function registerHandlers(bot) {
     return next();
   });
 
-  // Админ: выводы / поддержка (ДО catch-all)
+  // Админ: выводы / поддержка (кнопки) — ДО catch-all action
   registerAdminHandlers(bot);
 
-  // Админ-аналитика в лог-канале + ЛС админам
-  registerLogAdminHandlers(bot);
-
-  // Админ: ForceReply ответы игрокам (ДО catch-all текста)
+  // Админ: ForceReply ответы (ДО лог-канала, иначе next() теряется)
   bot.on('message', async (ctx, next) => {
     const handled = await handleAdminReplyMessage(ctx, bot);
     if (handled) return;
     return next();
   });
 
+  // Админ-аналитика в лог-канале + ЛС админам
+  registerLogAdminHandlers(bot);
+
   // Любые старые callback'и меню → снова только кнопка казино
   bot.action(/.*/, async (ctx) => {
+    const data = String(ctx.callbackQuery?.data || '');
+    if (/^(wd_|sup_)/.test(data)) return;
     try {
       await ctx.answerCbQuery();
       const text = `

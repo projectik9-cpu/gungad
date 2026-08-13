@@ -164,6 +164,11 @@ const HELP_TEXT = `
 /bonuspush — ежедневное уведомление про колесо (если ещё не уходило сегодня)
 /bonuspush force — отправить ещё раз сегодня
 
+<b>Выводы / поддержка</b>
+/wdok UUID — подтвердить вывод
+/wdno UUID [причина] — отклонить (средства на баланс)
+/reply UUID текст — ответ в поддержку
+
 <b>Прочее</b>
 /help — это меню
 /ping — проверка бота
@@ -752,10 +757,9 @@ async function cmdBigWins(ctx) {
 }
 
 function wrap(handler) {
-  return async (ctx) => {
+  return async (ctx, next) => {
     try {
-      if (!isAllowedChat(ctx)) return;
-      await handler(ctx);
+      if (isAllowedChat(ctx)) await handler(ctx);
     } catch (e) {
       logger.error(`[logAdmin] ${handler.name || 'cmd'}: ${e?.message || e}`);
       try {
@@ -764,7 +768,67 @@ function wrap(handler) {
         /* ignore */
       }
     }
+    if (typeof next === 'function') return next();
   };
+}
+
+async function cmdWdOk(ctx) {
+  const parsed = parseCommand(getCommandText(ctx));
+  const id = parseArgId(parsed?.arg0);
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+    await replyChunks(ctx, 'Использование: <code>/wdok UUID</code>');
+    return;
+  }
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    await replyChunks(ctx, 'БД недоступна');
+    return;
+  }
+  const { data, error } = await sb.rpc('gg_process_withdrawal', {
+    p_withdrawal_id: id,
+    p_action: 'approved',
+    p_admin_telegram_id: ctx.from?.id || null,
+  });
+  if (error) {
+    await replyChunks(ctx, `Ошибка: ${escapeHtml(error.message)}`);
+    return;
+  }
+  if (!data?.ok) {
+    await replyChunks(ctx, `Уже обработана (${escapeHtml(data?.status)})`);
+    return;
+  }
+  await replyChunks(ctx, `✅ Вывод <code>${escapeHtml(id)}</code> подтверждён`);
+}
+
+async function cmdWdNo(ctx) {
+  const parsed = parseCommand(getCommandText(ctx));
+  const raw = (parsed?.args || '').trim();
+  const m = raw.match(/^([0-9a-f-]{36})(?:\s+([\s\S]+))?/i);
+  if (!m) {
+    await replyChunks(ctx, 'Использование: <code>/wdno UUID [причина]</code>');
+    return;
+  }
+  const reason = !m[2] || m[2].trim() === '-' ? null : m[2].trim();
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    await replyChunks(ctx, 'БД недоступна');
+    return;
+  }
+  const { data, error } = await sb.rpc('gg_process_withdrawal', {
+    p_withdrawal_id: m[1],
+    p_action: 'rejected',
+    p_admin_telegram_id: ctx.from?.id || null,
+    p_reason: reason,
+  });
+  if (error) {
+    await replyChunks(ctx, `Ошибка: ${escapeHtml(error.message)}`);
+    return;
+  }
+  if (!data?.ok) {
+    await replyChunks(ctx, `Уже обработана (${escapeHtml(data?.status)})`);
+    return;
+  }
+  await replyChunks(ctx, `❌ Вывод отклонён, средства на балансе игрока`);
 }
 
 const COMMAND_MAP = {
@@ -786,6 +850,8 @@ const COMMAND_MAP = {
   stats: cmdStats,
   bigwins: cmdBigWins,
   bonuspush: cmdBonusPush,
+  wdok: cmdWdOk,
+  wdno: cmdWdNo,
 };
 
 async function dispatchAdminCommand(ctx) {

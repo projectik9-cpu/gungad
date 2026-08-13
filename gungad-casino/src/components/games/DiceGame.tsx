@@ -105,7 +105,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
       {/* Dice Stage */}
-      <div className="lg:col-span-8 flex flex-col gap-4">
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-4">
         <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-2xl red-border-glow overflow-visible">
           {/* Roll Result Readout */}
           <div className="flex flex-col items-center justify-center my-6">
@@ -187,7 +187,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
       </div>
 
       {/* Control Panel */}
-      <div className="lg:col-span-4 flex flex-col gap-4">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-4">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
@@ -199,6 +199,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
           actionButtonLabel={isRolling ? t('rolling', lang) : t('rollDice', lang)}
           onAction={handleRoll}
           actionDisabled={isRolling || betAmountUSD > user.balanceUSD}
+          compact
         />
       </div>
     </div>

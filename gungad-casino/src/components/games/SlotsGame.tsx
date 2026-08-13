@@ -166,8 +166,8 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
         <div className="hidden sm:block w-16" />
       </div>
 
-      <div className="relative flex-1 flex flex-col items-center justify-center px-3 sm:px-6 py-4 gap-4 min-h-0">
-        <div className="w-full max-w-lg">
+      <div className="relative flex-1 flex flex-col items-center justify-center px-3 sm:px-6 py-4 gap-3 min-h-0 overflow-hidden">
+        <div className="relative w-full max-w-lg shrink min-h-0">
           <ReelGrid
             grid={grid}
             spinId={spinId}
@@ -177,15 +177,14 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
             onReelStop={handleReelStop}
             onSpinComplete={settle}
           />
+          {lastWin > 0 && !spinning && (
+            <div className="pointer-events-none absolute inset-x-0 top-[42%] z-40 flex justify-center">
+              <span className="px-3 py-1.5 rounded-xl bg-black/75 border border-emerald-500/40 font-display font-black text-xl sm:text-2xl text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
+                +{formatCurrency(lastWin, currency)}
+              </span>
+            </div>
+          )}
         </div>
-
-        {lastWin > 0 && !spinning && (
-          <div className="text-center animate-bounce">
-            <span className="font-display font-black text-2xl sm:text-3xl text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
-              +{formatCurrency(lastWin, currency)}
-            </span>
-          </div>
-        )}
       </div>
 
       <div className="relative px-2 sm:px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1">

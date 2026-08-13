@@ -231,7 +231,7 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
   const numBtnClass = (num: number) => {
     const picked = isPicked(num);
     const cap = atCap(num);
-    const base = `h-8 sm:h-9 flex items-center justify-center font-mono font-black text-[11px] sm:text-xs rounded-[4px] border transition-all ${cap ? 'opacity-40 cursor-not-allowed' : ''}`;
+    const base = `h-10 sm:h-8 lg:h-9 flex items-center justify-center font-mono font-black text-xs sm:text-[11px] rounded-[4px] border transition-all ${cap ? 'opacity-40 cursor-not-allowed' : ''}`;
     if (picked) {
       if (num === 0) return `${base} bg-emerald-500 text-white border-emerald-200 ring-1 ring-white`;
       if (RED_NUMBERS.includes(num)) return `${base} bg-rose-500 text-white border-rose-200 ring-1 ring-white`;
@@ -359,7 +359,63 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
             )}
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="md:hidden flex flex-col gap-1.5">
+            <button
+              onClick={() => addBet(0)}
+              disabled={isSpinning || atCap(0)}
+              className={`${numBtnClass(0)} w-full`}
+            >
+              0
+            </button>
+            <div className="grid grid-cols-6 gap-1">
+              {Array.from({ length: 36 }, (_, i) => i + 1).map((num) => (
+                <button
+                  key={num}
+                  onClick={() => addBet(num)}
+                  disabled={isSpinning || atCap(num)}
+                  className={numBtnClass(num)}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(['1stDozen', '2ndDozen', '3rdDozen'] as const).map((d) => (
+                <button key={d} onClick={() => addBet(d)} disabled={isSpinning || atCap(d)} className={outsideBtnClass(d)}>
+                  {betLabel(d)}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(['col1', 'col2', 'col3'] as const).map((col) => (
+                <button key={col} onClick={() => addBet(col)} disabled={isSpinning || atCap(col)} className={outsideBtnClass(col)}>
+                  2:1
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {(['1to18', 'even', 'red', 'black', 'odd', '19to36'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => addBet(d)}
+                  disabled={isSpinning || atCap(d)}
+                  className={`${outsideBtnClass(d)} ${
+                    d === 'red' && !isPicked(d) ? 'bg-[#9f1239] text-white border-rose-900' : ''
+                  } ${d === 'black' && !isPicked(d) ? 'bg-[#111113] text-white border-zinc-600' : ''}`}
+                >
+                  {d === 'red' ? (
+                    <span className="inline-block w-3.5 h-3.5 rotate-45 bg-rose-500 border border-rose-200" />
+                  ) : d === 'black' ? (
+                    <span className="inline-block w-3.5 h-3.5 rotate-45 bg-zinc-950 border border-zinc-300" />
+                  ) : (
+                    betLabel(d).replace(/\s*\(.*\)/, '')
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <div className="min-w-[560px] flex flex-col gap-1">
               <div className="flex gap-1">
                 <button

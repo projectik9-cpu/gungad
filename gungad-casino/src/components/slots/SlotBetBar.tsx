@@ -36,11 +36,8 @@ export const SlotBetBar: React.FC<SlotBetBarProps> = ({
 
   return (
     <div
-      className="relative flex items-center gap-1.5 sm:gap-2.5 px-2 sm:px-3 py-2 sm:py-3 rounded-xl sm:rounded-2xl border-2 border-amber-800/50"
-      style={{
-        background: 'linear-gradient(180deg, #2a1810 0%, #120c0e 100%)',
-        boxShadow: 'inset 0 1px 0 rgba(251,191,36,0.25), 0 8px 24px rgba(0,0,0,0.45)',
-      }}
+      className="relative flex items-center gap-1.5 sm:gap-2.5 px-2 sm:px-3 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl border border-zinc-800/60"
+      style={{ background: 'linear-gradient(180deg, #111116 0%, #0d0d11 100%)' }}
     >
       <div className="flex flex-col items-start min-w-0 shrink-0 max-w-[72px] sm:max-w-none">
         <span className="text-[8px] sm:text-[9px] text-zinc-600 uppercase tracking-widest font-mono">

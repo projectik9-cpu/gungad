@@ -694,7 +694,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in duration-500">
-      <div className="lg:col-span-8 flex flex-col gap-3">
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-3">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -734,7 +734,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         {/* Arena */}
         <div
           ref={arenaRef}
-          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[300px] sm:h-[380px] lg:h-[min(52vh,560px)]"
+          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[220px] sm:h-[340px] lg:h-[min(52vh,560px)]"
         >
           <canvas ref={canvasRef} className="w-full block" />
 
@@ -820,7 +820,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
       </div>
 
       {/* Controls column */}
-      <div className="lg:col-span-4 flex flex-col gap-3">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-3">
         <div className="rounded-2xl border border-rose-900/35 bg-gradient-to-b from-[#141018] to-[#0c0c10] p-1 red-border-glow">
           <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-3">
             <BetControls
@@ -845,6 +845,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
                 (gameState !== 'waiting' && !(gameState === 'running' && hasBet))
               }
               actionColor={gameState === 'running' && hasBet ? 'green' : 'red'}
+              compact
             />
           </div>
         </div>

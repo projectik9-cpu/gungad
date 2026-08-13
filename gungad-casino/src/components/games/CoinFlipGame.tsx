@@ -120,7 +120,7 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      <div className="lg:col-span-8 flex flex-col gap-4">
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-4">
         <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-8 min-h-[320px] lg:min-h-[420px] flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow">
           <div className="flex gap-4 mb-8 z-10">
             <button
@@ -196,7 +196,7 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
         </div>
       </div>
 
-      <div className="lg:col-span-4 flex flex-col gap-4">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-4">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
@@ -208,6 +208,7 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
           actionButtonLabel={isFlipping ? t('flipping', lang) : t('flipCoin', lang)}
           onAction={handleFlip}
           actionDisabled={isFlipping || betAmountUSD > user.balanceUSD}
+          compact
         />
       </div>
     </div>

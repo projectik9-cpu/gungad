@@ -18,6 +18,7 @@ interface BlackjackGameProps {
 }
 
 interface Card {
+  id: string;
   suit: '♠' | '♥' | '♦' | '♣';
   value: string;
   weight: number;
@@ -33,7 +34,7 @@ function getRandomCard(visible = true): Card {
   let weight = parseInt(val);
   if (['J', 'Q', 'K'].includes(val)) weight = 10;
   if (val === 'A') weight = 11;
-  return { suit, value: val, weight, visible };
+  return { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, suit, value: val, weight, visible };
 }
 
 function calculateHandScore(cards: Card[]): number {
@@ -57,17 +58,18 @@ function calculateFullScore(cards: Card[]): number {
   return score;
 }
 
-const CardFace: React.FC<{ card: Card; animate?: boolean }> = ({ card, animate }) => {
+const CardFace: React.FC<{ card: Card; animate?: boolean; flip?: boolean }> = ({ card, animate, flip }) => {
   const isRed = ['♥', '♦'].includes(card.suit);
+  const motion = flip ? 'animate-card-flip' : animate ? 'animate-deal-in' : '';
   if (!card.visible) {
     return (
-      <div className={`w-14 h-20 md:w-16 md:h-24 rounded-xl border-2 flex items-center justify-center bg-gradient-to-br from-rose-900 to-rose-950 border-rose-600 shadow-xl ${animate ? 'animate-deal-in' : ''}`}>
+      <div className={`w-14 h-20 md:w-16 md:h-24 rounded-xl border-2 flex items-center justify-center bg-gradient-to-br from-rose-900 to-rose-950 border-rose-600 shadow-xl ${motion}`}>
         <Layers className="w-5 h-5 text-rose-400/60" />
       </div>
     );
   }
   return (
-    <div className={`w-14 h-20 md:w-16 md:h-24 rounded-xl border-2 bg-zinc-100 border-zinc-300 flex flex-col justify-between p-1.5 shadow-xl ${animate ? 'animate-deal-in' : ''}`}>
+    <div className={`w-14 h-20 md:w-16 md:h-24 rounded-xl border-2 bg-zinc-100 border-zinc-300 flex flex-col justify-between p-1.5 shadow-xl ${motion}`}>
       <span className={`text-xs font-black ${isRed ? 'text-rose-600' : 'text-zinc-900'}`}>{card.value}</span>
       <span className={`text-lg md:text-xl text-center font-bold ${isRed ? 'text-rose-600' : 'text-zinc-900'}`}>{card.suit}</span>
       <span className={`text-xs font-black text-right ${isRed ? 'text-rose-600' : 'text-zinc-900'}`}>{card.value}</span>
@@ -141,9 +143,9 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
     setDealerCards([]);
     setDealStep(0);
 
-    trackTimeout(() => { soundFx.playCard(); setPlayerCards([p1]); setDealStep(1); }, 300);
-    trackTimeout(() => { soundFx.playCard(); setDealerCards([d1]); setDealStep(2); }, 700);
-    trackTimeout(() => { soundFx.playCard(); setPlayerCards([p1, p2]); setDealStep(3); }, 1100);
+    trackTimeout(() => { soundFx.playCard(); setPlayerCards([p1]); setDealStep(1); }, 280);
+    trackTimeout(() => { soundFx.playCard(); setDealerCards([d1]); setDealStep(2); }, 820);
+    trackTimeout(() => { soundFx.playCard(); setPlayerCards([p1, p2]); setDealStep(3); }, 1360);
     trackTimeout(() => {
       soundFx.playCard();
       setDealerCards([d1, d2]);
@@ -179,7 +181,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
       } else {
         setGameState('player_turn');
       }
-    }, 1500);
+    }, 1900);
   };
 
   const resolveDealerPeek = (insured: boolean, balanceNow: number) => {
@@ -318,14 +320,14 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
         currentDealer = [...currentDealer, next];
         dScore = calculateFullScore(currentDealer);
         setDealerCards([...currentDealer]);
-        trackTimeout(dealerPlay, 600);
+        trackTimeout(dealerPlay, 700);
         return;
       }
 
       const pScore = calculateFullScore(playerHand);
       settleRound(pScore, dScore, stakeUSD, balanceAfterBet);
     };
-    trackTimeout(dealerPlay, 500);
+    trackTimeout(dealerPlay, 650);
   };
 
   const visibleDealerScore = gameState === 'player_turn' || gameState === 'insurance' ? calculateHandScore(dealerCards.filter(c => c.visible)) : dealerFullScore;
@@ -334,68 +336,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-      <div className="lg:col-span-8 flex flex-col gap-2.5">
-        <div className="relative bg-[#0b130e] border border-rose-900/40 rounded-2xl p-4 sm:p-5 min-h-[280px] sm:min-h-[320px] flex flex-col justify-between gap-4 overflow-hidden shadow-2xl red-border-glow">
-          <div className="absolute inset-0 bg-[radial-gradient(#152e1f_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
-
-          {/* Dealer Area */}
-          <div className="relative z-10 flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-rose-500" />
-              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                {t('dealer', lang)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 min-h-[80px]">
-              {dealerCards.map((card, i) => <CardFace key={i} card={card} animate={i === dealerCards.length - 1} />)}
-            </div>
-            {dealerCards.length > 0 && (
-              <span className="text-sm font-bold text-rose-300 bg-rose-950/60 px-3 py-0.5 rounded-full border border-rose-800/50">
-                {gameState === 'player_turn' || gameState === 'insurance' ? `${visibleDealerScore} + ?` : visibleDealerScore}
-              </span>
-            )}
-          </div>
-
-          {gameState === 'insurance' && (
-            <div className="relative z-20 text-center px-3">
-              <div className="inline-flex items-center gap-2 bg-amber-950/80 border border-amber-700/60 rounded-xl px-3 py-2">
-                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="text-[11px] sm:text-xs font-bold text-amber-200">
-                  {t('insuranceHint', lang)} ({formatCurrency(insuranceCostUSD, currency)})
-                </span>
-              </div>
-            </div>
-          )}
-
-          {resultMessage && (
-            <div className="relative z-20 text-center">
-              <span className="font-display font-black text-2xl md:text-3xl text-rose-500 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(225,29,72,0.8)]">
-                {resultMessage}
-              </span>
-            </div>
-          )}
-
-          {/* Player Area */}
-          <div className="relative z-10 flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2 min-h-[80px]">
-              {playerCards.map((card, i) => <CardFace key={i} card={card} animate={i === playerCards.length - 1} />)}
-            </div>
-            {playerCards.length > 0 && (
-              <span className={`text-sm font-bold px-3 py-0.5 rounded-full border ${
-                playerScore > 21
-                  ? 'text-red-400 bg-red-950/60 border-red-800/50'
-                  : playerScore === 21
-                  ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/50'
-                  : 'text-zinc-300 bg-zinc-900/60 border-zinc-700/50'
-              }`}>
-                {t('player', lang)}: {playerScore}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="lg:col-span-4 flex flex-col gap-2.5">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
@@ -434,6 +375,76 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
           }
           compact
         />
+      </div>
+
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2.5">
+        <div className="relative bg-[#0b130e] border border-rose-900/40 rounded-2xl p-4 sm:p-5 min-h-[280px] sm:min-h-[320px] flex flex-col justify-between gap-4 overflow-hidden shadow-2xl red-border-glow">
+          <div className="absolute inset-0 bg-[radial-gradient(#152e1f_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
+
+          {/* Dealer Area */}
+          <div className="relative z-10 flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-rose-500" />
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                {t('dealer', lang)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 min-h-[80px]" style={{ perspective: 600 }}>
+              {dealerCards.map((card, i) => (
+                <CardFace
+                  key={`${card.id}-${card.visible ? 'up' : 'down'}`}
+                  card={card}
+                  animate
+                  flip={card.visible && i === 1 && gameState !== 'dealing' && gameState !== 'insurance'}
+                />
+              ))}
+            </div>
+            {dealerCards.length > 0 && (
+              <span className="text-sm font-bold text-rose-300 bg-rose-950/60 px-3 py-0.5 rounded-full border border-rose-800/50">
+                {gameState === 'player_turn' || gameState === 'insurance' ? `${visibleDealerScore} + ?` : visibleDealerScore}
+              </span>
+            )}
+          </div>
+
+          {gameState === 'insurance' && (
+            <div className="relative z-20 text-center px-3">
+              <div className="inline-flex items-center gap-2 bg-amber-950/80 border border-amber-700/60 rounded-xl px-3 py-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-[11px] sm:text-xs font-bold text-amber-200">
+                  {t('insuranceHint', lang)} ({formatCurrency(insuranceCostUSD, currency)})
+                </span>
+              </div>
+            </div>
+          )}
+
+          {resultMessage && (
+            <div className="relative z-20 text-center">
+              <span className="font-display font-black text-2xl md:text-3xl text-rose-500 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(225,29,72,0.8)]">
+                {resultMessage}
+              </span>
+            </div>
+          )}
+
+          {/* Player Area */}
+          <div className="relative z-10 flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 min-h-[80px]" style={{ perspective: 600 }}>
+              {playerCards.map((card) => (
+                <CardFace key={card.id} card={card} animate />
+              ))}
+            </div>
+            {playerCards.length > 0 && (
+              <span className={`text-sm font-bold px-3 py-0.5 rounded-full border ${
+                playerScore > 21
+                  ? 'text-red-400 bg-red-950/60 border-red-800/50'
+                  : playerScore === 21
+                  ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/50'
+                  : 'text-zinc-300 bg-zinc-900/60 border-zinc-700/50'
+              }`}>
+                {t('player', lang)}: {playerScore}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

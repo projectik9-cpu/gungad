@@ -157,6 +157,11 @@ export const translations = {
     blackJackWin: 'BLACKJACK!',
     playerWins: 'You Win!',
     dealerWins: 'Dealer Wins',
+    insurance: 'Insurance',
+    takeInsurance: 'Insurance',
+    noInsurance: 'No thanks',
+    dealerBlackjack: 'Dealer Blackjack',
+    insuranceHint: 'Dealer shows Ace. Insure half your bet?',
 
     // Coin Flip
     heads: 'HEADS',
@@ -451,6 +456,11 @@ export const translations = {
     blackJackWin: 'БЛЭКДЖЕК!',
     playerWins: 'Вы выиграли!',
     dealerWins: 'Дилер выиграл',
+    insurance: 'Страховка',
+    takeInsurance: 'Страховка',
+    noInsurance: 'Без страховки',
+    dealerBlackjack: 'Блэкджек у дилера',
+    insuranceHint: 'У дилера туз. Застраховать половину ставки?',
 
     // Coin Flip
     heads: 'ОРЁЛ',
@@ -743,6 +753,11 @@ export const translations = {
     blackJackWin: 'БЛЕКДЖЕК!',
     playerWins: 'Ви виграли!',
     dealerWins: 'Дилер виграв',
+    insurance: 'Страховка',
+    takeInsurance: 'Страховка',
+    noInsurance: 'Без страховки',
+    dealerBlackjack: 'Блекджек у дилера',
+    insuranceHint: 'У дилера туз. Застрахувати половину ставки?',
 
     // Coin Flip
     heads: 'ОРЕЛ',
@@ -1035,6 +1050,11 @@ export const translations = {
     blackJackWin: 'БЛЭКДЖЕК!',
     playerWins: 'Сіз жеңдіңіз!',
     dealerWins: 'Дилер жеңді',
+    insurance: 'Сақтандыру',
+    takeInsurance: 'Сақтандыру',
+    noInsurance: 'Жоқ',
+    dealerBlackjack: 'Дилер блекджегі',
+    insuranceHint: 'Дилерде туз. Ставканың жартысын сақтандыру?',
 
     // Coin Flip
     heads: 'БАС',

@@ -50,6 +50,32 @@ function historyPillClass(h: number): string {
   return 'bg-rose-950/90 text-rose-400 border-rose-800/50';
 }
 
+const CRASH_HISTORY_KEY = 'gg_crash_history';
+/** Same exponential rate every round so line speed never leaks the crash point. */
+const CRASH_GROWTH = 0.11;
+/** Visual path maps log(m) onto a fixed 12x span — not onto this round's crash. */
+const CRASH_VISUAL_MAX = 12;
+
+function loadCrashHistory(): number[] {
+  try {
+    const raw = localStorage.getItem(CRASH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((n: unknown) => typeof n === 'number' && n >= 1).slice(0, 10);
+  } catch {
+    return [];
+  }
+}
+
+function saveCrashHistory(history: number[]) {
+  try {
+    localStorage.setItem(CRASH_HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+  } catch {
+    /* ignore */
+  }
+}
+
 export const CrashGame: React.FC<CrashGameProps> = ({
   user, currency, lang, playMode = 'real', onAddHistory,
   placeBet, resolveBet, onRefreshWallet,
@@ -61,7 +87,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const [crashPoint, setCrashPoint] = useState<number>(0);
   const [cashedMultiplier, setCashedMultiplier] = useState<number>(0);
   const [cashedPayoutUSD, setCashedPayoutUSD] = useState<number>(0);
-  const [history, setHistory] = useState<number[]>([1.12, 1.45, 1.05, 3.20, 1.18, 1.02, 1.65]);
+  const [history, setHistory] = useState<number[]>(() => loadCrashHistory());
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const [countdown, setCountdown] = useState<number>(5);
   const [hasBet, setHasBet] = useState<boolean>(false);
@@ -153,14 +179,9 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const multToXY = (m: number, width: number, height: number) => {
     const startX = 36;
     const startY = height - 36;
-    // Scale path to this round's crash point so the tip hits the edge at crash —
-    // not at an arbitrary 13x (which looked like the rocket "flew away").
-    const target = Math.max(1.05, crashPointRef.current || 2);
-    const clamped = Math.min(Math.max(m, 1), target);
-    const progress = Math.min(1, Math.max(0, (clamped - 1) / (target - 1)));
-    const eased = Math.pow(progress, 0.85);
-    const x = startX + (width - 72) * eased;
-    const y = startY - (height - 72) * Math.min(0.92, eased * 0.98);
+    const p = Math.min(0.97, Math.log(Math.max(1, m)) / Math.log(CRASH_VISUAL_MAX));
+    const x = startX + (width - 72) * p;
+    const y = startY - (height - 72) * p * 0.92;
     return { x, y };
   };
 
@@ -499,7 +520,11 @@ export const CrashGame: React.FC<CrashGameProps> = ({
       const crashAt = parseFloat(Math.min(finalMult, cp).toFixed(2));
       multiplierRef.current = crashAt;
       setMultiplier(crashAt);
-      setHistory(prev => [cp, ...prev.slice(0, 9)]);
+      setHistory(prev => {
+        const next = [crashAt, ...prev].slice(0, 10);
+        saveCrashHistory(next);
+        return next;
+      });
 
       const arena = arenaRef.current;
       const w = arena?.clientWidth || 600;
@@ -531,7 +556,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     const tick = () => {
       if (!mountedRef.current || roundId !== roundIdRef.current) return;
       const elapsed = (Date.now() - startTime) / 1000;
-      current = parseFloat((1 + Math.pow(elapsed * (0.38 / 1.15), 1.65)).toFixed(2));
+      current = parseFloat(Math.exp(CRASH_GROWTH * elapsed).toFixed(2));
 
       // Safety: never let the multiplier run away if crash check is missed
       if (elapsed >= HARD_MAX_SECONDS) {
@@ -668,8 +693,8 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const countdownProgress = countdown / 5;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in duration-500 lg:flex-1 lg:min-h-0 lg:items-stretch">
-      <div className="lg:col-span-8 flex flex-col gap-3 lg:h-full lg:min-h-[calc(100dvh-7.5rem)]">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in duration-500">
+      <div className="lg:col-span-8 flex flex-col gap-3">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -690,7 +715,10 @@ export const CrashGame: React.FC<CrashGameProps> = ({
           </div>
           <div className="flex items-center gap-1.5 overflow-x-auto max-w-[55%] scrollbar-none">
             <History className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
-            {history.map((h, i) => (
+            {history.length === 0 ? (
+              <span className="text-[10px] text-zinc-600 font-medium">—</span>
+            ) : (
+              history.map((h, i) => (
               <span
                 key={`${h}-${i}`}
                 className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 border crash-hist-in ${historyPillClass(h)}`}
@@ -698,14 +726,15 @@ export const CrashGame: React.FC<CrashGameProps> = ({
               >
                 {h.toFixed(2)}x
               </span>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
         {/* Arena */}
         <div
           ref={arenaRef}
-          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[300px] sm:h-[360px] lg:h-auto lg:flex-1 lg:min-h-[min(68dvh,640px)]"
+          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[300px] sm:h-[380px] lg:h-[min(52vh,560px)]"
         >
           <canvas ref={canvasRef} className="w-full block" />
 
@@ -791,9 +820,9 @@ export const CrashGame: React.FC<CrashGameProps> = ({
       </div>
 
       {/* Controls column */}
-      <div className="lg:col-span-4 flex flex-col gap-3 lg:h-full">
-        <div className="rounded-2xl border border-rose-900/35 bg-gradient-to-b from-[#141018] to-[#0c0c10] p-1 red-border-glow lg:flex-1 lg:flex lg:flex-col">
-          <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-3 lg:flex-1 lg:flex lg:flex-col">
+      <div className="lg:col-span-4 flex flex-col gap-3">
+        <div className="rounded-2xl border border-rose-900/35 bg-gradient-to-b from-[#141018] to-[#0c0c10] p-1 red-border-glow">
+          <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-3">
             <BetControls
               betAmountUSD={betAmountUSD}
               onBetAmountChangeUSD={setBetAmountUSD}
@@ -802,7 +831,6 @@ export const CrashGame: React.FC<CrashGameProps> = ({
               lang={lang}
               disabled={betControlsDisabled}
               lastBetUSD={lastBetUSD}
-              stretch
               actionButtonLabel={
                 gameState === 'running' && hasBet
                   ? `${t('cashout', lang)} (${multiplier.toFixed(2)}x)`

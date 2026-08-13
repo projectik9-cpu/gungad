@@ -4,8 +4,9 @@ import { t } from '../../translations';
 import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import confetti from 'canvas-confetti';
-import { Layers, Shield } from 'lucide-react';
+import { Layers, Shield, ShieldCheck } from 'lucide-react';
 import { blackjackNaturalMult } from '../../game/demoOdds';
+import { formatCurrency } from '../../utils/currencies';
 
 interface BlackjackGameProps {
   user: UserProfile;
@@ -83,12 +84,14 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
   onAddHistory,
 }) => {
   const [betAmountUSD, setBetAmountUSD] = useState<number>(10);
-  const [gameState, setGameState] = useState<'idle' | 'dealing' | 'player_turn' | 'dealer_turn' | 'game_over'>('idle');
+  const [gameState, setGameState] = useState<'idle' | 'dealing' | 'insurance' | 'player_turn' | 'dealer_turn' | 'game_over'>('idle');
   const [playerCards, setPlayerCards] = useState<Card[]>([]);
   const [dealerCards, setDealerCards] = useState<Card[]>([]);
   const [resultMessage, setResultMessage] = useState<string>('');
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const [dealStep, setDealStep] = useState<number>(0);
+  const holeRef = useRef<Card | null>(null);
+  const upcardRef = useRef<Card | null>(null);
   const mountedRef = useRef(true);
   const timersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
@@ -131,6 +134,8 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
     const d1 = getRandomCard(true);
     const p2 = getRandomCard(true);
     const d2 = getRandomCard(false);
+    upcardRef.current = d1;
+    holeRef.current = d2;
 
     setPlayerCards([]);
     setDealerCards([]);
@@ -145,18 +150,89 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
       setDealStep(4);
 
       const pScore = calculateFullScore([p1, p2]);
+      const dealerBJ = calculateFullScore([d1, { ...d2, visible: true }]) === 21;
+
       if (pScore === 21) {
-        soundFx.playWin();
-        confetti({ particleCount: 80, spread: 60 });
-        const payoutUSD = stakeUSD * naturalMult;
-        onUpdateBalance(balanceAfterBet + payoutUSD);
-        setResultMessage(t('blackJackWin', lang));
+        setDealerCards([d1, { ...d2, visible: true }]);
+        if (dealerBJ) {
+          onUpdateBalance(balanceAfterBet + stakeUSD);
+          setResultMessage(t('push', lang));
+          setGameState('game_over');
+          onAddHistory({ id: String(Date.now()), gameId: 'blackjack', gameName: t('blackjackName', lang), timestamp: new Date(), betAmountUSD: stakeUSD, multiplier: 1, payoutUSD: stakeUSD, win: true, currency });
+        } else {
+          soundFx.playWin();
+          confetti({ particleCount: 80, spread: 60 });
+          const payoutUSD = stakeUSD * naturalMult;
+          onUpdateBalance(balanceAfterBet + payoutUSD);
+          setResultMessage(t('blackJackWin', lang));
+          setGameState('game_over');
+          onAddHistory({ id: String(Date.now()), gameId: 'blackjack', gameName: t('blackjackName', lang), timestamp: new Date(), betAmountUSD: stakeUSD, multiplier: naturalMult, payoutUSD, win: true, currency });
+        }
+      } else if (d1.value === 'A') {
+        setGameState('insurance');
+      } else if (dealerBJ) {
+        setDealerCards([d1, { ...d2, visible: true }]);
+        soundFx.playLoss();
+        setResultMessage(t('dealerBlackjack', lang));
         setGameState('game_over');
-        onAddHistory({ id: String(Date.now()), gameId: 'blackjack', gameName: t('blackjackName', lang), timestamp: new Date(), betAmountUSD: stakeUSD, multiplier: naturalMult, payoutUSD, win: true, currency });
+        onAddHistory({ id: String(Date.now()), gameId: 'blackjack', gameName: t('blackjackName', lang), timestamp: new Date(), betAmountUSD: stakeUSD, multiplier: 0, payoutUSD: 0, win: false, currency });
       } else {
         setGameState('player_turn');
       }
     }, 1500);
+  };
+
+  const resolveDealerPeek = (insured: boolean, balanceNow: number) => {
+    const up = upcardRef.current;
+    const hole = holeRef.current;
+    if (!up || !hole) {
+      setGameState('player_turn');
+      return;
+    }
+    const revealedHole = { ...hole, visible: true };
+    const dealerBJ = calculateFullScore([up, revealedHole]) === 21;
+    const stakeUSD = lastBetUSD;
+    const insuranceCost = stakeUSD / 2;
+
+    if (dealerBJ) {
+      setDealerCards([up, revealedHole]);
+      if (insured) {
+        onUpdateBalance(balanceNow + insuranceCost * 3);
+        setResultMessage(t('dealerBlackjack', lang));
+      } else {
+        soundFx.playLoss();
+        setResultMessage(t('dealerBlackjack', lang));
+      }
+      setGameState('game_over');
+      onAddHistory({
+        id: String(Date.now()),
+        gameId: 'blackjack',
+        gameName: t('blackjackName', lang),
+        timestamp: new Date(),
+        betAmountUSD: stakeUSD,
+        multiplier: insured ? 1 : 0,
+        payoutUSD: insured ? stakeUSD : 0,
+        win: insured,
+        currency,
+      });
+      return;
+    }
+
+    setGameState('player_turn');
+  };
+
+  const handleTakeInsurance = () => {
+    if (gameState !== 'insurance') return;
+    const cost = lastBetUSD / 2;
+    if (cost <= 0 || cost > user.balanceUSD) return;
+    const after = user.balanceUSD - cost;
+    onUpdateBalance(after);
+    resolveDealerPeek(true, after);
+  };
+
+  const handleDeclineInsurance = () => {
+    if (gameState !== 'insurance') return;
+    resolveDealerPeek(false, user.balanceUSD);
   };
 
   const handleHit = () => {
@@ -252,12 +328,14 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
     trackTimeout(dealerPlay, 500);
   };
 
-  const visibleDealerScore = gameState === 'player_turn' ? calculateHandScore(dealerCards.filter(c => c.visible)) : dealerFullScore;
+  const visibleDealerScore = gameState === 'player_turn' || gameState === 'insurance' ? calculateHandScore(dealerCards.filter(c => c.visible)) : dealerFullScore;
+  const insuranceCostUSD = lastBetUSD / 2;
+  const canAffordInsurance = user.balanceUSD >= insuranceCostUSD;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:flex-1 lg:min-h-0 lg:items-stretch">
-      <div className="lg:col-span-8 flex flex-col gap-4 lg:min-h-[calc(100dvh-7.5rem)] lg:h-full">
-        <div className="relative bg-[#0b130e] border border-rose-900/40 rounded-2xl p-6 min-h-[380px] lg:min-h-[min(58dvh,560px)] lg:flex-1 flex flex-col justify-between overflow-hidden shadow-2xl red-border-glow">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+      <div className="lg:col-span-8 flex flex-col gap-2.5">
+        <div className="relative bg-[#0b130e] border border-rose-900/40 rounded-2xl p-4 sm:p-5 min-h-[280px] sm:min-h-[320px] flex flex-col justify-between gap-4 overflow-hidden shadow-2xl red-border-glow">
           <div className="absolute inset-0 bg-[radial-gradient(#152e1f_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
 
           {/* Dealer Area */}
@@ -271,17 +349,26 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
             <div className="flex items-center gap-2 min-h-[80px]">
               {dealerCards.map((card, i) => <CardFace key={i} card={card} animate={i === dealerCards.length - 1} />)}
             </div>
-            {/* Очки дилера */}
             {dealerCards.length > 0 && (
               <span className="text-sm font-bold text-rose-300 bg-rose-950/60 px-3 py-0.5 rounded-full border border-rose-800/50">
-                {gameState === 'player_turn' ? `${visibleDealerScore} + ?` : visibleDealerScore}
+                {gameState === 'player_turn' || gameState === 'insurance' ? `${visibleDealerScore} + ?` : visibleDealerScore}
               </span>
             )}
           </div>
 
-          {/* Status Banner */}
+          {gameState === 'insurance' && (
+            <div className="relative z-20 text-center px-3">
+              <div className="inline-flex items-center gap-2 bg-amber-950/80 border border-amber-700/60 rounded-xl px-3 py-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="text-[11px] sm:text-xs font-bold text-amber-200">
+                  {t('insuranceHint', lang)} ({formatCurrency(insuranceCostUSD, currency)})
+                </span>
+              </div>
+            </div>
+          )}
+
           {resultMessage && (
-            <div className="relative z-20 my-2 text-center">
+            <div className="relative z-20 text-center">
               <span className="font-display font-black text-2xl md:text-3xl text-rose-500 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(225,29,72,0.8)]">
                 {resultMessage}
               </span>
@@ -293,7 +380,6 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
             <div className="flex items-center gap-2 min-h-[80px]">
               {playerCards.map((card, i) => <CardFace key={i} card={card} animate={i === playerCards.length - 1} />)}
             </div>
-            {/* Очки игрока */}
             {playerCards.length > 0 && (
               <span className={`text-sm font-bold px-3 py-0.5 rounded-full border ${
                 playerScore > 21
@@ -309,23 +395,44 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
         </div>
       </div>
 
-      <div className="lg:col-span-4 flex flex-col gap-4 lg:h-full">
+      <div className="lg:col-span-4 flex flex-col gap-2.5">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
           userBalanceUSD={user.balanceUSD}
           currency={currency}
           lang={lang}
-          disabled={gameState === 'player_turn' || gameState === 'dealer_turn' || gameState === 'dealing'}
+          disabled={gameState === 'player_turn' || gameState === 'dealer_turn' || gameState === 'dealing' || gameState === 'insurance'}
           lastBetUSD={lastBetUSD}
-          actionButtonLabel={gameState === 'player_turn' ? t('hit', lang) : t('dealCards', lang)}
-          onAction={gameState === 'player_turn' ? handleHit : handleDeal}
+          actionButtonLabel={
+            gameState === 'insurance'
+              ? t('takeInsurance', lang)
+              : gameState === 'player_turn'
+              ? t('hit', lang)
+              : t('dealCards', lang)
+          }
+          onAction={
+            gameState === 'insurance'
+              ? handleTakeInsurance
+              : gameState === 'player_turn'
+              ? handleHit
+              : handleDeal
+          }
+          actionDisabled={
+            gameState === 'insurance'
+              ? !canAffordInsurance
+              : gameState === 'player_turn'
+              ? false
+              : gameState !== 'idle' && gameState !== 'game_over'
+          }
           secondaryAction={
-            gameState === 'player_turn'
+            gameState === 'insurance'
+              ? { label: t('noInsurance', lang), onClick: handleDeclineInsurance }
+              : gameState === 'player_turn'
               ? { label: t('stand', lang), onClick: handleStand }
               : undefined
           }
-          stretch
+          compact
         />
       </div>
     </div>

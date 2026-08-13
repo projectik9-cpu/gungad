@@ -58,45 +58,38 @@ export const SymbolFace: React.FC<{
             </defs>
             <text
               x="50"
-              y="62"
+              y="72"
               textAnchor="middle"
-              fontFamily="Georgia, 'Times New Roman', serif"
+              fontFamily="Impact, Haettenschweiler, sans-serif"
               fontWeight="900"
-              fontSize="34"
+              fontSize="72"
               fill={`url(#${gid})`}
-              style={{ paintOrder: 'stroke', stroke: '#450a0a', strokeWidth: 2 }}
+              style={{ paintOrder: 'stroke', stroke: '#450a0a', strokeWidth: 3 }}
             >
-              777
+              7
             </text>
           </>
         )}
         {symbol === 'bar' && (
           <>
-            <rect x="12" y="34" width="76" height="32" rx="6" fill="#1c1917" stroke="#fbbf24" strokeWidth="3" />
-            <text
-              x="50"
-              y="57"
-              textAnchor="middle"
-              fontFamily="Impact, Haettenschweiler, sans-serif"
-              fontWeight="900"
-              fontSize="26"
-              letterSpacing="2"
-              fill="#fbbf24"
-            >
-              BAR
-            </text>
+            <rect x="10" y="22" width="80" height="22" rx="4" fill="#78350f" stroke="#fbbf24" strokeWidth="2.5" />
+            <rect x="10" y="48" width="80" height="22" rx="4" fill="#1c1917" stroke="#f59e0b" strokeWidth="2.5" />
+            <text x="50" y="39" textAnchor="middle" fontFamily="Impact, sans-serif" fontWeight="900" fontSize="14" fill="#fde68a">BAR</text>
+            <text x="50" y="65" textAnchor="middle" fontFamily="Impact, sans-serif" fontWeight="900" fontSize="14" fill="#fbbf24">BAR</text>
           </>
         )}
         {symbol === 'grape' && (
           <>
-            <ellipse cx="50" cy="22" rx="10" ry="6" fill="#4ade80" opacity="0.9" />
-            <circle cx="38" cy="42" r="11" fill="#7c3aed" />
-            <circle cx="54" cy="40" r="12" fill="#8b5cf6" />
-            <circle cx="46" cy="54" r="11" fill="#6d28d9" />
-            <circle cx="62" cy="54" r="10" fill="#a78bfa" />
-            <circle cx="38" cy="66" r="10" fill="#5b21b6" />
-            <circle cx="54" cy="68" r="11" fill="#7c3aed" />
-            <circle cx="70" cy="64" r="9" fill="#8b5cf6" />
+            <path d="M48 14 C52 18, 62 22, 58 30" fill="none" stroke="#4d7c0f" strokeWidth="3" strokeLinecap="round" />
+            <ellipse cx="62" cy="24" rx="8" ry="4" fill="#65a30d" transform="rotate(20 62 24)" />
+            <circle cx="36" cy="44" r="13" fill="#6d28d9" />
+            <circle cx="54" cy="40" r="14" fill="#8b5cf6" />
+            <circle cx="68" cy="50" r="12" fill="#7c3aed" />
+            <circle cx="42" cy="60" r="13" fill="#5b21b6" />
+            <circle cx="58" cy="64" r="13" fill="#7c3aed" />
+            <circle cx="72" cy="66" r="10" fill="#a78bfa" />
+            <circle cx="40" cy="74" r="10" fill="#4c1d95" />
+            <circle cx="50" cy="48" r="6" fill="#c4b5fd" opacity="0.45" />
           </>
         )}
         {symbol === 'lemon' && (
@@ -144,14 +137,18 @@ const ReelCol: React.FC<ColProps> = ({
   const finalsRef = useRef(finalSymbols);
   finalsRef.current = finalSymbols;
   const spinningRef = useRef(false);
+  const [spinning, setSpinning] = useState(false);
 
-  // Idle sync when not mid-spin
+  // Lock spinning BEFORE the idle-sync effect can paint the final grid.
+  useLayoutEffect(() => {
+    if (spinId > 0) spinningRef.current = true;
+  }, [spinId]);
+
   useEffect(() => {
-    if (!spinningRef.current) {
-      setStrip(finalSymbols);
-      stripRef.current = finalSymbols;
-      setOffsetY(0);
-    }
+    if (spinningRef.current) return;
+    setStrip(finalSymbols);
+    stripRef.current = finalSymbols;
+    setOffsetY(0);
   }, [finalSymbols]);
 
   useEffect(() => {
@@ -159,6 +156,7 @@ const ReelCol: React.FC<ColProps> = ({
 
     let cancelled = false;
     spinningRef.current = true;
+    setSpinning(true);
     const landingSymbols = finalsRef.current.slice();
     const fillers = Array.from({ length: STRIP_EXTRA }, () => randomSymbol());
     const full = [...fillers, ...landingSymbols];
@@ -166,7 +164,9 @@ const ReelCol: React.FC<ColProps> = ({
     setStrip(full);
     setLanding(false);
 
-    const startY = -(STRIP_EXTRA * cellH);
+    // Scroll from random fillers (y=0) down onto the locked landing — never swap the strip.
+    const startY = 0;
+    const endY = -(STRIP_EXTRA * cellH);
     setOffsetY(startY);
 
     const duration = spinDurationMs + colIdx * staggerMs;
@@ -176,16 +176,14 @@ const ReelCol: React.FC<ColProps> = ({
       if (cancelled) return;
       const t = Math.min(1, (now - start) / duration);
       const eased = easeOutCubic(t);
-      const y = startY + (0 - startY) * eased;
-      setOffsetY(y);
+      setOffsetY(startY + (endY - startY) * eased);
 
       if (t < 1) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
-        setOffsetY(0);
-        setStrip(landingSymbols);
-        stripRef.current = landingSymbols;
+        setOffsetY(endY);
         spinningRef.current = false;
+        setSpinning(false);
         setLanding(true);
         onStopped(colIdx);
         window.setTimeout(() => {
@@ -200,8 +198,6 @@ const ReelCol: React.FC<ColProps> = ({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [spinId, cellH, colIdx, spinDurationMs, staggerMs, onStopped]);
-
-  const spinning = strip.length > VISIBLE_ROWS;
 
   return (
     <div
@@ -241,33 +237,17 @@ const ReelCol: React.FC<ColProps> = ({
         }}
       >
         {strip.map((sym, i) => {
-          const visibleStart = strip.length - VISIBLE_ROWS;
+          const visibleStart =
+            strip.length > VISIBLE_ROWS ? STRIP_EXTRA : 0;
+          const isVisible = i >= visibleStart && i < visibleStart + VISIBLE_ROWS;
           const rowInWindow = i - visibleStart;
-          const isPayline =
-            !spinning &&
-            strip.length === VISIBLE_ROWS &&
-            i === PAYLINE_ROW &&
-            winLine;
-          const isNearPayline =
-            spinning
-              ? false
-              : strip.length === VISIBLE_ROWS && i !== PAYLINE_ROW;
-
-          // 3D tilt for top/bottom when idle
-          let rotateX = 0;
-          if (!spinning && strip.length === VISIBLE_ROWS) {
-            if (rowInWindow === 0 || i === 0) rotateX = 18;
-            if (rowInWindow === 2 || i === 2) rotateX = -18;
-          }
+          const isPayline = !spinning && isVisible && rowInWindow === PAYLINE_ROW && winLine;
+          const isNearPayline = !spinning && isVisible && rowInWindow !== PAYLINE_ROW;
 
           return (
             <div
               key={`${spinId}-${colIdx}-${i}`}
-              style={{
-                height: cellH,
-                transform: rotateX ? `perspective(420px) rotateX(${rotateX}deg)` : undefined,
-                transformOrigin: i === 0 ? 'center bottom' : i === 2 ? 'center top' : 'center center',
-              }}
+              style={{ height: cellH }}
               className="p-1.5"
             >
               <SymbolFace
@@ -333,22 +313,35 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
   }).current;
 
   return (
-    <div
-      className="w-full mx-auto"
-      style={{ perspective: 900, maxWidth: 440 }}
-    >
+    <div className="w-full mx-auto" style={{ maxWidth: 480 }}>
+      <div
+        className="rounded-[1.4rem] p-[10px] sm:p-3"
+        style={{
+          background:
+            'linear-gradient(180deg, #6b3a12 0%, #3d220c 18%, #1a0e08 55%, #12080c 100%)',
+          boxShadow:
+            '0 24px 50px rgba(0,0,0,0.65), inset 0 1px 0 rgba(251,191,36,0.35), 0 0 0 2px #92400e',
+        }}
+      >
+        <div
+          className="mb-2 sm:mb-2.5 rounded-lg py-1.5 text-center border border-amber-700/50"
+          style={{
+            background: 'linear-gradient(90deg, #7f1d1d, #b45309, #7f1d1d)',
+            boxShadow: '0 0 18px rgba(245,158,11,0.35)',
+          }}
+        >
+          <span className="font-display font-black text-[11px] sm:text-sm tracking-[0.28em] text-amber-100 uppercase">
+            GUN GAD
+          </span>
+        </div>
       <div
         ref={wrapRef}
-        className="grid gap-2 sm:gap-2.5 w-full rounded-2xl p-2 sm:p-2.5 border border-zinc-700/60"
+        className="grid gap-1.5 sm:gap-2 w-full rounded-xl p-2 sm:p-2.5 border-2 border-zinc-800"
         style={{
           gridTemplateColumns: `repeat(${REELS}, 1fr)`,
           aspectRatio: `${REELS} / ${VISIBLE_ROWS}`,
-          background:
-            'linear-gradient(180deg, #2a1518 0%, #120a0c 40%, #0a0a0d 100%)',
-          boxShadow:
-            'inset 0 1px 0 rgba(255,255,255,0.06), 0 20px 50px rgba(0,0,0,0.55), 0 0 0 1px rgba(225,29,72,0.25)',
-          transform: 'rotateX(8deg)',
-          transformStyle: 'preserve-3d',
+          background: 'linear-gradient(180deg, #0a0a0e 0%, #050506 100%)',
+          boxShadow: 'inset 0 0 28px rgba(0,0,0,0.85)',
         }}
       >
         {Array.from({ length: REELS }, (_, col) => {
@@ -370,6 +363,7 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
             />
           );
         })}
+      </div>
       </div>
     </div>
   );

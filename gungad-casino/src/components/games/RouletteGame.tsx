@@ -225,10 +225,36 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
     return map[type as string] || String(type);
   };
 
+  const isPicked = (type: BetType) => placedBets.some((b) => b.type === type);
+  const atCap = (type: BetType) => placedBets.length >= MAX_BETS && !isPicked(type);
+
+  const numBtnClass = (num: number) => {
+    const picked = isPicked(num);
+    const cap = atCap(num);
+    const base = `h-8 sm:h-9 flex items-center justify-center font-mono font-black text-[11px] sm:text-xs rounded-[4px] border transition-all ${cap ? 'opacity-40 cursor-not-allowed' : ''}`;
+    if (picked) {
+      if (num === 0) return `${base} bg-emerald-500 text-white border-emerald-200 ring-1 ring-white`;
+      if (RED_NUMBERS.includes(num)) return `${base} bg-rose-500 text-white border-rose-200 ring-1 ring-white`;
+      return `${base} bg-zinc-100 text-zinc-900 border-white ring-1 ring-white`;
+    }
+    if (num === 0) return `${base} bg-emerald-800 text-emerald-50 border-emerald-600 hover:bg-emerald-600`;
+    if (RED_NUMBERS.includes(num)) return `${base} bg-[#9f1239] text-white border-rose-950 hover:bg-rose-600`;
+    return `${base} bg-[#1a1a1f] text-zinc-100 border-zinc-700 hover:bg-zinc-600`;
+  };
+
+  const outsideBtnClass = (type: BetType) =>
+    `py-2 px-1 rounded-[4px] border text-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wide transition-all truncate ${
+      atCap(type) ? 'opacity-40 cursor-not-allowed' : ''
+    } ${
+      isPicked(type)
+        ? 'bg-rose-600 text-white border-rose-300'
+        : 'bg-[#16161c] border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-white'
+    }`;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:flex-1 lg:min-h-0 lg:items-stretch">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
       {/* Bet + spin first on mobile */}
-      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5 lg:h-full">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
@@ -241,11 +267,10 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
           onAction={handleSpin}
           actionDisabled={isSpinning || placedBets.length === 0 || totalBetUSD > user.balanceUSD}
           compact
-          stretch
         />
       </div>
 
-      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2.5 lg:min-h-[calc(100dvh-7.5rem)] lg:h-full">
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2.5">
         {/* История */}
         <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2 flex items-center gap-1.5 overflow-x-auto shrink-0">
           <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">{t('lastNumbers', lang)}:</span>
@@ -255,13 +280,13 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
         </div>
 
         {/* Wheel */}
-        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-2 lg:p-4 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow lg:flex-1 lg:min-h-[min(42vh,320px)]">
+        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-3 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow">
           <div className="absolute top-2 z-20 left-1/2 -translate-x-1/2">
             <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-rose-600 drop-shadow-[0_0_8px_rgba(225,29,72,0.9)]" />
           </div>
 
           <div
-            className="w-40 h-40 sm:w-52 sm:h-52 lg:w-[min(42vh,280px)] lg:h-[min(42vh,280px)] rounded-full border-4 border-zinc-800 relative shadow-[0_0_40px_rgba(0,0,0,0.9)] transition-transform duration-[4000ms] ease-out"
+            className="w-40 h-40 sm:w-52 sm:h-52 lg:w-56 lg:h-56 rounded-full border-4 border-zinc-800 relative shadow-[0_0_40px_rgba(0,0,0,0.9)] transition-transform duration-[4000ms] ease-out"
             style={{ transform: `rotate(${wheelRotation}deg)` }}
           >
             <svg viewBox="0 0 200 200" className="w-full h-full rounded-full">
@@ -325,67 +350,83 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
           )}
         </div>
 
-        {/* Betting Board — компактнее */}
-        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2 flex flex-col gap-2">
+        {/* European betting layout */}
+        <div className="bg-[#0b3d2c] border border-emerald-900/50 rounded-2xl p-2.5 sm:p-3 flex flex-col gap-2 shadow-[inset_0_0_40px_rgba(0,0,0,0.45)]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase">{t('selectBets', lang)} ({placedBets.length}/{MAX_BETS})</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{t('selectBets', lang)} ({placedBets.length}/{MAX_BETS})</span>
             {placedBets.length > 0 && (
               <button onClick={clearBets} className="text-[10px] text-rose-400 hover:text-rose-300 font-bold">{t('clearBets', lang)}</button>
             )}
           </div>
 
-          <div className="grid grid-cols-12 gap-0.5">
-            <button
-              onClick={() => addBet(0)}
-              disabled={isSpinning}
-              className={`col-span-12 py-1 rounded text-[10px] font-bold font-mono transition-all ${
-                placedBets.find(b => b.type === 0) ? 'bg-emerald-600 text-white ring-1 ring-emerald-400' : 'bg-emerald-900/60 text-emerald-400 hover:bg-emerald-700'
-              } ${placedBets.length >= MAX_BETS && !placedBets.find(b => b.type === 0) ? 'opacity-40 cursor-not-allowed' : ''}`}
-            >0</button>
+          <div className="overflow-x-auto">
+            <div className="min-w-[560px] flex flex-col gap-1">
+              <div className="flex gap-1">
+                <button
+                  onClick={() => addBet(0)}
+                  disabled={isSpinning || atCap(0)}
+                  className={`${numBtnClass(0)} w-11 shrink-0 self-stretch`}
+                  style={{ minHeight: '6.75rem' }}
+                >
+                  0
+                </button>
+                <div className="flex-1 grid grid-cols-12 grid-rows-3 gap-0.5">
+                  {[3, 2, 1].map((rowStart) =>
+                    Array.from({ length: 12 }, (_, i) => rowStart + i * 3).map((num) => (
+                      <button
+                        key={num}
+                        onClick={() => addBet(num)}
+                        disabled={isSpinning || atCap(num)}
+                        className={numBtnClass(num)}
+                      >
+                        {num}
+                      </button>
+                    )),
+                  )}
+                </div>
+                <div className="w-12 shrink-0 grid grid-rows-3 gap-0.5">
+                  {(['col3', 'col2', 'col1'] as const).map((col) => (
+                    <button
+                      key={col}
+                      onClick={() => addBet(col)}
+                      disabled={isSpinning || atCap(col)}
+                      className={outsideBtnClass(col)}
+                    >
+                      2:1
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            {Array.from({ length: 36 }, (_, i) => i + 1).map(num => (
-              <button
-                key={num}
-                onClick={() => addBet(num)}
-                disabled={isSpinning}
-                className={`aspect-square flex items-center justify-center rounded text-[9px] font-bold font-mono transition-all ${
-                  placedBets.find(b => b.type === num)
-                    ? RED_NUMBERS.includes(num)
-                      ? 'bg-rose-500 text-white ring-1 ring-white'
-                      : 'bg-zinc-200 text-zinc-900 ring-1 ring-white'
-                    : RED_NUMBERS.includes(num)
-                    ? 'bg-rose-800/60 text-rose-300 hover:bg-rose-600'
-                    : 'bg-zinc-800/60 text-zinc-300 hover:bg-zinc-600'
-                } ${placedBets.length >= MAX_BETS && !placedBets.find(b => b.type === num) ? 'opacity-40 cursor-not-allowed' : ''}`}
-              >{num}</button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-3 gap-1 text-[9px] font-bold">
-            {([
-              ['red','black','zero'],
-              ['even','odd',''],
-              ['1to18','19to36',''],
-              ['1stDozen','2ndDozen','3rdDozen'],
-              ['col1','col2','col3'],
-            ] as BetType[][]).map((row, ri) => (
-              <React.Fragment key={ri}>
-                {row.map((type, ci) => type === '' ? <div key={ci} /> : (
-                  <button
-                    key={ci}
-                    onClick={() => addBet(type)}
-                    disabled={isSpinning}
-                    className={`py-1 px-1 rounded border text-center transition-all truncate ${
-                      placedBets.find(b => b.type === type)
-                        ? 'bg-rose-600/40 border-rose-500 text-rose-200 ring-1 ring-rose-400'
-                        : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-700'
-                    } ${placedBets.length >= MAX_BETS && !placedBets.find(b => b.type === type) ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    {betLabel(type)}
+              <div className="grid grid-cols-3 gap-1 pl-12 pr-13" style={{ paddingLeft: '3rem', paddingRight: '3.25rem' }}>
+                {(['1stDozen', '2ndDozen', '3rdDozen'] as const).map((d) => (
+                  <button key={d} onClick={() => addBet(d)} disabled={isSpinning || atCap(d)} className={outsideBtnClass(d)}>
+                    {betLabel(d)}
                   </button>
                 ))}
-              </React.Fragment>
-            ))}
+              </div>
+
+              <div className="grid grid-cols-6 gap-1" style={{ paddingLeft: '3rem', paddingRight: '3.25rem' }}>
+                {(['1to18', 'even', 'red', 'black', 'odd', '19to36'] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => addBet(d)}
+                    disabled={isSpinning || atCap(d)}
+                    className={`${outsideBtnClass(d)} ${
+                      d === 'red' && !isPicked(d) ? 'bg-[#9f1239] text-white border-rose-900' : ''
+                    } ${d === 'black' && !isPicked(d) ? 'bg-[#111113] text-white border-zinc-600' : ''}`}
+                  >
+                    {d === 'red' ? (
+                      <span className="inline-block w-3.5 h-3.5 rotate-45 bg-rose-500 border border-rose-200 shadow-[0_0_8px_rgba(244,63,94,0.7)]" />
+                    ) : d === 'black' ? (
+                      <span className="inline-block w-3.5 h-3.5 rotate-45 bg-zinc-950 border border-zinc-300" />
+                    ) : (
+                      betLabel(d).replace(/\s*\(.*\)/, '')
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {placedBets.length > 0 && (

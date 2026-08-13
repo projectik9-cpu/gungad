@@ -313,11 +313,7 @@ export default function App() {
   return (
     <>
     <div
-      className={`min-h-dvh bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw] pb-[4.5rem] md:pb-0${!legalOk ? ' pointer-events-none select-none' : ''}${
-        activeTab === 'game' && activeGameId && activeGameId !== 'slots'
-          ? ' lg:h-dvh lg:overflow-hidden'
-          : ''
-      }`}
+      className={`min-h-dvh bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw] pb-[4.5rem] md:pb-0${!legalOk ? ' pointer-events-none select-none' : ''}`}
       onPointerDown={() => { if (legalOk) soundFx.unlockAndStartMusic(); }}
       aria-hidden={!legalOk}
     >
@@ -350,7 +346,7 @@ export default function App() {
         />
       )}
 
-      <div className={`flex-1 flex min-h-0${activeTab === 'game' && activeGameId && activeGameId !== 'slots' ? ' lg:overflow-hidden' : ''}`}>
+      <div className="flex-1 flex min-h-0">
         <aside className="hidden lg:flex flex-col gap-2 w-48 xl:w-56 shrink-0 border-r border-zinc-900 bg-[#09090b] px-3 py-5 sticky top-14 self-start h-[calc(100dvh-56px)] overflow-y-auto">
           <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider px-2 mb-1">{t('allGames', lang)}</span>
           {[
@@ -388,9 +384,9 @@ export default function App() {
           )}
         </aside>
 
-        <main className={`relative flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 flex flex-col ${
+        <main className={`relative flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 flex flex-col overflow-y-auto ${
           activeTab === 'game'
-            ? 'py-2 sm:py-3 gap-2 sm:gap-3 lg:flex-1 lg:min-h-0 lg:overflow-hidden'
+            ? 'py-2 sm:py-3 gap-2 sm:gap-3'
             : 'py-5 gap-5'
         }`}>
           <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(ellipse_at_50%_0%,rgba(225,29,72,0.08)_0%,transparent_55%)] opacity-90" />
@@ -427,7 +423,7 @@ export default function App() {
             </div>
           )}
 
-          <div className={`relative z-[1] ${activeTab === 'game' ? 'lg:flex-1 lg:min-h-0 lg:flex lg:flex-col' : ''}`}>
+          <div className="relative z-[1]">
             {activeTab === 'games' && <GamesGrid onSelectGame={handleSelectGame} lang={lang} />}
 
             {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...crashProps} />}

@@ -143,9 +143,9 @@ export const MinesGame: React.FC<MinesGameProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:flex-1 lg:min-h-0 lg:items-stretch">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
       {/* Controls first on mobile */}
-      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5 lg:h-full">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
         <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2.5 flex flex-col gap-1.5 shrink-0">
           <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
             <span>{t('minesCount', lang)}</span>
@@ -184,15 +184,14 @@ export const MinesGame: React.FC<MinesGameProps> = ({
           actionDisabled={gameState === 'playing' ? gemsRevealed === 0 : betAmountUSD > user.balanceUSD}
           actionColor={gameState === 'playing' ? 'green' : 'red'}
           compact
-          stretch
         />
       </div>
 
-      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2 lg:min-h-[calc(100dvh-7.5rem)] lg:h-full">
-        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-2.5 sm:p-3 lg:p-5 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow mx-auto w-full lg:flex-1 lg:max-w-none"
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2">
+        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-2.5 sm:p-3 lg:p-5 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow mx-auto w-full"
           style={{ maxWidth: 520 }}
         >
-          <div className="grid grid-cols-5 gap-1.5 w-full aspect-square max-h-[min(42vh,340px)] lg:max-h-[min(62dvh,520px)]">
+          <div className="grid grid-cols-5 gap-1.5 w-full aspect-square max-h-[min(52vh,480px)]">
             {grid.map((tile, i) => (
               <button
                 key={i}

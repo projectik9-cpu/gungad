@@ -103,10 +103,10 @@ export const DiceGame: React.FC<DiceGameProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:flex-1 lg:min-h-0 lg:items-stretch">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
       {/* Dice Stage */}
-      <div className="lg:col-span-8 flex flex-col gap-4 lg:min-h-[calc(100dvh-7.5rem)] lg:h-full">
-        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-6 min-h-[360px] lg:min-h-[min(58dvh,560px)] lg:flex-1 flex flex-col justify-between shadow-2xl red-border-glow">
+      <div className="lg:col-span-8 flex flex-col gap-4">
+        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 shadow-2xl red-border-glow overflow-visible">
           {/* Roll Result Readout */}
           <div className="flex flex-col items-center justify-center my-6">
             <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
@@ -128,7 +128,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
           </div>
 
           {/* Slider & Controls */}
-          <div className="flex flex-col gap-6 bg-[#111115] border border-zinc-800 rounded-2xl p-6">
+          <div className="flex flex-col gap-4 bg-[#111115] border border-zinc-800 rounded-2xl p-4">
             {/* Range Slider */}
             <div className="relative flex flex-col gap-2">
               <div className="flex justify-between items-center text-xs font-mono font-bold text-zinc-400">
@@ -187,7 +187,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
       </div>
 
       {/* Control Panel */}
-      <div className="lg:col-span-4 flex flex-col gap-4 lg:h-full">
+      <div className="lg:col-span-4 flex flex-col gap-4">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
@@ -199,7 +199,6 @@ export const DiceGame: React.FC<DiceGameProps> = ({
           actionButtonLabel={isRolling ? t('rolling', lang) : t('rollDice', lang)}
           onAction={handleRoll}
           actionDisabled={isRolling || betAmountUSD > user.balanceUSD}
-          stretch
         />
       </div>
     </div>

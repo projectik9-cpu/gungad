@@ -120,7 +120,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
 
       {/* Input + Multiplier buttons */}
       <div className={`flex flex-col gap-2${stretch ? ' lg:flex-1' : ''}`}>
-        <div className="relative flex-1">
+        <div className="relative">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">
             {currentCurrencyConfig.symbol}
           </span>
@@ -187,7 +187,9 @@ export const BetControls: React.FC<BetControlsProps> = ({
                 secondaryAction.onClick();
               }}
               disabled={secondaryAction.disabled}
-              className="flex-1 py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 text-white font-display font-bold text-sm tracking-wide rounded-xl border border-zinc-700 transition-all active:scale-[0.98] disabled:opacity-50"
+              className={`flex-1 basis-0 min-w-0 font-display font-black tracking-wider uppercase rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white transition-all active:scale-[0.98] disabled:opacity-50 ${
+                compact ? 'py-3 px-2 text-sm' : 'py-3.5 px-2 text-sm'
+              }`}
             >
               {secondaryAction.label}
             </button>
@@ -199,8 +201,8 @@ export const BetControls: React.FC<BetControlsProps> = ({
               onAction();
             }}
             disabled={actionDisabled}
-            className={`w-full font-display font-black tracking-wider uppercase rounded-xl border transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
-              compact ? 'py-2.5 px-4 text-sm' : 'py-3.5 px-6 text-base'
+            className={`${secondaryAction ? 'flex-1 basis-0 min-w-0' : 'w-full'} font-display font-black tracking-wider uppercase rounded-xl border transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
+              compact ? 'py-3 px-2 text-sm' : 'py-3.5 px-2 text-sm'
             } ${buttonStyle}`}
           >
             {actionButtonLabel}

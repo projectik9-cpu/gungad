@@ -6,7 +6,8 @@ export type GgGameId =
   | 'dice'
   | 'mines'
   | 'plinko'
-  | 'slots';
+  | 'slots'
+  | 'poker';
 
 export type GgLedgerKind =
   | 'deposit'
@@ -18,7 +19,11 @@ export type GgLedgerKind =
   | 'referral'
   | 'admin_adjust'
   | 'star_topup'
-  | 'star_spend';
+  | 'star_spend'
+  | 'poker_buyin'
+  | 'poker_cashout'
+  | 'poker_hand'
+  | 'poker_rake';
 
 export type GgBetStatus =
   | 'pending'

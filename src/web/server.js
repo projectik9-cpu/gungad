@@ -14,6 +14,7 @@ import depositTonRouter from './api/depositTon.js';
 import withdrawRouter, { setWithdrawBot } from './api/withdraw.js';
 import supportRouter, { setSupportBot } from './api/support.js';
 import bonusRouter from './api/bonus.js';
+import pokerRouter from './api/poker.js';
 
 export { setStarsBot, setWithdrawBot, setSupportBot };
 
@@ -196,6 +197,7 @@ app.use('/api/deposit/ton',       depositTonRouter);
 app.use('/api/withdraw',  withdrawRouter);
 app.use('/api/support',   supportRouter);
 app.use('/api/bonus',     bonusRouter);
+app.use('/api/poker',     pokerRouter);
 
 // Обработка 404
 app.use((req, res) => {

@@ -35,6 +35,17 @@ export const GAMES: GameInfo[] = [
     descriptionKey: 'blackjackDesc',
   },
   {
+    id: 'poker',
+    name: "Texas Hold'em",
+    category: 'cards',
+    image: '/games/poker.svg',
+    badge: 'badgeCards',
+    rtp: '5% rake',
+    minBetUSD: 0.02,
+    maxBetUSD: 400,
+    descriptionKey: 'pokerDesc',
+  },
+  {
     id: 'coinflip',
     name: 'Gun Coin Flip',
     category: 'instant',

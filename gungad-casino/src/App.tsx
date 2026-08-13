@@ -5,6 +5,7 @@ import { GamesGrid } from './components/GamesGrid';
 import { CrashGame } from './components/games/CrashGame';
 import { RouletteGame } from './components/games/RouletteGame';
 import { BlackjackGame } from './components/games/BlackjackGame';
+import { PokerGame } from './components/games/PokerGame';
 import { CoinFlipGame } from './components/games/CoinFlipGame';
 import { DiceGame } from './components/games/DiceGame';
 import { MinesGame } from './components/games/MinesGame';
@@ -354,6 +355,7 @@ export default function App() {
             { id: 'crash',     label: t('crashName',     lang) },
             { id: 'roulette',  label: t('rouletteName',  lang) },
             { id: 'blackjack', label: t('blackjackName', lang) },
+            { id: 'poker',     label: t('pokerName',     lang) },
             { id: 'coinflip',  label: t('coinflipName',  lang) },
             { id: 'dice',      label: t('diceName',      lang) },
             { id: 'mines',     label: t('minesName',     lang) },
@@ -429,6 +431,15 @@ export default function App() {
             {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...crashProps} />}
             {activeTab === 'game' && activeGameId === 'roulette'  && <RouletteGame  {...gameProps} />}
             {activeTab === 'game' && activeGameId === 'blackjack' && <BlackjackGame {...gameProps} />}
+            {activeTab === 'game' && activeGameId === 'poker' && (
+              <PokerGame
+                {...gameProps}
+                profileId={session?.profile_id ?? null}
+                sessionStatus={status}
+                availableCents={availableCents}
+                onRefreshWallet={refreshWallet}
+              />
+            )}
             {activeTab === 'game' && activeGameId === 'coinflip'  && <CoinFlipGame  {...gameProps} />}
             {activeTab === 'game' && activeGameId === 'dice'      && <DiceGame      {...gameProps} />}
             {activeTab === 'game' && activeGameId === 'mines'     && <MinesGame     {...gameProps} />}

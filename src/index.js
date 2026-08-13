@@ -4,6 +4,7 @@ import { startWebServer, setStarsBot, setWithdrawBot, setSupportBot } from './we
 import { startTonMonitor } from './services/tonMonitor.js';
 import { startCryptoBotReconcile } from './services/cryptoBotReconcile.js';
 import { startDailyBonusNotify } from './services/dailyBonusNotify.js';
+import { startPokerTimerWorker } from './poker/timerWorker.js';
 import { setLogBot } from './services/telegramLog.js';
 import { maybeAnnounceCommandsOnline } from './bot/handlers/logAdminHandler.js';
 import { testConnection, syncDatabase } from './database/database.js';
@@ -88,6 +89,7 @@ async function startApplication() {
     logger.logBotStart();
     void maybeAnnounceCommandsOnline();
     startDailyBonusNotify(bot);
+    startPokerTimerWorker();
 
     // Обработка завершения приложения
     process.once('SIGINT', () => gracefulShutdown('SIGINT'));

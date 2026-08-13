@@ -35,7 +35,7 @@ router.post('/', async (req, res) => {
     if (!sb) return res.status(500).json({ error: 'Supabase not configured' });
 
     // Only pass game_id if it's a valid enum value
-    const validGames = ['crash', 'roulette', 'blackjack', 'coinflip', 'dice', 'mines', 'plinko', 'slots'];
+    const validGames = ['crash', 'roulette', 'blackjack', 'coinflip', 'dice', 'mines', 'plinko', 'slots', 'poker'];
     const safeGameId = validGames.includes(game_id) ? game_id : null;
 
     const { error } = await sb.rpc('gg_heartbeat', {

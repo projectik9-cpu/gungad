@@ -255,9 +255,9 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
   const visibleDealerScore = gameState === 'player_turn' ? calculateHandScore(dealerCards.filter(c => c.visible)) : dealerFullScore;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      <div className="lg:col-span-8 flex flex-col gap-4">
-        <div className="relative bg-[#0b130e] border border-rose-900/40 rounded-2xl p-6 min-h-[380px] flex flex-col justify-between overflow-hidden shadow-2xl red-border-glow">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:flex-1 lg:min-h-0 lg:items-stretch">
+      <div className="lg:col-span-8 flex flex-col gap-4 lg:min-h-[calc(100dvh-7.5rem)] lg:h-full">
+        <div className="relative bg-[#0b130e] border border-rose-900/40 rounded-2xl p-6 min-h-[380px] lg:min-h-[min(58dvh,560px)] lg:flex-1 flex flex-col justify-between overflow-hidden shadow-2xl red-border-glow">
           <div className="absolute inset-0 bg-[radial-gradient(#152e1f_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
 
           {/* Dealer Area */}
@@ -309,7 +309,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
         </div>
       </div>
 
-      <div className="lg:col-span-4 flex flex-col gap-4">
+      <div className="lg:col-span-4 flex flex-col gap-4 lg:h-full">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
@@ -325,6 +325,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
               ? { label: t('stand', lang), onClick: handleStand }
               : undefined
           }
+          stretch
         />
       </div>
     </div>

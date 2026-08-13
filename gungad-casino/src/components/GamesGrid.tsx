@@ -76,16 +76,16 @@ const GameCard: React.FC<{
       {/* Card Footer */}
       <div className="p-4 flex flex-col justify-between flex-1 gap-3">
         <div>
-          <h3 className="font-display font-black text-lg text-white group-hover:text-rose-400 transition-colors uppercase">
+          <h3 className="font-display font-black text-lg xl:text-xl text-white group-hover:text-rose-400 transition-colors uppercase">
             {gameTitle}
           </h3>
-          <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
+          <p className="text-xs xl:text-sm text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
             {t(game.descriptionKey as any, lang)}
           </p>
         </div>
 
         <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-end">
-          <button className="px-3.5 py-1.5 bg-rose-600/20 group-hover:bg-rose-600 text-rose-400 group-hover:text-white border border-rose-600/40 rounded-xl text-xs font-display font-bold uppercase transition-all shadow-md">
+          <button className="px-3.5 py-1.5 xl:px-4 xl:py-2 bg-rose-600/20 group-hover:bg-rose-600 text-rose-400 group-hover:text-white border border-rose-600/40 rounded-xl text-xs xl:text-sm font-display font-bold uppercase transition-all shadow-md">
             {t('playNow', lang)}
           </button>
         </div>
@@ -148,8 +148,8 @@ export const GamesGrid: React.FC<GamesGridProps> = ({ onSelectGame, lang }) => {
           </div>
         </div>
 
-        {/* Responsive Games Grid: 1→2→3→4→5→6 колонок */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+        {/* Responsive Games Grid: 2→3→4 колонок (крупнее на десктопе) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 xl:gap-5">
           {filteredGames.map((game) => (
             <GameCard
               key={game.id}
@@ -172,7 +172,7 @@ export const GamesGrid: React.FC<GamesGridProps> = ({ onSelectGame, lang }) => {
             </h2>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 xl:gap-5">
             {slotGames.map((game) => (
               <GameCard
                 key={`slots-${game.id}`}

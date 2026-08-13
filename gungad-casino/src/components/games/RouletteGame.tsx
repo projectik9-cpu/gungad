@@ -226,9 +226,9 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:flex-1 lg:min-h-0 lg:items-stretch">
       {/* Bet + spin first on mobile */}
-      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5 lg:h-full">
         <BetControls
           betAmountUSD={betAmountUSD}
           onBetAmountChangeUSD={setBetAmountUSD}
@@ -241,26 +241,27 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
           onAction={handleSpin}
           actionDisabled={isSpinning || placedBets.length === 0 || totalBetUSD > user.balanceUSD}
           compact
+          stretch
         />
       </div>
 
-      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2.5">
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2.5 lg:min-h-[calc(100dvh-7.5rem)] lg:h-full">
         {/* История */}
-        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2 flex items-center gap-1.5 overflow-x-auto">
+        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2 flex items-center gap-1.5 overflow-x-auto shrink-0">
           <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">{t('lastNumbers', lang)}:</span>
           {history.map((num, idx) => (
             <span key={idx} className={`w-6 h-6 rounded-md flex items-center justify-center font-mono font-bold text-[10px] shrink-0 ${colorClass(num)}`}>{num}</span>
           ))}
         </div>
 
-        {/* Wheel — компактнее */}
-        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-2 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow">
+        {/* Wheel */}
+        <div className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl p-2 lg:p-4 flex flex-col items-center justify-center overflow-hidden shadow-2xl red-border-glow lg:flex-1 lg:min-h-[min(42vh,320px)]">
           <div className="absolute top-2 z-20 left-1/2 -translate-x-1/2">
             <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-rose-600 drop-shadow-[0_0_8px_rgba(225,29,72,0.9)]" />
           </div>
 
           <div
-            className="w-40 h-40 sm:w-52 sm:h-52 rounded-full border-4 border-zinc-800 relative shadow-[0_0_40px_rgba(0,0,0,0.9)] transition-transform duration-[4000ms] ease-out"
+            className="w-40 h-40 sm:w-52 sm:h-52 lg:w-[min(42vh,280px)] lg:h-[min(42vh,280px)] rounded-full border-4 border-zinc-800 relative shadow-[0_0_40px_rgba(0,0,0,0.9)] transition-transform duration-[4000ms] ease-out"
             style={{ transform: `rotate(${wheelRotation}deg)` }}
           >
             <svg viewBox="0 0 200 200" className="w-full h-full rounded-full">

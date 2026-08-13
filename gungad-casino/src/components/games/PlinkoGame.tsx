@@ -256,9 +256,9 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5">
-        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2.5 flex flex-col gap-1.5">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:flex-1 lg:min-h-0 lg:items-stretch">
+      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-2.5 lg:h-full">
+        <div className="bg-[#111115] border border-zinc-800 rounded-xl p-2.5 flex flex-col gap-1.5 shrink-0">
           <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">{t('riskLevel', lang)}</label>
           <div className="grid grid-cols-3 gap-1.5">
             {(['low', 'medium', 'high'] as const).map((r) => (
@@ -291,13 +291,14 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
           onAction={handleDrop}
           actionDisabled={betAmountUSD > user.balanceUSD || betAmountUSD <= 0}
           compact
+          stretch
         />
       </div>
 
-      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2">
+      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-2 lg:min-h-[calc(100dvh-7.5rem)] lg:h-full">
         <div
-          className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl overflow-hidden shadow-2xl red-border-glow w-full mx-auto"
-          style={{ aspectRatio: '1 / 1', maxHeight: 'min(42vh, 360px)', maxWidth: 420 }}
+          className="relative bg-[#0d0d12] border border-rose-900/40 rounded-2xl overflow-hidden shadow-2xl red-border-glow w-full mx-auto lg:flex-1 lg:max-w-none max-h-[min(42vh,360px)] lg:max-h-[min(62vh,560px)] max-w-[420px] lg:max-w-[560px]"
+          style={{ aspectRatio: '1 / 1' }}
         >
           <div className="absolute inset-0 z-10 pointer-events-none">
             {pegRows.map((count, rowIdx) =>

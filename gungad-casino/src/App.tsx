@@ -313,7 +313,11 @@ export default function App() {
   return (
     <>
     <div
-      className={`min-h-screen bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw] pb-[4.5rem] md:pb-0${!legalOk ? ' pointer-events-none select-none' : ''}`}
+      className={`min-h-dvh bg-[#0a0a0a] text-slate-100 flex flex-col font-sans selection:bg-rose-600 selection:text-white overflow-x-hidden max-w-[100vw] pb-[4.5rem] md:pb-0${!legalOk ? ' pointer-events-none select-none' : ''}${
+        activeTab === 'game' && activeGameId && activeGameId !== 'slots'
+          ? ' lg:h-dvh lg:overflow-hidden'
+          : ''
+      }`}
       onPointerDown={() => { if (legalOk) soundFx.unlockAndStartMusic(); }}
       aria-hidden={!legalOk}
     >
@@ -346,8 +350,8 @@ export default function App() {
         />
       )}
 
-      <div className="flex-1 flex">
-        <aside className="hidden lg:flex flex-col gap-2 w-48 shrink-0 border-r border-zinc-900 bg-[#09090b] px-3 py-5 sticky top-14 self-start h-[calc(100vh-56px)] overflow-y-auto">
+      <div className={`flex-1 flex min-h-0${activeTab === 'game' && activeGameId && activeGameId !== 'slots' ? ' lg:overflow-hidden' : ''}`}>
+        <aside className="hidden lg:flex flex-col gap-2 w-48 xl:w-56 shrink-0 border-r border-zinc-900 bg-[#09090b] px-3 py-5 sticky top-14 self-start h-[calc(100dvh-56px)] overflow-y-auto">
           <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider px-2 mb-1">{t('allGames', lang)}</span>
           {[
             { id: 'games',     label: t('allGames',      lang) },
@@ -384,25 +388,31 @@ export default function App() {
           )}
         </aside>
 
-        <main className={`flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 flex flex-col ${
-          activeTab === 'game' ? 'py-2 sm:py-3 gap-2 sm:gap-3' : 'py-5 gap-5'
+        <main className={`relative flex-1 min-w-0 max-w-full px-3 sm:px-5 lg:px-6 flex flex-col ${
+          activeTab === 'game'
+            ? 'py-2 sm:py-3 gap-2 sm:gap-3 lg:flex-1 lg:min-h-0 lg:overflow-hidden'
+            : 'py-5 gap-5'
         }`}>
+          <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(ellipse_at_50%_0%,rgba(225,29,72,0.08)_0%,transparent_55%)] opacity-90" />
+          <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(#e11d48_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.06]" />
           {activeTab === 'games' && !activeGameId && (
-            <div className="relative bg-[#0e0e13] border border-rose-900/40 rounded-2xl px-6 py-8 overflow-hidden shadow-xl flex flex-col items-center justify-center text-center gap-4">
+            <div className="relative z-[1] bg-[#0e0e13] border border-rose-900/40 rounded-2xl px-5 sm:px-8 py-6 lg:py-0 overflow-hidden shadow-xl flex flex-col lg:flex-row items-center lg:items-center justify-center lg:justify-between text-center lg:text-left gap-4 lg:min-h-[160px] xl:min-h-[200px]">
               <div className="absolute inset-0 bg-[radial-gradient(#e11d48_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.07] pointer-events-none" />
-              <RevolverLogo size="lg" />
-              <div className="flex items-center gap-1.5 text-sm font-mono font-bold text-zinc-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#22c55e] animate-pulse" />
-                {onlineCount}
+              <RevolverLogo size="lg" className="relative z-[1]" />
+              <div className="relative z-[1] flex flex-col items-center lg:items-end gap-2">
+                <div className="flex items-center gap-1.5 text-sm font-mono font-bold text-zinc-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#22c55e] animate-pulse" />
+                  {onlineCount}
+                </div>
+                {status === 'loading' && (
+                  <span className="text-[10px] text-zinc-600 animate-pulse">Подключение…</span>
+                )}
               </div>
-              {status === 'loading' && (
-                <span className="text-[10px] text-zinc-600 animate-pulse">Подключение…</span>
-              )}
             </div>
           )}
 
           {activeTab === 'game' && activeGameId && (
-            <div className="flex items-center justify-between gap-2 shrink-0">
+            <div className="relative z-[1] flex items-center justify-between gap-2 shrink-0">
               <button
                 onClick={() => { soundFx.stopAllFx(); soundFx.playClick(); setActiveTab('games'); setActiveGameId(null); }}
                 className="px-3 py-1.5 bg-[#121217] hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-[11px] font-display font-bold uppercase rounded-lg flex items-center gap-1.5 transition-all"
@@ -417,22 +427,24 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === 'games' && <GamesGrid onSelectGame={handleSelectGame} lang={lang} />}
+          <div className={`relative z-[1] ${activeTab === 'game' ? 'lg:flex-1 lg:min-h-0 lg:flex lg:flex-col' : ''}`}>
+            {activeTab === 'games' && <GamesGrid onSelectGame={handleSelectGame} lang={lang} />}
 
-          {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...crashProps} />}
-          {activeTab === 'game' && activeGameId === 'roulette'  && <RouletteGame  {...gameProps} />}
-          {activeTab === 'game' && activeGameId === 'blackjack' && <BlackjackGame {...gameProps} />}
-          {activeTab === 'game' && activeGameId === 'coinflip'  && <CoinFlipGame  {...gameProps} />}
-          {activeTab === 'game' && activeGameId === 'dice'      && <DiceGame      {...gameProps} />}
-          {activeTab === 'game' && activeGameId === 'mines'     && <MinesGame     {...gameProps} />}
-          {activeTab === 'game' && activeGameId === 'plinko'    && <PlinkoGame    {...gameProps} />}
+            {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...crashProps} />}
+            {activeTab === 'game' && activeGameId === 'roulette'  && <RouletteGame  {...gameProps} />}
+            {activeTab === 'game' && activeGameId === 'blackjack' && <BlackjackGame {...gameProps} />}
+            {activeTab === 'game' && activeGameId === 'coinflip'  && <CoinFlipGame  {...gameProps} />}
+            {activeTab === 'game' && activeGameId === 'dice'      && <DiceGame      {...gameProps} />}
+            {activeTab === 'game' && activeGameId === 'mines'     && <MinesGame     {...gameProps} />}
+            {activeTab === 'game' && activeGameId === 'plinko'    && <PlinkoGame    {...gameProps} />}
+          </div>
           {/* slots is rendered fullscreen outside main layout — see overlay below */}
         </main>
       </div>
 
       {activeTab !== 'game' && (
       <footer className="border-t border-rose-900/30 bg-[#09090b] py-6 text-zinc-500 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="w-full px-3 sm:px-5 lg:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <RevolverLogo size="sm" />
             <span className="border-l border-zinc-800 pl-3">{t('footerCopyright', lang)}</span>

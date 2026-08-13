@@ -164,6 +164,14 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     return { x, y };
   };
 
+  const arenaCssHeight = (arena: HTMLElement | null, fallbackW = 600) => {
+    if (arena?.clientHeight && arena.clientHeight > 40) {
+      return Math.max(280, arena.clientHeight);
+    }
+    const w = arena?.clientWidth || fallbackW;
+    return Math.max(280, Math.min(400, Math.round(w * 0.55)));
+  };
+
   const drawFrame = () => {
     const canvas = canvasRef.current;
     const arena = arenaRef.current;
@@ -173,7 +181,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = arena.clientWidth || 600;
-    const cssH = Math.max(300, Math.min(400, Math.round(cssW * 0.55)));
+    const cssH = arenaCssHeight(arena, cssW);
     if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
       canvas.width = Math.floor(cssW * dpr);
       canvas.height = Math.floor(cssH * dpr);
@@ -375,7 +383,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
     const arena = arenaRef.current;
     if (arena) {
-      const { x, y } = multToXY(winMult, arena.clientWidth || 600, Math.max(300, Math.min(400, Math.round((arena.clientWidth || 600) * 0.55))));
+      const { x, y } = multToXY(winMult, arena.clientWidth || 600, arenaCssHeight(arena));
       cashoutPointRef.current = { x, y };
     }
 
@@ -495,7 +503,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
       const arena = arenaRef.current;
       const w = arena?.clientWidth || 600;
-      const h = Math.max(300, Math.min(400, Math.round(w * 0.55)));
+      const h = arenaCssHeight(arena, w);
       const pos = multToXY(cp, w, h);
       const pts = pathPointsRef.current;
       const last = pts[pts.length - 1];
@@ -540,7 +548,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
       const arena = arenaRef.current;
       const w = arena?.clientWidth || 600;
-      const h = Math.max(300, Math.min(400, Math.round(w * 0.55)));
+      const h = arenaCssHeight(arena, w);
       const pos = multToXY(current, w, h);
       const pts = pathPointsRef.current;
       const last = pts[pts.length - 1];
@@ -660,10 +668,10 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const countdownProgress = countdown / 5;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in duration-500">
-      <div className="lg:col-span-8 flex flex-col gap-3">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in duration-500 lg:flex-1 lg:min-h-0 lg:items-stretch">
+      <div className="lg:col-span-8 flex flex-col gap-3 lg:h-full lg:min-h-[calc(100dvh-7.5rem)]">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-rose-950/60 border border-rose-800/50 red-glow shrink-0">
               <Rocket className="w-4.5 h-4.5 text-rose-400" />
@@ -697,7 +705,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         {/* Arena */}
         <div
           ref={arenaRef}
-          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d]"
+          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[300px] sm:h-[360px] lg:h-auto lg:flex-1 lg:min-h-[min(68dvh,640px)]"
         >
           <canvas ref={canvasRef} className="w-full block" />
 
@@ -783,9 +791,9 @@ export const CrashGame: React.FC<CrashGameProps> = ({
       </div>
 
       {/* Controls column */}
-      <div className="lg:col-span-4 flex flex-col gap-3">
-        <div className="rounded-2xl border border-rose-900/35 bg-gradient-to-b from-[#141018] to-[#0c0c10] p-1 red-border-glow">
-          <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-3">
+      <div className="lg:col-span-4 flex flex-col gap-3 lg:h-full">
+        <div className="rounded-2xl border border-rose-900/35 bg-gradient-to-b from-[#141018] to-[#0c0c10] p-1 red-border-glow lg:flex-1 lg:flex lg:flex-col">
+          <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-3 lg:flex-1 lg:flex lg:flex-col">
             <BetControls
               betAmountUSD={betAmountUSD}
               onBetAmountChangeUSD={setBetAmountUSD}
@@ -794,6 +802,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
               lang={lang}
               disabled={betControlsDisabled}
               lastBetUSD={lastBetUSD}
+              stretch
               actionButtonLabel={
                 gameState === 'running' && hasBet
                   ? `${t('cashout', lang)} (${multiplier.toFixed(2)}x)`
@@ -812,7 +821,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800/90 bg-[#111115]/95 p-4 flex flex-col gap-2 backdrop-blur-sm">
+        <div className="rounded-2xl border border-zinc-800/90 bg-[#111115]/95 p-4 flex flex-col gap-2 backdrop-blur-sm shrink-0">
           <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.14em]">
             {t('autoCashoutLabel', lang)}
           </label>

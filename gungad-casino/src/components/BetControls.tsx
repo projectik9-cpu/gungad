@@ -26,6 +26,8 @@ interface BetControlsProps {
   };
   /** Tighter padding for mobile game layouts */
   compact?: boolean;
+  /** Stretch to fill desktop bet column height */
+  stretch?: boolean;
 }
 
 export const BetControls: React.FC<BetControlsProps> = ({
@@ -44,6 +46,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
   actionColor = 'red',
   secondaryAction,
   compact = false,
+  stretch = false,
 }) => {
   const currentCurrencyConfig = CURRENCIES[currency];
   const displayAmount = convertUSDToCurrency(betAmountUSD, currency);
@@ -96,7 +99,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
   return (
     <div className={`bg-[#111115] border border-rose-900/30 rounded-2xl shadow-2xl flex flex-col ${
       compact ? 'p-3 gap-2.5' : 'p-4 md:p-5 gap-4'
-    }`}>
+    }${stretch ? ' lg:flex-1 lg:h-full' : ''}`}>
       {/* Label and Quick presets */}
       <div className="flex flex-row items-center justify-between gap-2">
         <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -116,7 +119,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
       </div>
 
       {/* Input + Multiplier buttons */}
-      <div className="flex flex-col gap-2">
+      <div className={`flex flex-col gap-2${stretch ? ' lg:flex-1' : ''}`}>
         <div className="relative flex-1">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">
             {currentCurrencyConfig.symbol}
@@ -176,7 +179,7 @@ export const BetControls: React.FC<BetControlsProps> = ({
 
       {/* Main Action Button */}
       {actionButtonLabel && onAction ? (
-        <div className="flex gap-2">
+        <div className={`flex gap-2${stretch ? ' lg:mt-auto' : ''}`}>
           {secondaryAction ? (
             <button
               onClick={() => {

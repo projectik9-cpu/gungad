@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
         ref={topRef}
         className="sticky top-0 z-[200] bg-[#0a0a0d]/98 backdrop-blur-xl border-b border-rose-900/30"
       >
-        <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-2 flex items-center justify-between gap-2 min-w-0">
+        <div className="w-full px-3 sm:px-5 lg:px-6 py-2 flex items-center justify-between gap-2 min-w-0">
           {/* Left: menu (desktop) + logo */}
           <div className="flex items-center gap-1.5 shrink-0 min-w-0">
             <div className="hidden md:block">

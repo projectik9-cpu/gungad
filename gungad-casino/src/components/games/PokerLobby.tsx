@@ -171,8 +171,8 @@ export const PokerLobby: React.FC<PokerLobbyProps> = ({
       </div>
 
       {joinTable && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#121217] border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3">
+        <div className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4 pb-28 md:pb-6">
+          <div className="w-full max-w-sm bg-[#121217] border border-zinc-800 rounded-2xl p-4 pb-5 flex flex-col gap-3 shrink-0 max-h-[min(28rem,calc(100dvh-8rem))] overflow-y-auto">
             <div className="text-white font-bold">{t('pokerBuyin', lang)}</div>
             <div className="text-xs text-zinc-400 font-mono">
               {formatChips(joinTable.minBuyinCents)} – {formatChips(joinTable.maxBuyinCents)}
@@ -187,12 +187,12 @@ export const PokerLobby: React.FC<PokerLobbyProps> = ({
             />
             <div className="text-center text-xl font-mono text-white">{formatChips(buyin)}</div>
             <div className="text-[11px] text-zinc-500">{t('pokerBuyin', lang)} ≤ {formatChips(availableCents)}</div>
-            <div className="flex gap-2">
-              <button onClick={() => setJoinTable(null)} className="flex-1 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm">{t('slotsCancel', lang)}</button>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setJoinTable(null)} className="flex-1 py-2.5 rounded-lg bg-zinc-800 text-zinc-300 text-sm">{t('slotsCancel', lang)}</button>
               <button
                 disabled={buyin > availableCents}
                 onClick={confirmJoin}
-                className="flex-1 py-2 rounded-lg bg-rose-600 text-white text-sm font-bold"
+                className="flex-1 py-2.5 rounded-lg bg-rose-600 text-white text-sm font-bold"
               >
                 {t('pokerJoin', lang)}
               </button>

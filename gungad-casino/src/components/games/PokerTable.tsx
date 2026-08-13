@@ -280,8 +280,8 @@ export const PokerTableView: React.FC<PokerTableProps> = ({
       )}
 
       {rebuyOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#121217] rounded-2xl p-4 border border-zinc-800">
+        <div className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4 pb-28 md:pb-6">
+          <div className="w-full max-w-sm bg-[#121217] rounded-2xl p-4 pb-5 border border-zinc-800 shrink-0">
             <div className="text-white font-bold mb-2">{t('pokerRebuy', lang)}</div>
             <input type="range" min={table.bbCents} max={table.maxBuyinCents} value={rebuyAmt} onChange={(e) => setRebuyAmt(Number(e.target.value))} className="w-full" />
             <div className="text-center font-mono text-white my-2">{formatChips(rebuyAmt)}</div>

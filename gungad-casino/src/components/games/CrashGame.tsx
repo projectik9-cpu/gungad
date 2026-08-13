@@ -693,8 +693,8 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const countdownProgress = countdown / 5;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-in fade-in duration-500">
-      <div className="lg:col-span-8 order-2 lg:order-1 flex flex-col gap-3">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4 animate-in fade-in duration-500">
+      <div className="lg:col-span-8 flex flex-col gap-2.5">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -734,7 +734,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         {/* Arena */}
         <div
           ref={arenaRef}
-          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[220px] sm:h-[340px] lg:h-[min(52vh,560px)]"
+          className="relative rounded-2xl overflow-hidden border border-rose-900/40 red-border-glow bg-[#0a0a0d] h-[min(48dvh,400px)] sm:h-[360px] lg:h-[min(52vh,560px)]"
         >
           <canvas ref={canvasRef} className="w-full block" />
 
@@ -819,10 +819,10 @@ export const CrashGame: React.FC<CrashGameProps> = ({
         </div>
       </div>
 
-      {/* Controls column */}
-      <div className="lg:col-span-4 order-1 lg:order-2 flex flex-col gap-3">
+      {/* Controls — sticky above mobile bottom nav so the rocket stays on screen */}
+      <div className="lg:col-span-4 flex flex-col gap-2 lg:gap-3 sticky bottom-[4.6rem] z-40 lg:static lg:bottom-auto bg-[#0a0a0a]/95 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none pt-1 pb-1 lg:pt-0 lg:pb-0">
         <div className="rounded-2xl border border-rose-900/35 bg-gradient-to-b from-[#141018] to-[#0c0c10] p-1 red-border-glow">
-          <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-3">
+          <div className="rounded-[0.9rem] bg-[#0a0a0d]/80 p-2 sm:p-3">
             <BetControls
               betAmountUSD={betAmountUSD}
               onBetAmountChangeUSD={setBetAmountUSD}
@@ -850,24 +850,22 @@ export const CrashGame: React.FC<CrashGameProps> = ({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800/90 bg-[#111115]/95 p-4 flex flex-col gap-2 backdrop-blur-sm shrink-0">
-          <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.14em]">
+        <div className="rounded-2xl border border-zinc-800/90 bg-[#111115]/95 px-3 py-2 flex items-center gap-2 backdrop-blur-sm shrink-0">
+          <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.08em] shrink-0 max-w-[42%] leading-tight">
             {t('autoCashoutLabel', lang)}
           </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              step="0.1"
-              min="1.01"
-              max="1000"
-              placeholder={t('autoCashoutPlaceholder', lang)}
-              value={autoCashout}
-              onChange={(e) => setAutoCashout(e.target.value)}
-              disabled={gameState === 'running' || hasBet}
-              className="w-full bg-[#0a0a0d] border border-zinc-800 text-white font-mono font-bold text-base rounded-xl px-3 py-2.5 outline-none focus:border-rose-600 placeholder:text-zinc-600 transition-colors"
-            />
-            <span className="text-zinc-500 font-bold text-sm shrink-0">x</span>
-          </div>
+          <input
+            type="number"
+            step="0.1"
+            min="1.01"
+            max="1000"
+            placeholder={t('autoCashoutPlaceholder', lang)}
+            value={autoCashout}
+            onChange={(e) => setAutoCashout(e.target.value)}
+            disabled={gameState === 'running' || hasBet}
+            className="min-w-0 flex-1 bg-[#0a0a0d] border border-zinc-800 text-white font-mono font-bold text-sm rounded-xl px-3 py-2 outline-none focus:border-rose-600 placeholder:text-zinc-600 transition-colors"
+          />
+          <span className="text-zinc-500 font-bold text-sm shrink-0">x</span>
         </div>
       </div>
     </div>

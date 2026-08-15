@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Loader2,
   AlertTriangle,
+  Star,
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
@@ -32,6 +33,7 @@ interface DepositModalProps {
   onUpdateBalance: (newBalance: number) => void;
   playMode?: 'real' | 'demo';
   profileId?: string | null;
+  onWalletRefresh?: () => Promise<void> | void;
 }
 
 interface TonInvoice {
@@ -61,6 +63,21 @@ function openTgLink(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+function openStarsInvoice(url: string, onPaid: () => void) {
+  try {
+    const tg = (window as any).Telegram?.WebApp;
+    if (typeof tg?.openInvoice === 'function') {
+      tg.openInvoice(url, (status: string) => {
+        if (status === 'paid') onPaid();
+      });
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  openTgLink(url);
+}
+
 export const DepositModal: React.FC<DepositModalProps> = ({
   isOpen,
   onClose,
@@ -71,9 +88,10 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   onUpdateBalance,
   playMode = 'real',
   profileId = null,
+  onWalletRefresh,
 }) => {
   const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
-  const [method, setMethod] = useState<'cryptobot' | 'tonkeeper'>('cryptobot');
+  const [method, setMethod] = useState<'cryptobot' | 'tonkeeper' | 'stars'>('cryptobot');
 
   // Deposit state
   const [depositAmount, setDepositAmount] = useState<number>(10);
@@ -85,6 +103,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCoin, setSelectedCoin] = useState<CryptoBotAsset>('USDT');
+  const [starsAmount, setStarsAmount] = useState<number>(100);
+  const [starsInvoiceUrl, setStarsInvoiceUrl] = useState<string | null>(null);
+  const starsBaselineRef = useRef<number>(0);
 
   // Withdraw state
   const [withdrawAsset, setWithdrawAsset] = useState<'TON' | 'USDT'>('TON');
@@ -154,6 +175,29 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     };
   }, [isOpen, tonInvoice, cryptoDepositId, depositDone, onUpdateBalance]);
 
+  useEffect(() => {
+    if (!isOpen || method !== 'stars' || !starsInvoiceUrl || depositDone || !profileId) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/wallet?profile_id=${encodeURIComponent(profileId)}`);
+        const json = await res.json();
+        const stars = json?.wallet?.stars_balance;
+        if (typeof stars === 'number' && stars > starsBaselineRef.current) {
+          setDepositDone(true);
+          soundFx.playWin();
+          await onWalletRefresh?.();
+        }
+      } catch {
+        /* keep polling */
+      }
+    };
+
+    void poll();
+    const id = window.setInterval(() => { void poll(); }, 4000);
+    return () => window.clearInterval(id);
+  }, [isOpen, method, starsInvoiceUrl, depositDone, profileId, onWalletRefresh]);
+
   if (!isOpen) return null;
 
   const isReal = playMode === 'real' && Boolean(profileId);
@@ -169,6 +213,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     setInvoiceUrl(null);
     setCryptoDepositId(null);
     setTonInvoice(null);
+    setStarsInvoiceUrl(null);
     setDepositDone(false);
     setError(null);
   };
@@ -218,6 +263,37 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || 'fail');
       setTonInvoice(json as TonInvoice);
+    } catch {
+      setError(t('errorGeneric', lang));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleCreateStars = async () => {
+    if (!isReal || creating) return;
+    soundFx.playClick();
+    setError(null);
+    if (!Number.isInteger(starsAmount) || starsAmount < 1 || starsAmount > 10000) {
+      setError(t('minStarsNote', lang));
+      return;
+    }
+    setCreating(true);
+    try {
+      starsBaselineRef.current = user.starsBalance ?? 0;
+      const res = await fetch(`${API_BASE}/api/stars/invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, stars_amount: starsAmount }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok || !json.invoice_url) throw new Error(json.error || 'fail');
+      setStarsInvoiceUrl(json.invoice_url);
+      openStarsInvoice(json.invoice_url, () => {
+        setDepositDone(true);
+        soundFx.playWin();
+        void onWalletRefresh?.();
+      });
     } catch {
       setError(t('errorGeneric', lang));
     } finally {
@@ -413,8 +489,24 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   <span className="text-[10px] text-zinc-400 leading-tight">{t('payTonkeeperSub', lang)}</span>
                 </button>
               </div>
+              <button
+                onClick={() => { soundFx.playClick(); setMethod('stars'); resetDepositFlow(); }}
+                className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
+                  method === 'stars'
+                    ? 'bg-amber-950/40 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
+                    : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                }`}
+              >
+                <span className="flex items-center gap-1.5 text-sm font-bold text-white">
+                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  {t('payStars', lang)}
+                </span>
+                <span className="text-[10px] text-zinc-400 leading-tight">{t('payStarsSub', lang)}</span>
+              </button>
 
               {/* Amount */}
+              {method !== 'stars' && (
+              <>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-zinc-400 uppercase">{t('depositAmountLabel', lang)}</label>
                 <input
@@ -560,6 +652,73 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                         {t('waitingPayment', lang)}
                       </div>
                     </div>
+                  )}
+                </div>
+              )}
+              </>
+              )}
+
+              {method === 'stars' && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-zinc-400 uppercase">{t('starsAmountLabel', lang)}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      step={1}
+                      value={starsAmount}
+                      onChange={(e) => { setStarsAmount(parseInt(e.target.value, 10) || 0); resetDepositFlow(); }}
+                      className={inputCls}
+                    />
+                    <div className="flex gap-2">
+                      {[50, 100, 250, 500, 1000].map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => { soundFx.playClick(); setStarsAmount(v); resetDepositFlow(); }}
+                          className="flex-1 py-1.5 text-[11px] font-mono font-bold bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-300"
+                        >
+                          ⭐{v}
+                        </button>
+                      ))}
+                    </div>
+                    <span className="text-[10px] text-zinc-500">{t('minStarsNote', lang)}</span>
+                  </div>
+
+                  {depositDone ? (
+                    <div className="p-4 bg-emerald-950 border border-emerald-600 text-emerald-300 text-sm font-bold rounded-xl text-center">
+                      ✅ {t('starsCredited', lang)}
+                    </div>
+                  ) : starsInvoiceUrl ? (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => {
+                          soundFx.playClick();
+                          openStarsInvoice(starsInvoiceUrl, () => {
+                            setDepositDone(true);
+                            soundFx.playWin();
+                            void onWalletRefresh?.();
+                          });
+                        }}
+                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        {t('openInvoice', lang)}
+                      </button>
+                      <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 font-mono">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        {t('waitingPayment', lang)}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleCreateStars}
+                      disabled={!isReal || creating || starsAmount < 1}
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4 fill-current" />}
+                      {creating ? t('creatingInvoice', lang) : t('payWithStars', lang)}
+                    </button>
                   )}
                 </div>
               )}

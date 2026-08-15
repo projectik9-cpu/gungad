@@ -55,10 +55,12 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
     }
     if (betAmountUSD <= 0 || betAmountUSD > user.balanceUSD || isFlipping) return;
 
+    const startBalance = user.balanceUSD;
+    const afterBet = startBalance - betAmountUSD;
     const lockedChoice = choice;
     setShowChoiceWarning(false);
     soundFx.playClick();
-    onUpdateBalance(user.balanceUSD - betAmountUSD);
+    onUpdateBalance(afterBet);
     setLastBetUSD(betAmountUSD);
     setIsFlipping(true);
     setResult(null);
@@ -98,7 +100,7 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
       if (win) {
         soundFx.playWin();
         confetti({ particleCount: 60, spread: 50 });
-        onUpdateBalance(user.balanceUSD - betAmountUSD + payoutUSD);
+        onUpdateBalance(afterBet + payoutUSD);
       } else {
         soundFx.playLoss();
       }

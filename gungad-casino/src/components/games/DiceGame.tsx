@@ -51,8 +51,10 @@ export const DiceGame: React.FC<DiceGameProps> = ({
   const handleRoll = () => {
     if (betAmountUSD <= 0 || betAmountUSD > user.balanceUSD || isRolling) return;
 
+    const startBalance = user.balanceUSD;
+    const afterBet = startBalance - betAmountUSD;
     soundFx.playClick();
-    onUpdateBalance(user.balanceUSD - betAmountUSD);
+    onUpdateBalance(afterBet);
     setLastBetUSD(betAmountUSD);
     setIsRolling(true);
 
@@ -82,7 +84,7 @@ export const DiceGame: React.FC<DiceGameProps> = ({
       if (win) {
         soundFx.playWin();
         if (multiplier >= 5) confetti({ particleCount: 70, spread: 60 });
-        onUpdateBalance(user.balanceUSD - betAmountUSD + payoutUSD);
+        onUpdateBalance(afterBet + payoutUSD);
       } else {
         soundFx.playLoss();
       }

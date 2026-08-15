@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../../types';
 import { t } from '../../translations';
 import { BetControls } from '../BetControls';
@@ -37,6 +37,7 @@ export const MinesGame: React.FC<MinesGameProps> = ({
   const [gemsRevealed, setGemsRevealed] = useState<number>(0);
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
+  const afterBetRef = useRef(0);
 
   // Multiplier math formula per revealed gem
   const calculateNextMultiplier = (gems: number) => {
@@ -51,7 +52,9 @@ export const MinesGame: React.FC<MinesGameProps> = ({
     if (betAmountUSD <= 0 || betAmountUSD > user.balanceUSD) return;
 
     soundFx.playClick();
-    onUpdateBalance(user.balanceUSD - betAmountUSD);
+    const afterBet = user.balanceUSD - betAmountUSD;
+    afterBetRef.current = afterBet;
+    onUpdateBalance(afterBet);
     setLastBetUSD(betAmountUSD);
 
     // Randomize mine positions
@@ -124,7 +127,7 @@ export const MinesGame: React.FC<MinesGameProps> = ({
     soundFx.playWin();
     if (finalMult >= 3) confetti({ particleCount: 70, spread: 60 });
 
-    onUpdateBalance(user.balanceUSD + payoutUSD);
+    onUpdateBalance(afterBetRef.current + payoutUSD);
     setGameState('game_over');
     // Reveal all remaining
     setGrid(grid.map((t) => ({ ...t, revealed: true })));

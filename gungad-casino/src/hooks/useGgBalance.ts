@@ -71,6 +71,18 @@ function newIdempotencyKey(gameId: string): string {
   return `${gameId}_${Date.now()}_${++_idempotencyCounter}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+let _walletMutationSeq = 0;
+let _walletAppliedSeq = 0;
+function beginWalletMutation(): number {
+  return ++_walletMutationSeq;
+}
+function applyWalletIfLatest(seq: number, apply: () => void): boolean {
+  if (seq < _walletAppliedSeq) return false;
+  _walletAppliedSeq = seq;
+  apply();
+  return true;
+}
+
 function getInitData(): string | null {
   try {
     const early = (window as any).__GG_INIT_DATA;
@@ -95,11 +107,12 @@ export function useGgBalance(
     const useServer = playMode === 'real' && status === 'live' && Boolean(session?.profile_id);
 
     if (!useServer) {
+      const seq = beginWalletMutation();
       const betCents = usdToCents(params.betUSD);
       const payoutCents = usdToCents(params.payoutUSD);
       const newCents = balanceCents - betCents + payoutCents;
       const next = Math.max(0, newCents);
-      onBalanceUpdate(next);
+      applyWalletIfLatest(seq, () => onBalanceUpdate(next));
       return { ok: true, balance_cents: next };
     }
 
@@ -108,6 +121,7 @@ export function useGgBalance(
       return { ok: false, balance_cents: session!.balance_cents, error: 'Missing initData' };
     }
 
+    const seq = beginWalletMutation();
     try {
       const body = {
         profile_id:        session!.profile_id,
@@ -136,7 +150,7 @@ export function useGgBalance(
         return { ok: false, balance_cents: session!.balance_cents, error: json.error ?? 'Bet failed' };
       }
 
-      onBalanceUpdate(json.balance_cents, json.locked_cents);
+      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents));
       return {
         ok: true,
         balance_cents: json.balance_cents,
@@ -153,12 +167,13 @@ export function useGgBalance(
     const useServer = playMode === 'real' && status === 'live' && Boolean(session?.profile_id);
 
     if (!useServer) {
+      const seq = beginWalletMutation();
       const betCents = usdToCents(params.betUSD);
       if (betCents <= 0 || betCents > balanceCents) {
         return { ok: false, balance_cents: balanceCents, error: 'Insufficient balance' };
       }
       const next = balanceCents - betCents;
-      onBalanceUpdate(next);
+      applyWalletIfLatest(seq, () => onBalanceUpdate(next));
       return {
         ok: true,
         bet_id: `demo_${Date.now()}`,
@@ -172,6 +187,7 @@ export function useGgBalance(
       return { ok: false, balance_cents: session!.balance_cents, error: 'Missing initData' };
     }
 
+    const seq = beginWalletMutation();
     try {
       const res = await fetch(`${API_BASE}/api/bet/place`, {
         method: 'POST',
@@ -194,7 +210,7 @@ export function useGgBalance(
           error: json.error ?? 'Place failed',
         };
       }
-      onBalanceUpdate(json.balance_cents, json.locked_cents);
+      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents));
       return {
         ok: true,
         bet_id: json.bet_id,
@@ -220,8 +236,9 @@ export function useGgBalance(
         ? Number(params.result.bet_cents)
         : 0;
       if (params.status === 'cancelled') {
+        const seq = beginWalletMutation();
         const next = balanceCents + stakeCents;
-        onBalanceUpdate(next);
+        applyWalletIfLatest(seq, () => onBalanceUpdate(next));
         return {
           ok: true,
           balance_cents: next,
@@ -232,8 +249,9 @@ export function useGgBalance(
       }
       const mult = params.multiplier ?? 1;
       const payoutCents = Math.round(stakeCents * mult);
+      const seq = beginWalletMutation();
       const next = balanceCents + payoutCents;
-      onBalanceUpdate(next);
+      applyWalletIfLatest(seq, () => onBalanceUpdate(next));
       return {
         ok: true,
         balance_cents: next,
@@ -248,6 +266,7 @@ export function useGgBalance(
       return { ok: false, balance_cents: session!.balance_cents, error: 'Missing initData' };
     }
 
+    const seq = beginWalletMutation();
     try {
       const res = await fetch(`${API_BASE}/api/bet/resolve`, {
         method: 'POST',
@@ -271,7 +290,7 @@ export function useGgBalance(
           error: json.error ?? 'Resolve failed',
         };
       }
-      onBalanceUpdate(json.balance_cents, json.locked_cents);
+      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents));
       return {
         ok: true,
         balance_cents: json.balance_cents,
@@ -291,8 +310,9 @@ export function useGgBalance(
     if (playMode !== 'demo') {
       return balanceCents;
     }
+    const seq = beginWalletMutation();
     const newCents = balanceCents + 100000;
-    onBalanceUpdate(newCents);
+    applyWalletIfLatest(seq, () => onBalanceUpdate(newCents));
     return newCents;
   }, [playMode, balanceCents, onBalanceUpdate]);
 

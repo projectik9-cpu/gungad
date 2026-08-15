@@ -40,6 +40,13 @@ export const CURRENCIES: Record<Currency, CurrencyConfig> = {
     flag: '🇰🇿',
     rateToUSD: 510,
   },
+  STARS: {
+    code: 'STARS',
+    symbol: '⭐',
+    name: 'Telegram Stars',
+    flag: '⭐',
+    rateToUSD: 1,
+  },
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
@@ -47,6 +54,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.r
 /** Apply live FX rates into CURRENCIES (mutates in place). */
 export function setLiveRates(rates: Partial<Record<Currency, number>>): void {
   for (const code of Object.keys(CURRENCIES) as Currency[]) {
+    if (code === 'STARS') continue;
     const v = rates[code];
     if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
       CURRENCIES[code].rateToUSD = v;
@@ -58,13 +66,13 @@ export function setLiveRates(rates: Partial<Record<Currency, number>>): void {
  * Fetch live rates from backend; falls back to public CDN if API is down.
  * Returns the rates object or null on total failure.
  */
-export async function fetchLiveRates(): Promise<Record<Currency, number> | null> {
+export async function fetchLiveRates(): Promise<Partial<Record<Currency, number>> | null> {
   try {
     const res = await fetch(`${API_BASE}/api/rates`);
     const json = await res.json();
     if (json?.ok && json.rates) {
       setLiveRates(json.rates);
-      return json.rates as Record<Currency, number>;
+      return json.rates as Partial<Record<Currency, number>>;
     }
   } catch {
     /* try CDN fallback */
@@ -94,16 +102,28 @@ export async function fetchLiveRates(): Promise<Record<Currency, number> | null>
 }
 
 export function convertUSDToCurrency(amountUSD: number, targetCurrency: Currency): number {
+  if (targetCurrency === 'STARS') return amountUSD;
   const config = CURRENCIES[targetCurrency];
   return amountUSD * config.rateToUSD;
 }
 
 export function convertCurrencyToUSD(amount: number, fromCurrency: Currency): number {
+  if (fromCurrency === 'STARS') return amount;
   const config = CURRENCIES[fromCurrency];
   return amount / config.rateToUSD;
 }
 
+export function formatStars(stars: number, showSymbol = true): string {
+  const n = Math.max(0, Math.round(Number(stars) || 0));
+  const formatted = n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return showSymbol ? `⭐ ${formatted}` : formatted;
+}
+
 export function formatCurrency(amountUSD: number, currency: Currency, showSymbol = true): string {
+  // Game/fiat amounts stay in money. Stars is a separate wallet (see formatStars).
+  if (currency === 'STARS') {
+    return formatCurrency(amountUSD, 'USD', showSymbol);
+  }
   const converted = convertUSDToCurrency(amountUSD, currency);
   const config = CURRENCIES[currency];
 

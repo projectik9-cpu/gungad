@@ -262,7 +262,7 @@ export async function logStarsTopup({ profileId, starsAmount, usdCents, idempote
     '⭐ <b>STARS ПОПОЛНЕНИЕ</b>',
     formatPlayerLine(profile, wallet),
     '',
-    `Stars: <b>${starsAmount}</b> → <b>${formatUsd(usdCents)}</b>`,
+    `Stars: <b>${starsAmount}</b>`,
   ].join('\n'));
 }
 

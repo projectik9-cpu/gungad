@@ -77,7 +77,7 @@ function saveCrashHistory(history: number[]) {
 }
 
 export const CrashGame: React.FC<CrashGameProps> = ({
-  user, currency, lang, playMode = 'real', onAddHistory,
+  user, currency, lang, playMode = 'real', onAddHistory, onUpdateBalance,
   placeBet, resolveBet, onRefreshWallet,
 }) => {
   const [betAmountUSD, setBetAmountUSD] = useState<number>(10);
@@ -95,6 +95,8 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
   const playModeRef = useRef(playMode);
   useEffect(() => { playModeRef.current = playMode; }, [playMode]);
+  const balanceUsdRef = useRef(user.balanceUSD);
+  useEffect(() => { balanceUsdRef.current = user.balanceUSD; }, [user.balanceUSD]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const arenaRef = useRef<HTMLDivElement | null>(null);
@@ -440,6 +442,9 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     soundFx.playWin();
     if (winMult >= 5) confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 }, colors: ['#f43f5e', '#fb7185', '#fbbf24'] });
 
+    const payoutUSD = stake * winMult;
+    onUpdateBalance(balanceUsdRef.current + payoutUSD);
+
     const res = await resolveBet({
       bet_id: betId,
       status: 'cashed_out',
@@ -691,11 +696,14 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
     setPlacing(true);
     const stake = betAmountUSD;
+    const before = user.balanceUSD;
+    onUpdateBalance(before - stake);
     const res = await placeBet({ game_id: 'crash', betUSD: stake });
     if (!mountedRef.current) return;
 
     if (!res.ok || !res.bet_id) {
       console.warn('[crash] place failed', res.error);
+      onUpdateBalance(before);
       setPlacing(false);
       return;
     }

@@ -69,6 +69,7 @@ export const PlinkoGame: React.FC<PlinkoGameProps> = ({
   const settleQueue = useRef<Array<() => void>>([]);
 
   useEffect(() => {
+    if (activeRef.current.size > 0) return;
     balanceRef.current = user.balanceUSD;
   }, [user.balanceUSD]);
 

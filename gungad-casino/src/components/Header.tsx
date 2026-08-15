@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Currency, Language, UserProfile } from '../types';
 import { LANGUAGES, t } from '../translations';
-import { CURRENCIES, formatCurrency } from '../utils/currencies';
+import { CURRENCIES, formatCurrency, formatStars } from '../utils/currencies';
 import { RevolverLogo } from './RevolverLogo';
 import { SettingsMenu } from './SettingsMenu';
 import { soundFx } from '../utils/sound';
@@ -142,7 +142,9 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Wallet className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                 <span className="font-mono font-bold text-white text-[10px] sm:text-xs whitespace-nowrap">
-                  {formatCurrency(user.balanceUSD, currency)}
+                  {currency === 'STARS'
+                    ? formatStars(user.starsBalance)
+                    : formatCurrency(user.balanceUSD, currency)}
                 </span>
                 <ChevronDown className="w-2.5 h-2.5 text-zinc-500 shrink-0" />
               </button>
@@ -159,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
 
               {currOpen && (
-                <div className="absolute right-0 top-full mt-2 w-44 bg-[#111116] border border-zinc-800 rounded-2xl shadow-2xl p-1.5 z-[300]">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-[#111116] border border-zinc-800 rounded-2xl shadow-2xl p-1.5 z-[300]">
                   <div className="px-2 py-1 text-[10px] font-bold text-zinc-500 uppercase">{t('selectCurrency', lang)}</div>
                   {Object.values(CURRENCIES).map((c) => (
                     <button

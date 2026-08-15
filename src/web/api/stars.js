@@ -20,8 +20,8 @@ router.post('/invoice', async (req, res) => {
     if (!profile_id) return res.status(400).json({ error: 'profile_id required' });
 
     const stars = parseInt(stars_amount, 10);
-    if (!stars || stars < 1 || stars > 2500) {
-      return res.status(400).json({ error: 'stars_amount must be 1–2500' });
+    if (!stars || stars < 1 || stars > 10000) {
+      return res.status(400).json({ error: 'stars_amount must be 1–10000' });
     }
 
     if (!_bot) return res.status(503).json({ error: 'Bot not initialized' });

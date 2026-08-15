@@ -1,4 +1,4 @@
-export type Currency = 'USD' | 'EUR' | 'RUB' | 'UAH' | 'KZT';
+export type Currency = 'USD' | 'EUR' | 'RUB' | 'UAH' | 'KZT' | 'STARS';
 
 export interface CurrencyConfig {
   code: Currency;
@@ -34,6 +34,8 @@ export interface UserProfile {
   username: string;
   avatar: string;
   balanceUSD: number;
+  /** Separate Telegram Stars wallet — never converted to fiat/USD play money */
+  starsBalance: number;
   vipLevel: number; // 1 to 6
   vipXp: number;
   vipMaxXp: number;

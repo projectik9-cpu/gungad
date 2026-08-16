@@ -114,15 +114,17 @@ export function convertCurrencyToUSD(amount: number, fromCurrency: Currency): nu
 }
 
 export function formatStars(stars: number, showSymbol = true): string {
-  const n = Math.max(0, Math.round(Number(stars) || 0));
-  const formatted = n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const n = Math.max(0, Number(stars) || 0);
+  const formatted = n.toLocaleString(undefined, {
+    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
   return showSymbol ? `⭐ ${formatted}` : formatted;
 }
 
 export function formatCurrency(amountUSD: number, currency: Currency, showSymbol = true): string {
-  // Game/fiat amounts stay in money. Stars is a separate wallet (see formatStars).
   if (currency === 'STARS') {
-    return formatCurrency(amountUSD, 'USD', showSymbol);
+    return formatStars(amountUSD, showSymbol);
   }
   const converted = convertUSDToCurrency(amountUSD, currency);
   const config = CURRENCIES[currency];

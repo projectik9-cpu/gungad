@@ -118,6 +118,8 @@ export default function App() {
   const [lockedCents, setLockedCents] = useState(0);
   // Instant UI overlay: games write this, server commits do not clobber in-flight bets
   const [pendingDeltaCents, setPendingDeltaCents] = useState(0);
+  const [starsCents, setStarsCents] = useState(0);
+  const [pendingDeltaStars, setPendingDeltaStars] = useState(0);
 
   // Separate demo wallet
   const [demoBalanceCents, setDemoBalanceCents] = useState(() => {
@@ -139,87 +141,6 @@ export default function App() {
     localStorage.setItem('gungad_demo_balance_cents', String(demoBalanceCents));
   }, [demoBalanceCents]);
 
-  const walletSnapRef = useRef({
-    playMode,
-    balanceCents,
-    lockedCents,
-    demoBalanceCents,
-    pendingDeltaCents,
-  });
-  walletSnapRef.current = {
-    playMode,
-    balanceCents,
-    lockedCents,
-    demoBalanceCents,
-    pendingDeltaCents,
-  };
-
-  // Sync real totals from session (deposits, refresh). Keep pending overlay so a
-  // mid-spin wallet fetch cannot restore the pre-bet display.
-  useEffect(() => {
-    if (isLive && session && playMode === 'real') {
-      setBalanceCents(session.balance_cents);
-      setLockedCents(session.locked_cents ?? 0);
-    }
-  }, [isLive, session?.balance_cents, session?.locked_cents, playMode]);
-
-  const baseSpendableCents = playMode === 'demo'
-    ? demoBalanceCents
-    : Math.max(0, balanceCents - lockedCents);
-
-  // Spendable balance for UI / bets (withdrawal locks are not bettable)
-  const availableCents = Math.max(0, baseSpendableCents + pendingDeltaCents);
-
-  /** Server/demo ledger commit. Preserves the currently shown balance via pending. */
-  const applyAuthoritativeCents = useCallback((newCents: number, nextLocked?: number) => {
-    const snap = walletSnapRef.current;
-    const next = Math.max(0, newCents);
-    const oldBase = snap.playMode === 'demo'
-      ? snap.demoBalanceCents
-      : Math.max(0, snap.balanceCents - snap.lockedCents);
-    const oldDisplay = oldBase + snap.pendingDeltaCents;
-
-    if (snap.playMode === 'demo') {
-      const pending = oldDisplay - next;
-      walletSnapRef.current = { ...snap, demoBalanceCents: next, pendingDeltaCents: pending };
-      setDemoBalanceCents(next);
-      setPendingDeltaCents(pending);
-      return;
-    }
-
-    const locked = typeof nextLocked === 'number' ? Math.max(0, nextLocked) : snap.lockedCents;
-    const newBase = Math.max(0, next - locked);
-    const pending = oldDisplay - newBase;
-    walletSnapRef.current = {
-      ...snap,
-      balanceCents: next,
-      lockedCents: locked,
-      pendingDeltaCents: pending,
-    };
-    setBalanceCents(next);
-    if (typeof nextLocked === 'number') setLockedCents(locked);
-    setPendingDeltaCents(pending);
-    updateBalance(next, typeof nextLocked === 'number' ? locked : undefined);
-  }, [updateBalance]);
-
-  const { settleBet, placeBet, resolveBet, refillDemo } = useGgBalance(
-    session,
-    status,
-    applyAuthoritativeCents,
-    { playMode, balanceCents: baseSpendableCents },
-  );
-
-  const [extraStats, setExtraStats] = useState({ betsCount: 0, winsCount: 0 });
-  const useLiveProfile = isLive && playMode === 'real';
-  const user: UserProfile = useMemo(() => {
-    const profile = buildUserProfile(session, useLiveProfile, availableCents);
-    return {
-      ...profile,
-      totalBetsCount: extraStats.betsCount,
-      totalWinsCount: extraStats.winsCount,
-    };
-  }, [session, useLiveProfile, availableCents, extraStats]);
-
   const [currency, setCurrency] = useState<Currency>(() => {
     const saved = localStorage.getItem('gungad_currency');
     return saved && saved in CURRENCIES ? (saved as Currency) : 'USD';
@@ -228,6 +149,101 @@ export default function App() {
     (localStorage.getItem('gungad_lang') as Language) || 'ru',
   );
   const [legalOk, setLegalOk] = useState(() => Boolean(readLegalAcceptance()));
+
+  const walletSnapRef = useRef({
+    playMode,
+    balanceCents,
+    lockedCents,
+    demoBalanceCents,
+    pendingDeltaCents,
+    starsCents,
+    pendingDeltaStars,
+    currency,
+  });
+  walletSnapRef.current = {
+    playMode,
+    balanceCents,
+    lockedCents,
+    demoBalanceCents,
+    pendingDeltaCents,
+    starsCents,
+    pendingDeltaStars,
+    currency,
+  };
+
+  // Sync real totals from session (deposits, refresh). Keep pending overlay so a
+  // mid-spin wallet fetch cannot restore the pre-bet display.
+  useEffect(() => {
+    if (isLive && session && playMode === 'real') {
+      setBalanceCents(session.balance_cents);
+      setLockedCents(session.locked_cents ?? 0);
+      setStarsCents(session.stars_balance ?? 0);
+    }
+  }, [isLive, session?.balance_cents, session?.locked_cents, session?.stars_balance, playMode]);
+
+  const usdSpendableCents = playMode === 'demo'
+    ? demoBalanceCents
+    : Math.max(0, balanceCents - lockedCents);
+
+  const availableCents = playMode === 'demo'
+    ? Math.max(0, demoBalanceCents + pendingDeltaCents)
+    : currency === 'STARS'
+      ? Math.max(0, starsCents + pendingDeltaStars)
+      : Math.max(0, usdSpendableCents + pendingDeltaCents);
+
+  const applyAuthoritativeCents = useCallback((newCents: number, nextLocked?: number, nextStars?: number) => {
+    const snap = walletSnapRef.current;
+    const next = Math.max(0, newCents);
+
+    if (typeof nextStars === 'number') {
+      const pendingStars = (snap.starsCents + snap.pendingDeltaStars) - nextStars;
+      setStarsCents(nextStars);
+      setPendingDeltaStars(pendingStars);
+      updateStars(nextStars);
+    }
+
+    if (snap.playMode === 'demo') {
+      const oldDisplay = snap.demoBalanceCents + snap.pendingDeltaCents;
+      const pending = oldDisplay - next;
+      setDemoBalanceCents(next);
+      setPendingDeltaCents(pending);
+      return;
+    }
+
+    const locked = typeof nextLocked === 'number' ? Math.max(0, nextLocked) : snap.lockedCents;
+    const oldUsdDisplay = Math.max(0, snap.balanceCents - snap.lockedCents) + snap.pendingDeltaCents;
+    const newUsdBase = Math.max(0, next - locked);
+    const pendingUsd = oldUsdDisplay - newUsdBase;
+    setBalanceCents(next);
+    if (typeof nextLocked === 'number') setLockedCents(locked);
+    if (snap.currency !== 'STARS') setPendingDeltaCents(pendingUsd);
+    updateBalance(next, typeof nextLocked === 'number' ? locked : undefined);
+  }, [updateBalance, updateStars]);
+
+  const { settleBet, placeBet, resolveBet, refillDemo } = useGgBalance(
+    session,
+    status,
+    applyAuthoritativeCents,
+    {
+      playMode,
+      balanceCents: playMode === 'demo'
+        ? demoBalanceCents
+        : (currency === 'STARS' ? starsCents : usdSpendableCents),
+      wallet: playMode === 'real' && currency === 'STARS' ? 'STARS' : 'USD',
+    },
+  );
+
+  const [extraStats, setExtraStats] = useState({ betsCount: 0, winsCount: 0 });
+  const useLiveProfile = isLive && playMode === 'real';
+  const user: UserProfile = useMemo(() => {
+    const profile = buildUserProfile(session, useLiveProfile, availableCents);
+    return {
+      ...profile,
+      starsBalance: playMode === 'real' ? Math.max(0, starsCents + pendingDeltaStars) : profile.starsBalance,
+      totalBetsCount: extraStats.betsCount,
+      totalWinsCount: extraStats.winsCount,
+    };
+  }, [session, useLiveProfile, availableCents, extraStats, playMode, starsCents, pendingDeltaStars]);
 
   useEffect(() => { localStorage.setItem('gungad_currency', currency); }, [currency]);
   useEffect(() => { localStorage.setItem('gungad_lang', lang); }, [lang]);
@@ -266,11 +282,15 @@ export default function App() {
   const handleUpdateBalance = useCallback((newBalanceUSD: number) => {
     const snap = walletSnapRef.current;
     const target = usdToCents(newBalanceUSD);
+    if (snap.playMode === 'real' && snap.currency === 'STARS') {
+      const pending = target - snap.starsCents;
+      setPendingDeltaStars(pending);
+      return;
+    }
     const base = snap.playMode === 'demo'
       ? snap.demoBalanceCents
       : Math.max(0, snap.balanceCents - snap.lockedCents);
     const pending = target - base;
-    walletSnapRef.current = { ...snap, pendingDeltaCents: pending };
     setPendingDeltaCents(pending);
   }, []);
 
@@ -298,6 +318,7 @@ export default function App() {
       }).then(res => {
         if (!res.ok) {
           setPendingDeltaCents(0);
+          setPendingDeltaStars(0);
           void refreshWallet();
         }
       });
@@ -491,7 +512,7 @@ export default function App() {
                 {...gameProps}
                 profileId={session?.profile_id ?? null}
                 sessionStatus={status}
-                availableCents={availableCents}
+                availableCents={usdSpendableCents}
                 onRefreshWallet={refreshWallet}
               />
             )}

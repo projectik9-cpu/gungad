@@ -23,12 +23,14 @@ function isStarsWd(data) {
 
 function formatWdSum(data) {
   const n = Number(data?.amount_usd_cents) || 0;
-  return isStarsWd(data) ? `⭐ ${n}` : `$${(n / 100).toFixed(2)}`;
+  return isStarsWd(data)
+    ? `⭐ ${(n / 100).toFixed(2).replace(/\.00$/, '')}`
+    : `$${(n / 100).toFixed(2)}`;
 }
 
 function userWdApprovedText(data) {
   if (isStarsWd(data)) {
-    return `✅ <b>Вывод выполнен</b>\n\n⭐ ${data.amount_usd_cents} Stars отправлены вам в Telegram.`;
+    return `✅ <b>Вывод выполнен</b>\n\n⭐ ${(data.amount_usd_cents / 100).toFixed(2).replace(/\.00$/, '')} Stars отправлены вам в Telegram.`;
   }
   return `✅ <b>Вывод выполнен</b>\n\nСумма $${(data.amount_usd_cents / 100).toFixed(2)} отправлена на ваш кошелёк. Спасибо за игру в GunGad!`;
 }

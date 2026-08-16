@@ -64,6 +64,7 @@ export interface GgBalanceOpts {
   playMode: 'real' | 'demo';
   /** Current displayed balance (demo or real) for local settle math */
   balanceCents: number;
+  wallet?: 'USD' | 'STARS';
 }
 
 let _idempotencyCounter = 0;
@@ -98,10 +99,10 @@ function getInitData(): string | null {
 export function useGgBalance(
   session: GgSessionData | null,
   status: 'loading' | 'demo' | 'live' | 'error',
-  onBalanceUpdate: (newCents: number, lockedCents?: number) => void,
+  onBalanceUpdate: (newCents: number, lockedCents?: number, starsBalance?: number) => void,
   opts: GgBalanceOpts,
 ) {
-  const { playMode, balanceCents } = opts;
+  const { playMode, balanceCents, wallet = 'USD' } = opts;
 
   const settleBet = useCallback(async (params: SettleBetParams): Promise<SettleBetResult> => {
     const useServer = playMode === 'real' && status === 'live' && Boolean(session?.profile_id);
@@ -135,6 +136,7 @@ export function useGgBalance(
         idempotency_key:   newIdempotencyKey(params.game_id),
         client_seed:       params.client_seed ?? null,
         server_seed_hash:  params.server_seed_hash ?? null,
+        wallet,
       };
 
       const res = await fetch(`${API_BASE}/api/bet`, {
@@ -150,7 +152,7 @@ export function useGgBalance(
         return { ok: false, balance_cents: session!.balance_cents, error: json.error ?? 'Bet failed' };
       }
 
-      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents));
+      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents, json.stars_balance));
       return {
         ok: true,
         balance_cents: json.balance_cents,
@@ -161,7 +163,7 @@ export function useGgBalance(
       console.error('[ggBalance] settleBet network error:', err);
       return { ok: false, balance_cents: session?.balance_cents ?? 0, error: 'Network error' };
     }
-  }, [session, status, onBalanceUpdate, playMode, balanceCents]);
+  }, [session, status, onBalanceUpdate, playMode, balanceCents, wallet]);
 
   const placeBet = useCallback(async (params: PlaceBetParams): Promise<PlaceBetResult> => {
     const useServer = playMode === 'real' && status === 'live' && Boolean(session?.profile_id);
@@ -198,6 +200,7 @@ export function useGgBalance(
           game_id: params.game_id,
           bet_cents: usdToCents(params.betUSD),
           idempotency_key: newIdempotencyKey(`${params.game_id}_place`),
+          wallet,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -210,7 +213,7 @@ export function useGgBalance(
           error: json.error ?? 'Place failed',
         };
       }
-      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents));
+      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents, json.stars_balance));
       return {
         ok: true,
         bet_id: json.bet_id,
@@ -222,7 +225,7 @@ export function useGgBalance(
       console.error('[ggBalance] placeBet network error:', err);
       return { ok: false, balance_cents: session?.balance_cents ?? 0, error: 'Network error' };
     }
-  }, [session, status, onBalanceUpdate, playMode, balanceCents]);
+  }, [session, status, onBalanceUpdate, playMode, balanceCents, wallet]);
 
   const resolveBet = useCallback(async (params: ResolveBetParams): Promise<ResolveBetResult> => {
     const useServer = playMode === 'real' && status === 'live' && Boolean(session?.profile_id);
@@ -290,7 +293,7 @@ export function useGgBalance(
           error: json.error ?? 'Resolve failed',
         };
       }
-      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents));
+      applyWalletIfLatest(seq, () => onBalanceUpdate(json.balance_cents, json.locked_cents, json.stars_balance));
       return {
         ok: true,
         balance_cents: json.balance_cents,
@@ -303,7 +306,7 @@ export function useGgBalance(
       console.error('[ggBalance] resolveBet network error:', err);
       return { ok: false, balance_cents: session?.balance_cents ?? 0, error: 'Network error' };
     }
-  }, [session, status, onBalanceUpdate, playMode, balanceCents]);
+  }, [session, status, onBalanceUpdate, playMode, balanceCents, wallet]);
 
   /** Demo-only local refill (+$1000). Never credits the live wallet. */
   const refillDemo = useCallback(async (): Promise<number> => {

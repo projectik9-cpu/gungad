@@ -226,7 +226,7 @@ export async function logWithdrawProcessed({
   const { profile, wallet } = await fetchProfileBundle(profileId);
   const title = status === 'approved' ? '✅ ВЫВОД ВЫПЛАЧЕН' : '❌ ВЫВОД ОТКЛОНЁН';
   const sum = String(asset).toUpperCase() === 'STARS'
-    ? `⭐ ${amountCents}`
+    ? `⭐ ${(Number(amountCents) / 100).toFixed(2).replace(/\.00$/, '')}`
     : formatUsd(amountCents);
   await notifyLog([
     `<b>${title}</b>`,

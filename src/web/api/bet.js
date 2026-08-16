@@ -37,6 +37,7 @@ router.post('/', async (req, res) => {
       client_seed,
       server_seed_hash,
       server_seed,
+      wallet,
     } = req.body || {};
 
     const auth = await assertProfileOwnership(profile_id, initData);
@@ -71,6 +72,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'payout_cents exceeds maximum allowed' });
     }
 
+    const walletAsset = String(wallet || 'USD').toUpperCase() === 'STARS' ? 'STARS' : 'USD';
+
     const sb = getSupabaseAdmin();
     const { data, error } = await sb.rpc('gg_settle_bet', {
       p_profile_id:        profile_id,
@@ -84,6 +87,7 @@ router.post('/', async (req, res) => {
       p_client_seed:       client_seed ?? null,
       p_server_seed_hash:  server_seed_hash ?? null,
       p_server_seed:       server_seed ?? null,
+      p_wallet:            walletAsset,
     });
 
     if (error) {
@@ -120,7 +124,7 @@ router.post('/', async (req, res) => {
 /** POST /api/bet/place — debit available balance, open pending bet */
 router.post('/place', async (req, res) => {
   try {
-    const { profile_id, initData, game_id, bet_cents, idempotency_key } = req.body || {};
+    const { profile_id, initData, game_id, bet_cents, idempotency_key, wallet } = req.body || {};
 
     const auth = await assertProfileOwnership(profile_id, initData);
     if (!auth.ok) {
@@ -134,12 +138,15 @@ router.post('/place', async (req, res) => {
       return res.status(400).json({ error: `bet_cents must be integer ${MIN_BET_CENTS}–${MAX_BET_CENTS}` });
     }
 
+    const walletAsset = String(wallet || 'USD').toUpperCase() === 'STARS' ? 'STARS' : 'USD';
+
     const sb = getSupabaseAdmin();
     const { data, error } = await sb.rpc('gg_place_bet', {
       p_profile_id:      profile_id,
       p_game_id:         game_id,
       p_bet_cents:       bet_cents,
       p_idempotency_key: idempotency_key ?? null,
+      p_wallet:          walletAsset,
     });
 
     if (error) {

@@ -143,12 +143,12 @@ export const Header: React.FC<HeaderProps> = ({
                 <Wallet className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                 <span className="font-mono font-bold text-white text-[10px] sm:text-xs whitespace-nowrap">
                   {currency === 'STARS'
-                    ? formatStars(user.starsBalance)
+                    ? formatStars(user.balanceUSD)
                     : formatCurrency(user.balanceUSD, currency)}
                 </span>
                 {playMode === 'real' && currency !== 'STARS' && (
                   <span className="font-mono text-[10px] text-amber-300 whitespace-nowrap">
-                    {formatStars(user.starsBalance)}
+                    {formatStars(user.starsBalance / 100)}
                   </span>
                 )}
                 <ChevronDown className="w-2.5 h-2.5 text-zinc-500 shrink-0" />

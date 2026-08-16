@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Currency, UserProfile } from '../types';
 import { t } from '../translations';
+import { formatStars } from '../utils/currencies';
 import { soundFx } from '../utils/sound';
 import {
   X,
@@ -298,7 +299,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       setStarsInvoiceUrl(json.invoice_url);
       openStarsInvoice(json.invoice_url, () => {
         setStarsAwaitingCredit(true);
-        onStarsBalance?.(starsBaselineRef.current + starsAmount);
+        onStarsBalance?.(starsBaselineRef.current + starsAmount * 100);
       });
     } catch {
       setError(t('errorGeneric', lang));
@@ -317,7 +318,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         setWithdrawError(t('withdrawStarsMinNote', lang));
         return;
       }
-      if (withdrawStars > (user.starsBalance ?? 0)) {
+      if (withdrawStars * 100 > (user.starsBalance ?? 0)) {
         setWithdrawError(t('insufficientFunds', lang));
         return;
       }
@@ -340,7 +341,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         soundFx.playWin();
         setWithdrawSuccess(true);
         if (typeof json.stars_balance === 'number') onStarsBalance?.(json.stars_balance);
-        else onStarsBalance?.(Math.max(0, (user.starsBalance ?? 0) - withdrawStars));
+        else onStarsBalance?.(Math.max(0, (user.starsBalance ?? 0) - withdrawStars * 100));
         await onWalletRefresh?.();
         await loadPendingWds();
         setTimeout(() => setWithdrawSuccess(false), 6000);
@@ -736,7 +737,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       ))}
                     </div>
                     <span className="text-[10px] text-zinc-500">{t('minStarsNote', lang)}</span>
-                    <span className="text-[10px] text-amber-300 font-mono">⭐ {user.starsBalance ?? 0}</span>
+                    <span className="text-[10px] text-amber-300 font-mono">{formatStars((user.starsBalance ?? 0) / 100)}</span>
                   </div>
 
                   {depositDone ? (
@@ -750,7 +751,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                           soundFx.playClick();
                           openStarsInvoice(starsInvoiceUrl, () => {
                             setStarsAwaitingCredit(true);
-                            onStarsBalance?.(starsBaselineRef.current + starsAmount);
+                            onStarsBalance?.(starsBaselineRef.current + starsAmount * 100);
                           });
                         }}
                         className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2"
@@ -841,7 +842,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   ))}
                 </div>
                 <span className="text-[10px] text-zinc-500">{t('withdrawStarsNote', lang)}</span>
-                <span className="text-[10px] text-amber-300 font-mono">⭐ {user.starsBalance ?? 0}</span>
+                <span className="text-[10px] text-amber-300 font-mono">{formatStars((user.starsBalance ?? 0) / 100)}</span>
               </div>
               ) : (
               <div className="flex flex-col gap-1.5">
@@ -865,7 +866,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-mono text-white">
                           {w.asset === 'STARS'
-                            ? `⭐ ${w.amount_usd_cents}`
+                            ? `⭐ ${(w.amount_usd_cents / 100).toFixed(2).replace(/\.00$/, '')}`
                             : `$${(w.amount_usd_cents / 100).toFixed(2)}`} · {w.asset}
                         </div>
                         <div className="text-[10px] text-zinc-500 truncate">{w.id.slice(0, 8)}…</div>
@@ -899,7 +900,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   !isReal ||
                   withdrawSubmitting ||
                   (withdrawAsset === 'STARS'
-                    ? withdrawStars < 1 || withdrawStars > (user.starsBalance ?? 0)
+                    ? withdrawStars < 1 || withdrawStars * 100 > (user.starsBalance ?? 0)
                     : withdrawAmountUSD < 7 || withdrawAmountUSD > user.balanceUSD || !withdrawAddress)
                 }
                 className="w-full py-3 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.5)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"

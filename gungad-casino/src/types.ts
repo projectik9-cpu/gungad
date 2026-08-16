@@ -28,6 +28,7 @@ export interface GameInfo {
   minBetUSD: number;
   maxBetUSD: number;
   descriptionKey: string;
+  locked?: boolean;
 }
 
 export interface UserProfile {

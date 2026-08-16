@@ -62,6 +62,7 @@ export async function creditStarsPayment({
       starsAmount,
       usdCents: 0,
       idempotent: false,
+      referralStarsCents: data?.referral_stars || 0,
     }).catch(() => {});
   }
 

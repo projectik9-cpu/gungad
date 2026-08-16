@@ -180,7 +180,7 @@ export async function logDepositCredited({
     if (!row) return;
     const ref = await fetchProfileBundle(row.profile_id);
     await notifyLog([
-      '🎁 <b>РЕФЕРАЛ 20%</b>',
+      '🎁 <b>РЕФЕРАЛ 25%</b>',
       formatPlayerLine(ref.profile, ref.wallet),
       '',
       `От депозита: ${formatUserLabel(profile)} (<code>${profile?.telegram_id ?? '?'}</code>)`,
@@ -262,7 +262,7 @@ export async function logSupportTicket({ ticketId, profile, message }) {
   ].join('\n'));
 }
 
-export async function logStarsTopup({ profileId, starsAmount, usdCents, idempotent }) {
+export async function logStarsTopup({ profileId, starsAmount, usdCents, idempotent, referralStarsCents }) {
   if (idempotent) return;
   const { profile, wallet } = await fetchProfileBundle(profileId);
   await notifyLog([
@@ -271,6 +271,33 @@ export async function logStarsTopup({ profileId, starsAmount, usdCents, idempote
     '',
     `Stars: <b>${starsAmount}</b>`,
   ].join('\n'));
+
+  const commission = Number(referralStarsCents) || 0;
+  if (commission <= 0) return;
+  const sb = getSupabaseAdmin();
+  if (!sb) return;
+  try {
+    const { data: rows } = await sb
+      .from('gg_ledger')
+      .select('profile_id, meta')
+      .eq('kind', 'referral')
+      .contains('meta', { friend_profile_id: profileId, wallet: 'STARS' })
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const row = rows?.[0];
+    if (!row) return;
+    const ref = await fetchProfileBundle(row.profile_id);
+    const stars = (commission / 100).toFixed(2);
+    await notifyLog([
+      '🎁 <b>РЕФЕРАЛ 25% STARS</b>',
+      formatPlayerLine(ref.profile, ref.wallet),
+      '',
+      `От пополнения Stars: ${formatUserLabel(profile)} (<code>${profile?.telegram_id ?? '?'}</code>)`,
+      `Начислено: <b>⭐ ${stars}</b>`,
+    ].join('\n'));
+  } catch (e) {
+    logger.warn(`[telegramLog] stars referral lookup: ${e?.message || e}`);
+  }
 }
 
 /**

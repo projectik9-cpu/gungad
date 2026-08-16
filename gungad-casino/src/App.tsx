@@ -5,7 +5,6 @@ import { GamesGrid } from './components/GamesGrid';
 import { CrashGame } from './components/games/CrashGame';
 import { RouletteGame } from './components/games/RouletteGame';
 import { BlackjackGame } from './components/games/BlackjackGame';
-import { PokerGame } from './components/games/PokerGame';
 import { CoinFlipGame } from './components/games/CoinFlipGame';
 import { DiceGame } from './components/games/DiceGame';
 import { MinesGame } from './components/games/MinesGame';
@@ -48,7 +47,7 @@ function getTgPhotoUrl(): string | null {
     return null;
   }
 }
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Lock } from 'lucide-react';
 import { centsToUsd, usdToCents } from './types/database';
 import { CURRENCIES } from './utils/currencies';
 
@@ -256,6 +255,7 @@ export default function App() {
   const [provablyFairOpen, setProvablyFairOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [bonusOpen, setBonusOpen] = useState(false);
+  const [pokerLockedOpen, setPokerLockedOpen] = useState(false);
 
   // Close all modals helper — prevents stacking
   const closeAllModals = () => {
@@ -264,6 +264,7 @@ export default function App() {
     setProvablyFairOpen(false);
     setSupportOpen(false);
     setBonusOpen(false);
+    setPokerLockedOpen(false);
   };
   const openDeposit = () => { closeAllModals(); setDepositOpen(true); };
   const openProfile = () => { closeAllModals(); setProfileOpen(true); };
@@ -355,6 +356,10 @@ export default function App() {
   const handleSelectGame = useCallback((gameId: GameId) => {
     soundFx.stopAllFx();
     soundFx.playClick();
+    if (gameId === 'poker') {
+      setPokerLockedOpen(true);
+      return;
+    }
     setActiveGameId(gameId);
     setActiveTab('game');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -431,12 +436,12 @@ export default function App() {
             { id: 'crash',     label: t('crashName',     lang) },
             { id: 'roulette',  label: t('rouletteName',  lang) },
             { id: 'blackjack', label: t('blackjackName', lang) },
-            { id: 'poker',     label: t('pokerName',     lang) },
             { id: 'coinflip',  label: t('coinflipName',  lang) },
             { id: 'dice',      label: t('diceName',      lang) },
             { id: 'mines',     label: t('minesName',     lang) },
             { id: 'plinko',    label: t('plinkoName',    lang) },
             { id: 'slots',     label: t('slotsName',     lang) },
+            { id: 'poker',     label: t('pokerName',     lang), locked: true },
           ].map(item => (
             <button
               key={item.id}
@@ -445,13 +450,16 @@ export default function App() {
                 if (item.id === 'games') { soundFx.stopAllFx(); setActiveGameId(null); setActiveTab('games'); }
                 else { handleSelectGame(item.id as GameId); }
               }}
-              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between gap-2 ${
                 (item.id === 'games' && activeTab === 'games') || (activeGameId === item.id)
                   ? 'bg-rose-950/70 text-rose-300 border border-rose-800/50'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                  : item.locked
+                    ? 'text-rose-400/90 hover:text-rose-200 hover:bg-rose-950/40 border border-rose-900/40'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
               }`}
             >
-              {item.label}
+              <span>{item.label}</span>
+              {item.locked && <Lock className="w-3.5 h-3.5 text-rose-500 animate-lock-glow shrink-0" />}
             </button>
           ))}
 
@@ -507,15 +515,6 @@ export default function App() {
             {activeTab === 'game' && activeGameId === 'crash'     && <CrashGame     {...crashProps} />}
             {activeTab === 'game' && activeGameId === 'roulette'  && <RouletteGame  {...gameProps} />}
             {activeTab === 'game' && activeGameId === 'blackjack' && <BlackjackGame {...gameProps} />}
-            {activeTab === 'game' && activeGameId === 'poker' && (
-              <PokerGame
-                {...gameProps}
-                profileId={session?.profile_id ?? null}
-                sessionStatus={status}
-                availableCents={usdSpendableCents}
-                onRefreshWallet={refreshWallet}
-              />
-            )}
             {activeTab === 'game' && activeGameId === 'coinflip'  && <CoinFlipGame  {...gameProps} />}
             {activeTab === 'game' && activeGameId === 'dice'      && <DiceGame      {...gameProps} />}
             {activeTab === 'game' && activeGameId === 'mines'     && <MinesGame     {...gameProps} />}
@@ -598,6 +597,35 @@ export default function App() {
         {...gameProps}
         onClose={handleExitSlots}
       />
+    )}
+
+    {pokerLockedOpen && (
+      <div
+        className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center px-4"
+        onClick={() => setPokerLockedOpen(false)}
+      >
+        <div
+          className="w-full max-w-sm rounded-2xl border border-rose-600/60 bg-[#12080c] p-6 shadow-[0_0_40px_rgba(225,29,72,0.35)] text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-rose-600 text-white flex items-center justify-center animate-lock-glow">
+            <Lock className="w-8 h-8" strokeWidth={2.4} />
+          </div>
+          <h3 className="font-display font-black text-white uppercase tracking-wide text-lg">
+            {t('pokerLockedTitle', lang)}
+          </h3>
+          <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
+            {t('pokerLockedBody', lang)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPokerLockedOpen(false)}
+            className="mt-5 w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-display font-bold uppercase"
+          >
+            {t('pokerLocked', lang)}
+          </button>
+        </div>
+      </div>
     )}
     </>
   );

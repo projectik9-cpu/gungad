@@ -63,6 +63,21 @@
   animation: pulse-red 2.5s infinite ease-in-out;
 }
 
+@keyframes lock-glow {
+  0%, 100% {
+    transform: scale(1) rotate(-6deg);
+    filter: drop-shadow(0 0 6px rgba(225, 29, 72, 0.55));
+  }
+  50% {
+    transform: scale(1.14) rotate(6deg);
+    filter: drop-shadow(0 0 18px rgba(239, 68, 68, 1));
+  }
+}
+
+.animate-lock-glow {
+  animation: lock-glow 1.5s ease-in-out infinite;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

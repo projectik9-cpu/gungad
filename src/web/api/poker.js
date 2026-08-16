@@ -25,6 +25,13 @@ import { logBetPlaced, logBetOutcome } from '../../services/telegramLog.js';
 
 const router = express.Router();
 
+router.use((_req, res) => {
+  res.status(503).json({
+    error: 'Texas Hold\'em is closed and in development',
+    code: 'coming_soon',
+  });
+});
+
 async function auth(req, res) {
   const profileId = req.body?.profile_id || req.query?.profile_id;
   const init = req.body?.initData || req.query?.initData;

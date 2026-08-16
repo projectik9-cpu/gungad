@@ -3,7 +3,7 @@ import { GameInfo, GameId } from '../types';
 import { GAMES } from '../data/games';
 import { t } from '../translations';
 import { soundFx } from '../utils/sound';
-import { Play, Sparkles, Gem } from 'lucide-react';
+import { Play, Sparkles, Gem, Lock } from 'lucide-react';
 
 interface GamesGridProps {
   onSelectGame: (id: GameId) => void;
@@ -20,13 +20,19 @@ const GameCard: React.FC<{
   const titleKey = `${game.id}Name` as any;
   const gameTitle = t(titleKey, lang);
 
+  const locked = Boolean(game.locked);
+
   return (
     <div
       onClick={() => {
         soundFx.playClick();
         onSelectGame(game.id);
       }}
-      className="group relative bg-[#0e0e12] border border-rose-900/30 hover:border-rose-600/70 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1.5 shadow-xl hover:shadow-[0_0_30px_rgba(225,29,72,0.3)] flex flex-col"
+      className={`group relative bg-[#0e0e12] border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1.5 shadow-xl flex flex-col ${
+        locked
+          ? 'border-rose-700/80 hover:border-rose-500 shadow-[0_0_24px_rgba(225,29,72,0.25)]'
+          : 'border-rose-900/30 hover:border-rose-600/70 hover:shadow-[0_0_30px_rgba(225,29,72,0.3)]'
+      }`}
     >
       {/* Card Thumbnail — 16:9 on every viewport (phone + desktop) */}
       <div className="relative w-full aspect-video overflow-hidden bg-zinc-900">
@@ -34,7 +40,7 @@ const GameCard: React.FC<{
           src={game.image}
           alt={gameTitle}
           loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500"
+          className={`absolute inset-0 w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500 ${locked ? 'grayscale-[.45] brightness-75' : ''}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0e0e12] via-transparent to-transparent opacity-80" />
 
@@ -65,12 +71,22 @@ const GameCard: React.FC<{
           {t('rtpLabel', lang, { rtp: game.rtp })}
         </span>
 
-        {/* Hover Play Icon Overlay */}
-        <div className="absolute inset-0 bg-rose-950/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <div className="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-[0_0_25px_rgba(225,29,72,0.9)] transform group-hover:scale-110 transition-transform">
-            <Play className="w-6 h-6 ml-1 fill-current" />
+        {locked ? (
+          <div className="absolute inset-0 bg-black/55 flex flex-col items-center justify-center gap-2">
+            <div className="w-16 h-16 rounded-2xl bg-rose-600/90 border-2 border-rose-300/80 text-white flex items-center justify-center animate-lock-glow shadow-[0_0_28px_rgba(225,29,72,0.85)]">
+              <Lock className="w-8 h-8" strokeWidth={2.4} />
+            </div>
+            <span className="text-[11px] font-display font-black uppercase tracking-widest text-rose-200">
+              {t('pokerLocked', lang)}
+            </span>
           </div>
-        </div>
+        ) : (
+          <div className="absolute inset-0 bg-rose-950/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-[0_0_25px_rgba(225,29,72,0.9)] transform group-hover:scale-110 transition-transform">
+              <Play className="w-6 h-6 ml-1 fill-current" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Card Footer */}
@@ -85,8 +101,12 @@ const GameCard: React.FC<{
         </div>
 
         <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-end">
-          <button className="px-3.5 py-1.5 xl:px-4 xl:py-2 bg-rose-600/20 group-hover:bg-rose-600 text-rose-400 group-hover:text-white border border-rose-600/40 rounded-xl text-xs xl:text-sm font-display font-bold uppercase transition-all shadow-md">
-            {t('playNow', lang)}
+          <button className={`px-3.5 py-1.5 xl:px-4 xl:py-2 border rounded-xl text-xs xl:text-sm font-display font-bold uppercase transition-all shadow-md ${
+            locked
+              ? 'bg-rose-950/80 text-rose-300 border-rose-600/60'
+              : 'bg-rose-600/20 group-hover:bg-rose-600 text-rose-400 group-hover:text-white border-rose-600/40'
+          }`}>
+            {locked ? t('pokerLocked', lang) : t('playNow', lang)}
           </button>
         </div>
       </div>

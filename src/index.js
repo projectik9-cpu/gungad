@@ -3,6 +3,7 @@ import { registerHandlers } from './bot/handlers/index.js';
 import { startWebServer, setStarsBot, setWithdrawBot, setSupportBot } from './web/server.js';
 import { startTonMonitor } from './services/tonMonitor.js';
 import { startCryptoBotReconcile } from './services/cryptoBotReconcile.js';
+import { startStarsReconcile } from './services/starsReconcile.js';
 import { startDailyBonusNotify } from './services/dailyBonusNotify.js';
 import { startPokerTimerWorker } from './poker/timerWorker.js';
 import { setLogBot } from './services/telegramLog.js';
@@ -49,6 +50,7 @@ async function startApplication() {
     startTonMonitor();
     // 5.2 Crypto Bot — поллинг оплаченных инвойсов (вебхук может быть выключен)
     startCryptoBotReconcile();
+    startStarsReconcile(bot);
 
     // 5. Запуск Telegram бота
     logger.info('🤖 Запуск Telegram бота...');

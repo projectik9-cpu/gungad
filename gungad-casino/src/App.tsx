@@ -105,7 +105,7 @@ function buildUserProfile(
 }
 
 export default function App() {
-  const { session, status, updateBalance, setWelcomeBonusClaimed, refreshWallet } = useGgSession();
+  const { session, status, updateBalance, updateStars, setWelcomeBonusClaimed, refreshWallet } = useGgSession();
   const { version: ratesVersion } = useLiveRates();
   const isLive = status === 'live';
 
@@ -531,6 +531,7 @@ export default function App() {
         playMode={playMode}
         profileId={session?.profile_id ?? null}
         onWalletRefresh={refreshWallet}
+        onStarsBalance={updateStars}
       />
       <ProfileModal
         isOpen={profileOpen}

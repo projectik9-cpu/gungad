@@ -146,6 +146,11 @@ export const Header: React.FC<HeaderProps> = ({
                     ? formatStars(user.starsBalance)
                     : formatCurrency(user.balanceUSD, currency)}
                 </span>
+                {playMode === 'real' && currency !== 'STARS' && (
+                  <span className="font-mono text-[10px] text-amber-300 whitespace-nowrap">
+                    {formatStars(user.starsBalance)}
+                  </span>
+                )}
                 <ChevronDown className="w-2.5 h-2.5 text-zinc-500 shrink-0" />
               </button>
 

@@ -25,6 +25,58 @@ export async function preCheckoutHandler(ctx) {
 }
 
 /**
+ * Credit Stars wallet (not USD). Shared by successful_payment and getStarTransactions poll.
+ */
+export async function creditStarsPayment({
+  profileId,
+  starsAmount,
+  chargeId,
+  payload,
+  telegramId,
+  notifyUser = false,
+  bot = null,
+}) {
+  const sb = getSupabaseAdmin();
+  if (!sb) return null;
+
+  const { data, error } = await sb.rpc('gg_credit_stars', {
+    p_profile_id: profileId,
+    p_stars_amount: starsAmount,
+    p_usd_cents: 0,
+    p_telegram_payment_charge_id: String(chargeId),
+    p_payload: payload ?? null,
+    p_meta: { telegram_id: telegramId ?? null },
+  });
+
+  if (error) {
+    logger.error('[stars] gg_credit_stars error: %s', error.message);
+    throw error;
+  }
+
+  logger.info('[stars] credited profile=%s stars=%d balance=%d idempotent=%s',
+    profileId, starsAmount, data?.stars_balance, data?.idempotent);
+
+  if (!data?.idempotent) {
+    logStarsTopup({
+      profileId,
+      starsAmount,
+      usdCents: 0,
+      idempotent: false,
+    }).catch(() => {});
+  }
+
+  if (notifyUser && bot && telegramId && !data?.idempotent) {
+    await bot.telegram.sendMessage(
+      telegramId,
+      `⭐ Пополнение успешно!\n\n+${starsAmount} Stars\nЗвёзды зачислены на отдельный баланс.`,
+      { parse_mode: 'HTML' },
+    ).catch(() => {});
+  }
+
+  return data;
+}
+
+/**
  * Handles successful_payment — credits Stars wallet (not USD play balance).
  */
 export async function successfulPaymentHandler(ctx) {
@@ -46,39 +98,22 @@ export async function successfulPaymentHandler(ctx) {
       return;
     }
 
-    const sb = getSupabaseAdmin();
-    if (!sb) return;
-
-    const { data, error } = await sb.rpc('gg_credit_stars', {
-      p_profile_id:                   profileId,
-      p_stars_amount:                 starsAmount,
-      p_usd_cents:                    0,
-      p_telegram_payment_charge_id:   chargeId,
-      p_payload:                      payload ?? null,
-      p_meta:                         { telegram_id: tgUser.id },
-    });
-
-    if (error) {
-      logger.error('[stars] gg_credit_stars error: %s', error.message);
-      return;
-    }
-
-    logger.info('[stars] credited profile=%s stars=%d balance=%d idempotent=%s',
-      profileId, starsAmount, data?.stars_balance, data?.idempotent);
-
-    logStarsTopup({
+    const data = await creditStarsPayment({
       profileId,
       starsAmount,
-      usdCents: 0,
-      idempotent: Boolean(data?.idempotent),
-    }).catch(() => {});
+      chargeId,
+      payload,
+      telegramId: tgUser.id,
+    });
 
-    await ctx.reply(
-      `⭐ Пополнение успешно!\n\n` +
-      `+${starsAmount} Stars\n` +
-      `Звёзды зачислены на отдельный баланс.`,
-      { parse_mode: 'HTML' },
-    );
+    if (data && !data.idempotent) {
+      await ctx.reply(
+        `⭐ Пополнение успешно!\n\n` +
+        `+${starsAmount} Stars\n` +
+        `Звёзды зачислены на отдельный баланс.`,
+        { parse_mode: 'HTML' },
+      );
+    }
   } catch (err) {
     logger.error('[stars] successfulPaymentHandler error', err);
   }

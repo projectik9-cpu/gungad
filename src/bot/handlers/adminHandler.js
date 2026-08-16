@@ -17,6 +17,30 @@ export function isAdmin(ctx) {
   return config.admin.ids.includes(Number(ctx.from?.id));
 }
 
+function isStarsWd(data) {
+  return String(data?.asset || '').toUpperCase() === 'STARS';
+}
+
+function formatWdSum(data) {
+  const n = Number(data?.amount_usd_cents) || 0;
+  return isStarsWd(data) ? `⭐ ${n}` : `$${(n / 100).toFixed(2)}`;
+}
+
+function userWdApprovedText(data) {
+  if (isStarsWd(data)) {
+    return `✅ <b>Вывод выполнен</b>\n\n⭐ ${data.amount_usd_cents} Stars отправлены вам в Telegram.`;
+  }
+  return `✅ <b>Вывод выполнен</b>\n\nСумма $${(data.amount_usd_cents / 100).toFixed(2)} отправлена на ваш кошелёк. Спасибо за игру в GunGad!`;
+}
+
+function userWdRejectedText(data, reason) {
+  const sum = formatWdSum(data);
+  if (reason) {
+    return `❌ <b>Вывод отклонён</b>\n\nЗаявка на ${sum} отклонена.\nПричина: ${escapeHtml(reason)}\n\nСредства возвращены на баланс.`;
+  }
+  return `❌ <b>Вывод отклонён</b>\n\nЗаявка на ${sum} отклонена, средства возвращены на баланс.`;
+}
+
 async function notifyUser(bot, sb, profileId, text) {
   try {
     const { data: profile } = await sb
@@ -172,22 +196,21 @@ export function registerAdminHandlers(bot) {
         return ctx.answerCbQuery(`Уже обработана (${data?.status || '?'})`, { show_alert: true });
       }
 
-      const amountUsd = (data.amount_usd_cents / 100).toFixed(2);
       await ctx.answerCbQuery('Заявка подтверждена ✅');
       const doneLine = `\n\n✅ <b>ВЫПЛАЧЕНО</b> админом @${ctx.from.username ?? ctx.from.id}`;
       await ctx.editMessageText(
         `${ctx.callbackQuery?.message?.text || 'Заявка'}${doneLine}`,
         { parse_mode: 'HTML' },
       ).catch(() => {});
-      await ctx.reply(`✅ Вывод <code>${withdrawalId}</code> подтверждён ($${amountUsd})`, { parse_mode: 'HTML' }).catch(() => {});
+      await ctx.reply(`✅ Вывод <code>${withdrawalId}</code> подтверждён (${formatWdSum(data)})`, { parse_mode: 'HTML' }).catch(() => {});
 
-      await notifyUser(bot, sb, data.profile_id,
-        `✅ <b>Вывод выполнен</b>\n\nСумма $${amountUsd} отправлена на ваш кошелёк. Спасибо за игру в GunGad!`);
+      await notifyUser(bot, sb, data.profile_id, userWdApprovedText(data));
 
       logWithdrawProcessed({
         withdrawalId,
         profileId: data.profile_id,
         amountCents: data.amount_usd_cents,
+        asset: data.asset,
         status: 'approved',
         adminId: ctx.from.id,
       }).catch(() => {});
@@ -360,13 +383,13 @@ export function registerAdminHandlers(bot) {
         await ctx.reply(`Уже обработана (${data?.status || '?'})`);
         return;
       }
-      await ctx.reply(`✅ Вывод ${m[1]} подтверждён`);
-      await notifyUser(bot, sb, data.profile_id,
-        `✅ <b>Вывод выполнен</b>\n\nСумма $${(data.amount_usd_cents / 100).toFixed(2)} отправлена на ваш кошелёк.`);
+      await ctx.reply(`✅ Вывод ${m[1]} подтверждён (${formatWdSum(data)})`);
+      await notifyUser(bot, sb, data.profile_id, userWdApprovedText(data));
       logWithdrawProcessed({
         withdrawalId: m[1],
         profileId: data.profile_id,
         amountCents: data.amount_usd_cents,
+        asset: data.asset,
         status: 'approved',
         adminId: ctx.from.id,
       }).catch(() => {});
@@ -399,15 +422,12 @@ export function registerAdminHandlers(bot) {
         await ctx.reply(`Уже обработана (${data?.status || '?'})`);
         return;
       }
-      const amountUsd = (data.amount_usd_cents / 100).toFixed(2);
-      const userText = reason
-        ? `❌ <b>Вывод отклонён</b>\n\nЗаявка на $${amountUsd} отклонена.\nПричина: ${escapeHtml(reason)}\n\nСредства возвращены на баланс.`
-        : `❌ <b>Вывод отклонён</b>\n\nЗаявка на $${amountUsd} отклонена, средства возвращены на баланс.`;
-      await notifyUser(bot, sb, data.profile_id, userText);
+      await notifyUser(bot, sb, data.profile_id, userWdRejectedText(data, reason));
       logWithdrawProcessed({
         withdrawalId: m[1],
         profileId: data.profile_id,
         amountCents: data.amount_usd_cents,
+        asset: data.asset,
         status: 'rejected',
         adminId: ctx.from.id,
         reason,
@@ -451,15 +471,12 @@ export async function handleAdminReplyMessage(ctx, bot) {
         await ctx.reply(`Уже обработана (${data?.status ?? '?'})`);
         return true;
       }
-      const amountUsd = (data.amount_usd_cents / 100).toFixed(2);
-      const userText = reason
-        ? `❌ <b>Вывод отклонён</b>\n\nЗаявка на $${amountUsd} отклонена.\nПричина: ${escapeHtml(reason)}\n\nСредства возвращены на баланс.`
-        : `❌ <b>Вывод отклонён</b>\n\nЗаявка на $${amountUsd} отклонена, средства возвращены на баланс. По вопросам пишите в поддержку.`;
-      await notifyUser(bot, sb, data.profile_id, userText);
+      await notifyUser(bot, sb, data.profile_id, userWdRejectedText(data, reason));
       logWithdrawProcessed({
         withdrawalId: pending.id,
         profileId: data.profile_id,
         amountCents: data.amount_usd_cents,
+        asset: data.asset,
         status: 'rejected',
         adminId: ctx.from.id,
         reason,

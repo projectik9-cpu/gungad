@@ -34,6 +34,7 @@ interface DepositModalProps {
   playMode?: 'real' | 'demo';
   profileId?: string | null;
   onWalletRefresh?: () => Promise<void> | void;
+  onStarsBalance?: (stars: number) => void;
 }
 
 interface TonInvoice {
@@ -89,6 +90,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   playMode = 'real',
   profileId = null,
   onWalletRefresh,
+  onStarsBalance,
 }) => {
   const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
   const [method, setMethod] = useState<'cryptobot' | 'tonkeeper' | 'stars'>('cryptobot');
@@ -105,10 +107,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [selectedCoin, setSelectedCoin] = useState<CryptoBotAsset>('USDT');
   const [starsAmount, setStarsAmount] = useState<number>(100);
   const [starsInvoiceUrl, setStarsInvoiceUrl] = useState<string | null>(null);
+  const [starsAwaitingCredit, setStarsAwaitingCredit] = useState(false);
   const starsBaselineRef = useRef<number>(0);
 
   // Withdraw state
-  const [withdrawAsset, setWithdrawAsset] = useState<'TON' | 'USDT'>('TON');
+  const [withdrawAsset, setWithdrawAsset] = useState<'TON' | 'USDT' | 'STARS'>('TON');
+  const [withdrawStars, setWithdrawStars] = useState<number>(50);
   const [withdrawAddress, setWithdrawAddress] = useState<string>('');
   const [withdrawAmountUSD, setWithdrawAmountUSD] = useState<number>(10);
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
@@ -185,6 +189,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         const stars = json?.wallet?.stars_balance;
         if (typeof stars === 'number' && stars > starsBaselineRef.current) {
           setDepositDone(true);
+          setStarsAwaitingCredit(false);
+          onStarsBalance?.(stars);
           soundFx.playWin();
           await onWalletRefresh?.();
         }
@@ -194,9 +200,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     };
 
     void poll();
-    const id = window.setInterval(() => { void poll(); }, 4000);
+    const id = window.setInterval(() => { void poll(); }, starsAwaitingCredit ? 500 : 1200);
     return () => window.clearInterval(id);
-  }, [isOpen, method, starsInvoiceUrl, depositDone, profileId, onWalletRefresh]);
+  }, [isOpen, method, starsInvoiceUrl, depositDone, profileId, starsAwaitingCredit, onWalletRefresh, onStarsBalance]);
 
   if (!isOpen) return null;
 
@@ -215,6 +221,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     setTonInvoice(null);
     setStarsInvoiceUrl(null);
     setDepositDone(false);
+    setStarsAwaitingCredit(false);
     setError(null);
   };
 
@@ -290,9 +297,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       if (!res.ok || !json.ok || !json.invoice_url) throw new Error(json.error || 'fail');
       setStarsInvoiceUrl(json.invoice_url);
       openStarsInvoice(json.invoice_url, () => {
-        setDepositDone(true);
-        soundFx.playWin();
-        void onWalletRefresh?.();
+        setStarsAwaitingCredit(true);
+        onStarsBalance?.(starsBaselineRef.current + starsAmount);
       });
     } catch {
       setError(t('errorGeneric', lang));
@@ -305,6 +311,47 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     if (!isReal || withdrawSubmitting) return;
     soundFx.playClick();
     setWithdrawError(null);
+
+    if (withdrawAsset === 'STARS') {
+      if (!Number.isInteger(withdrawStars) || withdrawStars < 1) {
+        setWithdrawError(t('withdrawStarsMinNote', lang));
+        return;
+      }
+      if (withdrawStars > (user.starsBalance ?? 0)) {
+        setWithdrawError(t('insufficientFunds', lang));
+        return;
+      }
+      setWithdrawSubmitting(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/withdraw/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profile_id: profileId,
+            asset: 'STARS',
+            stars_amount: withdrawStars,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+          setWithdrawError(json.error || t('errorGeneric', lang));
+          return;
+        }
+        soundFx.playWin();
+        setWithdrawSuccess(true);
+        if (typeof json.stars_balance === 'number') onStarsBalance?.(json.stars_balance);
+        else onStarsBalance?.(Math.max(0, (user.starsBalance ?? 0) - withdrawStars));
+        await onWalletRefresh?.();
+        await loadPendingWds();
+        setTimeout(() => setWithdrawSuccess(false), 6000);
+      } catch {
+        setWithdrawError(t('errorGeneric', lang));
+      } finally {
+        setWithdrawSubmitting(false);
+      }
+      return;
+    }
+
     if (!Number.isFinite(withdrawAmountUSD) || withdrawAmountUSD < 7) {
       setWithdrawError(t('withdrawMinNote', lang));
       return;
@@ -347,7 +394,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     }
   };
 
-  const handleCancelWithdraw = async (id: string, amountCents: number) => {
+  const handleCancelWithdraw = async (id: string, amountCents: number, asset: string) => {
     if (!profileId || cancellingId) return;
     soundFx.playClick();
     setCancellingId(id);
@@ -364,7 +411,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         return;
       }
       setPendingWds((prev) => prev.filter((w) => w.id !== id));
-      onUpdateBalance(user.balanceUSD + amountCents / 100);
+      if (String(asset).toUpperCase() === 'STARS' || json.asset === 'STARS') {
+        if (typeof json.stars_balance === 'number') onStarsBalance?.(json.stars_balance);
+        else onStarsBalance?.((user.starsBalance ?? 0) + amountCents);
+        await onWalletRefresh?.();
+      } else {
+        onUpdateBalance(user.balanceUSD + amountCents / 100);
+      }
     } catch {
       setWithdrawError(t('errorGeneric', lang));
     } finally {
@@ -683,6 +736,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       ))}
                     </div>
                     <span className="text-[10px] text-zinc-500">{t('minStarsNote', lang)}</span>
+                    <span className="text-[10px] text-amber-300 font-mono">⭐ {user.starsBalance ?? 0}</span>
                   </div>
 
                   {depositDone ? (
@@ -695,9 +749,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                         onClick={() => {
                           soundFx.playClick();
                           openStarsInvoice(starsInvoiceUrl, () => {
-                            setDepositDone(true);
-                            soundFx.playWin();
-                            void onWalletRefresh?.();
+                            setStarsAwaitingCredit(true);
+                            onStarsBalance?.(starsBaselineRef.current + starsAmount);
                           });
                         }}
                         className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2"
@@ -734,23 +787,26 @@ export const DepositModal: React.FC<DepositModalProps> = ({
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-zinc-400 uppercase">{t('withdrawAsset', lang)}</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['TON', 'USDT'] as const).map((a) => (
+                <div className="grid grid-cols-3 gap-2">
+                  {(['TON', 'USDT', 'STARS'] as const).map((a) => (
                     <button
                       key={a}
                       onClick={() => { soundFx.playClick(); setWithdrawAsset(a); }}
                       className={`py-2 rounded-xl border text-xs font-mono font-bold transition-all ${
                         withdrawAsset === a
-                          ? 'bg-rose-950 border-rose-600 text-rose-300 shadow-[0_0_10px_rgba(225,29,72,0.3)]'
+                          ? a === 'STARS'
+                            ? 'bg-amber-950 border-amber-500 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
+                            : 'bg-rose-950 border-rose-600 text-rose-300 shadow-[0_0_10px_rgba(225,29,72,0.3)]'
                           : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white'
                       }`}
                     >
-                      {a}
+                      {a === 'STARS' ? '⭐ Stars' : a}
                     </button>
                   ))}
                 </div>
               </div>
 
+              {withdrawAsset !== 'STARS' && (
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-zinc-400 uppercase">{t('cryptoAddress', lang)}</label>
                 <input
@@ -761,7 +817,33 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   className="w-full bg-[#121217] border border-zinc-800 focus:border-rose-600 text-white font-mono text-xs rounded-xl px-3 py-2.5 outline-none"
                 />
               </div>
+              )}
 
+              {withdrawAsset === 'STARS' ? (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase">{t('starsAmountLabel', lang)}</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={withdrawStars}
+                  onChange={(e) => setWithdrawStars(parseInt(e.target.value, 10) || 0)}
+                  className={inputCls}
+                />
+                <div className="flex gap-2">
+                  {[50, 100, 250, 500].map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => { soundFx.playClick(); setWithdrawStars(v); }}
+                      className="flex-1 py-1.5 text-[11px] font-mono font-bold bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-300"
+                    >
+                      ⭐{v}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[10px] text-zinc-500">{t('withdrawStarsNote', lang)}</span>
+                <span className="text-[10px] text-amber-300 font-mono">⭐ {user.starsBalance ?? 0}</span>
+              </div>
+              ) : (
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-zinc-400 uppercase">{t('amountUSD', lang)}</label>
                 <input
@@ -773,6 +855,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 />
                 <span className="text-[10px] text-zinc-500">{t('withdrawMinNote', lang)}</span>
               </div>
+              )}
 
               {pendingWds.length > 0 && (
                 <div className="flex flex-col gap-2">
@@ -780,12 +863,16 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   {pendingWds.map((w) => (
                     <div key={w.id} className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-mono text-white">${(w.amount_usd_cents / 100).toFixed(2)} · {w.asset}</div>
+                        <div className="text-sm font-mono text-white">
+                          {w.asset === 'STARS'
+                            ? `⭐ ${w.amount_usd_cents}`
+                            : `$${(w.amount_usd_cents / 100).toFixed(2)}`} · {w.asset}
+                        </div>
                         <div className="text-[10px] text-zinc-500 truncate">{w.id.slice(0, 8)}…</div>
                       </div>
                       <button
                         disabled={cancellingId === w.id}
-                        onClick={() => void handleCancelWithdraw(w.id, w.amount_usd_cents)}
+                        onClick={() => void handleCancelWithdraw(w.id, w.amount_usd_cents, w.asset)}
                         className="px-2.5 py-1.5 rounded-lg bg-zinc-800 text-rose-300 text-[11px] font-bold uppercase disabled:opacity-50"
                       >
                         {cancellingId === w.id ? '…' : t('cancelWithdraw', lang)}
@@ -808,7 +895,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
               <button
                 onClick={handleWithdraw}
-                disabled={!isReal || withdrawSubmitting || withdrawAmountUSD < 7 || withdrawAmountUSD > user.balanceUSD || !withdrawAddress}
+                disabled={
+                  !isReal ||
+                  withdrawSubmitting ||
+                  (withdrawAsset === 'STARS'
+                    ? withdrawStars < 1 || withdrawStars > (user.starsBalance ?? 0)
+                    : withdrawAmountUSD < 7 || withdrawAmountUSD > user.balanceUSD || !withdrawAddress)
+                }
                 className="w-full py-3 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-display font-bold uppercase text-sm rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.5)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {withdrawSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}

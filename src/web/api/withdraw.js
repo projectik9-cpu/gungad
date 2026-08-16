@@ -21,7 +21,7 @@ const router = express.Router();
 let _bot = null;
 export function setWithdrawBot(bot) { _bot = bot; }
 
-const VALID_ASSETS = ['TON', 'USDT'];
+const VALID_ASSETS = ['TON', 'USDT', 'STARS'];
 const ERROR_MESSAGES = {
   MIN_WITHDRAW: 'Минимальный вывод — $7',
   BAD_ADDRESS: 'Некорректный адрес кошелька',
@@ -32,25 +32,116 @@ const ERROR_MESSAGES = {
 
 router.post('/request', async (req, res) => {
   try {
-    const { profile_id, amount_usd, asset = 'TON', address } = req.body || {};
+    const { profile_id, amount_usd, stars_amount, asset = 'TON', address } = req.body || {};
 
     if (!profile_id || typeof profile_id !== 'string') {
       return res.status(400).json({ error: 'profile_id required' });
-    }
-    const amountUsd = Number(amount_usd);
-    if (!Number.isFinite(amountUsd) || amountUsd < 7) {
-      return res.status(400).json({ error: 'Минимальный вывод — $7', code: 'MIN_WITHDRAW' });
     }
     const upperAsset = String(asset).toUpperCase();
     if (!VALID_ASSETS.includes(upperAsset)) {
       return res.status(400).json({ error: `asset must be ${VALID_ASSETS.join(' | ')}` });
     }
-    if (!address || String(address).trim().length < 10) {
-      return res.status(400).json({ error: 'Некорректный адрес', code: 'BAD_ADDRESS' });
-    }
 
     const sb = getSupabaseAdmin();
     if (!sb) return res.status(500).json({ error: 'Supabase not configured' });
+
+    if (upperAsset === 'STARS') {
+      const stars = Math.round(Number(stars_amount ?? amount_usd));
+      if (!Number.isInteger(stars) || stars < 1) {
+        return res.status(400).json({ error: 'Минимальный вывод — 1 Star', code: 'MIN_WITHDRAW' });
+      }
+
+      const { data: profile } = await sb
+        .from('gg_profiles')
+        .select('telegram_id, username, first_name')
+        .eq('id', profile_id)
+        .maybeSingle();
+
+      const dest = `tg:${profile?.telegram_id ?? profile_id}`;
+      const { data, error } = await sb.rpc('gg_request_star_withdrawal', {
+        p_profile_id: profile_id,
+        p_stars: stars,
+        p_address: dest,
+      });
+
+      if (error) {
+        const code = Object.keys(ERROR_MESSAGES).find(k => error.message?.includes(k));
+        if (code) {
+          return res.status(400).json({ error: ERROR_MESSAGES[code], code });
+        }
+        logger.error(`[withdraw/request] stars ${error.message}`);
+        return res.status(500).json({ error: 'Ошибка создания заявки' });
+      }
+
+      const withdrawalId = data.withdrawal_id;
+      const userLabel = profile?.username
+        ? `@${profile.username}`
+        : profile?.first_name ?? profile?.telegram_id ?? profile_id;
+
+      if (_bot && config.admin.ids.length > 0) {
+        const text = [
+          '⭐ <b>Заявка на вывод Stars</b>',
+          '',
+          `Игрок: ${userLabel} (tg: <code>${profile?.telegram_id ?? '?'}</code>)`,
+          `Сумма: <b>⭐ ${stars}</b>`,
+          `Актив: <b>STARS</b>`,
+          `Куда: Telegram игрока (резервный акк → этому юзеру)`,
+          '',
+          `ID: <code>${withdrawalId}</code>`,
+        ].join('\n');
+
+        const keyboard = {
+          inline_keyboard: [
+            [
+              { text: '✅ Выплатил — подтвердить', callback_data: `wd_approve_${withdrawalId}` },
+              { text: '❌ Отклонить', callback_data: `wd_reject_${withdrawalId}` },
+            ],
+            [
+              { text: '✉️ Написать игроку', callback_data: `wd_msg_${withdrawalId}` },
+            ],
+          ],
+        };
+
+        const targets = [...new Set([...config.admin.ids, config.logChatId].filter(Boolean))];
+        for (const adminId of targets) {
+          try {
+            const msg = await _bot.telegram.sendMessage(adminId, text, {
+              parse_mode: 'HTML',
+              reply_markup: keyboard,
+            });
+            await sb.from('gg_withdrawals')
+              .update({ admin_message_id: msg.message_id })
+              .eq('id', withdrawalId);
+          } catch (e) {
+            logger.warn(`[withdraw] notify admin ${adminId} failed: ${e?.message || e}`);
+          }
+        }
+      }
+
+      logWithdrawRequest({
+        withdrawalId,
+        profileId: profile_id,
+        amountUsd: stars,
+        asset: 'STARS',
+        address: dest,
+      }).catch(() => {});
+
+      logger.info(`[withdraw/request] created ${withdrawalId} profile=${profile_id} ⭐${stars} STARS`);
+      return res.json({
+        ok: true,
+        withdrawal_id: withdrawalId,
+        status: 'pending',
+        stars_balance: data.stars_balance,
+      });
+    }
+
+    const amountUsd = Number(amount_usd);
+    if (!Number.isFinite(amountUsd) || amountUsd < 7) {
+      return res.status(400).json({ error: 'Минимальный вывод — $7', code: 'MIN_WITHDRAW' });
+    }
+    if (!address || String(address).trim().length < 10) {
+      return res.status(400).json({ error: 'Некорректный адрес', code: 'BAD_ADDRESS' });
+    }
 
     const amountCents = Math.round(amountUsd * 100);
     const { data, error } = await sb.rpc('gg_request_withdrawal', {
@@ -195,6 +286,8 @@ router.post('/cancel', async (req, res) => {
       ok: true,
       status: 'cancelled',
       balance_cents: data?.balance_cents,
+      stars_balance: data?.stars_balance,
+      asset: data?.asset,
       amount_usd_cents: data?.amount_usd_cents,
     });
   } catch (err) {

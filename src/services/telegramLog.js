@@ -200,11 +200,14 @@ export async function logWithdrawRequest({
   address,
 }) {
   const { profile, wallet } = await fetchProfileBundle(profileId);
+  const sum = String(asset).toUpperCase() === 'STARS'
+    ? `⭐ ${Math.round(Number(amountUsd))}`
+    : `${formatUsd(Math.round(Number(amountUsd) * 100))}`;
   await notifyLog([
     '💸 <b>ЗАЯВКА НА ВЫВОД</b>',
     formatPlayerLine(profile, wallet),
     '',
-    `Сумма: <b>${formatUsd(Math.round(Number(amountUsd) * 100))}</b> ${escapeHtml(asset)}`,
+    `Сумма: <b>${sum}</b> ${escapeHtml(asset)}`,
     `Адрес: <code>${escapeHtml(address)}</code>`,
     `Всего выведено: <b>${formatUsd(wallet?.total_withdrawn_cents)}</b>`,
     `ID: <code>${escapeHtml(withdrawalId)}</code>`,
@@ -215,17 +218,21 @@ export async function logWithdrawProcessed({
   withdrawalId,
   profileId,
   amountCents,
+  asset,
   status,
   adminId,
   reason,
 }) {
   const { profile, wallet } = await fetchProfileBundle(profileId);
   const title = status === 'approved' ? '✅ ВЫВОД ВЫПЛАЧЕН' : '❌ ВЫВОД ОТКЛОНЁН';
+  const sum = String(asset).toUpperCase() === 'STARS'
+    ? `⭐ ${amountCents}`
+    : formatUsd(amountCents);
   await notifyLog([
     `<b>${title}</b>`,
     formatPlayerLine(profile, wallet),
     '',
-    `Сумма: <b>${formatUsd(amountCents)}</b>`,
+    `Сумма: <b>${sum}</b>`,
     `Админ: <code>${adminId ?? '?'}</code>`,
     reason ? `Причина: ${escapeHtml(reason)}` : null,
     `ID: <code>${escapeHtml(withdrawalId)}</code>`,

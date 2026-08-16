@@ -33,6 +33,7 @@ export interface UseGgSessionResult {
   statusDetail: string | null;
   refreshWallet: () => Promise<void>;
   updateBalance: (newCents: number, lockedCents?: number) => void;
+  updateStars: (stars: number) => void;
   setWelcomeBonusClaimed: () => void;
 }
 
@@ -119,6 +120,10 @@ export function useGgSession(): UseGgSessionResult {
     );
   }, []);
 
+  const updateStars = useCallback((stars: number) => {
+    setSession((prev) => (prev ? { ...prev, stars_balance: Math.max(0, stars) } : null));
+  }, []);
+
   const setWelcomeBonusClaimed = useCallback(() => {
     setSession((prev) => (prev ? { ...prev, welcome_bonus_available: false } : null));
   }, []);
@@ -191,5 +196,5 @@ export function useGgSession(): UseGgSessionResult {
     };
   }, []);
 
-  return { session, status, statusDetail, refreshWallet, updateBalance, setWelcomeBonusClaimed };
+  return { session, status, statusDetail, refreshWallet, updateBalance, updateStars, setWelcomeBonusClaimed };
 }

@@ -164,7 +164,10 @@ export function useGgSession(): UseGgSessionResult {
         const res = await fetch(`${API_BASE}/api/auth`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData }),
+          body: JSON.stringify({
+            initData,
+            ref: (window as any).__GG_REF || new URLSearchParams(window.location.search).get('ref') || localStorage.getItem('gg_ref') || undefined,
+          }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {

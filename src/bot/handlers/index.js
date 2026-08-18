@@ -21,7 +21,7 @@ function isLogChat(ctx) {
  * Регистрация обработчиков — /start, Stars, админ, аналитика лог-канала
  */
 export function registerHandlers(bot) {
-  bot.command('start', startHandler);
+  bot.start(startHandler);
 
   // Telegram Stars payment flow
   bot.on('pre_checkout_query', preCheckoutHandler);

@@ -15,6 +15,16 @@
             try { tg.expand(); } catch (e) {}
             window.__GG_INIT_DATA = tg.initData || '';
             window.__GG_TG_PLATFORM = tg.platform || '';
+            window.__GG_START_PARAM = (tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
+          }
+          var qs = new URLSearchParams(window.location.search || '');
+          var urlRef = qs.get('ref') || qs.get('startapp') || qs.get('start_param') || '';
+          if (urlRef) window.__GG_REF = urlRef;
+          if (!window.__GG_REF && window.__GG_START_PARAM) window.__GG_REF = window.__GG_START_PARAM;
+          if (window.__GG_REF) {
+            try { localStorage.setItem('gg_ref', String(window.__GG_REF)); } catch (e2) {}
+          } else {
+            try { window.__GG_REF = localStorage.getItem('gg_ref') || ''; } catch (e3) {}
           }
         } catch (e) {}
       })();

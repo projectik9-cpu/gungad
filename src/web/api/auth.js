@@ -9,6 +9,7 @@ import {
   ensureGgProfile,
   getSupabaseDiag,
   parseReferrerTelegramId,
+  applyReferralSignup,
 } from '../../database/supabase.js';
 import config from '../../config/config.js';
 import logger from '../../utils/logger.js';
@@ -43,11 +44,21 @@ router.post('/', async (req, res) => {
       });
     }
     const tgUser = validated.user;
-    const referrerId = parseReferrerTelegramId(validated.startParam);
+    const referrerId =
+      parseReferrerTelegramId(validated.startParam) ||
+      parseReferrerTelegramId(req.body?.ref) ||
+      parseReferrerTelegramId(req.body?.start_param);
 
     const profileId = await ensureGgProfile(tgUser, referrerId);
     if (!profileId) {
       return res.status(500).json({ error: 'Failed to create profile', code: 'ensure_profile_failed' });
+    }
+
+    if (referrerId) {
+      const applied = await applyReferralSignup(profileId, referrerId);
+      logger.info(
+        `[auth] referral telegram_id=${tgUser.id} ref=${referrerId} result=${JSON.stringify(applied)}`,
+      );
     }
 
     const sb = getSupabaseAdmin();

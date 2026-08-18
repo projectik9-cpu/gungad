@@ -62,14 +62,28 @@ export function getSupabaseDiag() {
   };
 }
 
-/** Parse `ref123456` start payload → telegram id or null */
+/** Parse `ref123456` from /start payload, Mini App start_param, or URL. */
 export function parseReferrerTelegramId(payload) {
   if (payload == null) return null;
-  const raw = String(payload).trim();
-  const m = /^ref(\d+)$/i.exec(raw);
+  let raw = String(payload).trim();
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    /* keep raw */
+  }
+  const m = raw.match(/ref[_-]?(\d{5,16})/i);
   if (!m) return null;
   const id = Number(m[1]);
   return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+export function parseReferrerFromCtx(ctx) {
+  const text = ctx.message?.text || ctx.channelPost?.text || '';
+  return (
+    parseReferrerTelegramId(ctx.startPayload) ||
+    parseReferrerTelegramId(ctx.payload) ||
+    parseReferrerTelegramId(text)
+  );
 }
 
 /** Upsert Telegram user into gg_profiles + empty wallet */
@@ -97,6 +111,20 @@ export async function ensureGgProfile(telegramUser, referrerTelegramId = null) {
   return data;
 }
 
+export async function applyReferralSignup(profileId, referrerTelegramId) {
+  const sb = getSupabaseAdmin();
+  if (!sb || !profileId || referrerTelegramId == null) return null;
+  const { data, error } = await sb.rpc('gg_apply_referral_signup', {
+    p_profile_id: profileId,
+    p_referrer_telegram_id: referrerTelegramId,
+  });
+  if (error) {
+    logger.error(`[supabase] gg_apply_referral_signup failed: ${error.message}`);
+    return null;
+  }
+  return data;
+}
+
 export async function getOnlinePlayersCount() {
   const sb = getSupabaseAdmin();
   if (!sb) return null;
@@ -108,4 +136,4 @@ export async function getOnlinePlayersCount() {
   return data?.online_count ?? 0;
 }
 
-export default { getSupabaseAdmin, ensureGgProfile, parseReferrerTelegramId, getOnlinePlayersCount };
+export default { getSupabaseAdmin, ensureGgProfile, applyReferralSignup, parseReferrerTelegramId, parseReferrerFromCtx, getOnlinePlayersCount };

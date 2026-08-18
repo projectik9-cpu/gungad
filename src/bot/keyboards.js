@@ -4,9 +4,13 @@ import config from '../config/config.js';
 /**
  * Единственная кнопка — открыть казино (web app)
  */
-export function openCasinoKeyboard() {
+export function openCasinoKeyboard(referrerTelegramId = null) {
+  const base = String(config.web.webAppUrl || '').replace(/\/$/, '');
+  const url = referrerTelegramId
+    ? `${base}/?ref=ref${referrerTelegramId}`
+    : (config.web.webAppUrl || base);
   return Markup.inlineKeyboard([
-    [Markup.button.webApp('🎰 Открыть казино', config.web.webAppUrl)],
+    [Markup.button.webApp('🎰 Открыть казино', url)],
   ]);
 }
 

@@ -29,6 +29,7 @@ interface HeaderProps {
   telegramId?: number | null;
   welcomeBonusAvailable?: boolean;
   onOpenBonus?: () => void;
+  profileId?: string | null;
 }
 
 const LANG_CODES: Record<Language, string> = {
@@ -60,6 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
   telegramId = null,
   welcomeBonusAvailable = false,
   onOpenBonus,
+  profileId = null,
 }) => {
   const [langOpen, setLangOpen] = useState(false);
   const [currOpen, setCurrOpen] = useState(false);
@@ -110,6 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
                 telegramId={telegramId}
                 welcomeBonusAvailable={welcomeBonusAvailable}
                 onOpenBonus={onOpenBonus}
+                profileId={profileId}
               />
             </div>
             <div className="sm:hidden">
@@ -247,6 +250,7 @@ export const Header: React.FC<HeaderProps> = ({
             telegramId={telegramId}
             welcomeBonusAvailable={welcomeBonusAvailable}
             onOpenBonus={onOpenBonus}
+            profileId={profileId}
           />
 
           {/* Home */}

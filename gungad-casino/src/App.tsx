@@ -420,6 +420,7 @@ export default function App() {
           activeTab={activeTab}
           activeGameId={activeGameId}
           telegramId={session?.telegram_id ?? null}
+          profileId={session?.profile_id ?? null}
           welcomeBonusAvailable={Boolean(isLive && session?.welcome_bonus_available)}
           onOpenBonus={openBonus}
           onSelectTab={(tKey) => {

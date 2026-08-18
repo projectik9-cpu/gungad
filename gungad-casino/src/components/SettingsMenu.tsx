@@ -18,10 +18,12 @@ import {
   Users,
   Gift,
   Share2,
+  BarChart3,
 } from 'lucide-react';
 
 const SUPPORT_URL = 'https://t.me/gungad_bot';
 const BOT_USERNAME = 'gungad_bot';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app';
 
 interface SettingsMenuProps {
   lang: Language;
@@ -35,6 +37,7 @@ interface SettingsMenuProps {
   telegramId?: number | null;
   welcomeBonusAvailable?: boolean;
   onOpenBonus?: () => void;
+  profileId?: string | null;
 }
 
 function openSupport() {
@@ -67,6 +70,64 @@ function shareReferralLink(telegramId: number, lang: Language) {
   window.open(shareUrl, '_blank', 'noopener,noreferrer');
 }
 
+function getInitData(): string | null {
+  try {
+    return (window as any).Telegram?.WebApp?.initData || null;
+  } catch {
+    return null;
+  }
+}
+
+type RefStats = {
+  invited_count: number;
+  usd_cents: number;
+  stars_cents: number;
+  friends: { name: string; joined_at: string }[];
+};
+
+function useCountUp(value: number, active: boolean, duration = 900) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!active) {
+      setN(0);
+      return;
+    }
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - p) ** 3;
+      setN(value * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, active, duration]);
+  return n;
+}
+
+function StatCard({
+  delay,
+  label,
+  value,
+  accent,
+}: {
+  delay: string;
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <div
+      className={`ref-stat-in rounded-2xl border ${accent} bg-gradient-to-br from-white/5 to-transparent p-3`}
+      style={{ animationDelay: delay }}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">{label}</p>
+      <p className="mt-1 font-display font-black text-xl tabular-nums text-white">{value}</p>
+    </div>
+  );
+}
+
 function NotifBadge({ className = '' }: { className?: string }) {
   return (
     <span
@@ -87,15 +148,22 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
   telegramId = null,
   welcomeBonusAvailable = false,
   onOpenBonus,
+  profileId = null,
 }) => {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [entered, setEntered] = useState(false);
-  const [panel, setPanel] = useState<'root' | 'settings' | 'referral'>('root');
+  const [panel, setPanel] = useState<'root' | 'settings' | 'referral' | 'referralStats'>('root');
   const [soundMuted, setSoundMuted] = useState(soundFx.getMuted());
   const [musicMuted, setMusicMuted] = useState(soundFx.getMusicMuted());
   const [volume, setVolume] = useState(soundFx.getVolume());
   const [musicVolume, setMusicVolume] = useState(soundFx.getMusicVolume());
+  const [refStats, setRefStats] = useState<RefStats | null>(null);
+  const [refStatus, setRefStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const statsLive = panel === 'referralStats' && refStatus === 'ok';
+  const invitedAnim = useCountUp(refStats?.invited_count ?? 0, statsLive, 800);
+  const usdAnim = useCountUp((refStats?.usd_cents ?? 0) / 100, statsLive, 950);
+  const starsAnim = useCountUp((refStats?.stars_cents ?? 0) / 100, statsLive, 1100);
 
   useEffect(() => {
     if (open) {
@@ -111,6 +179,8 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     const timer = window.setTimeout(() => {
       setMounted(false);
       setPanel('root');
+      setRefStats(null);
+      setRefStatus('idle');
       document.body.style.overflow = '';
     }, 280);
     return () => clearTimeout(timer);
@@ -130,6 +200,43 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
+
+  useEffect(() => {
+    if (panel !== 'referralStats') return;
+    if (!profileId) {
+      setRefStatus('error');
+      return;
+    }
+    let cancelled = false;
+    setRefStatus('loading');
+    const initData = getInitData();
+    void fetch(`${API_BASE}/api/referral/stats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: profileId, initData }),
+    })
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok || !json.ok) {
+          setRefStatus('error');
+          return;
+        }
+        setRefStats({
+          invited_count: Number(json.invited_count) || 0,
+          usd_cents: Number(json.usd_cents) || 0,
+          stars_cents: Number(json.stars_cents) || 0,
+          friends: Array.isArray(json.friends) ? json.friends : [],
+        });
+        setRefStatus('ok');
+      })
+      .catch(() => {
+        if (!cancelled) setRefStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [panel, profileId]);
 
   const openDrawer = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -193,7 +300,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             <span className="text-sm font-bold text-white tracking-wide uppercase">
               {panel === 'settings'
                 ? t('settings', lang)
-                : panel === 'referral'
+                : panel === 'referral' || panel === 'referralStats'
                   ? t('referralTitle', lang)
                   : 'GunGad'}
             </span>
@@ -336,11 +443,101 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       <Share2 className="w-4 h-4" />
                       {t('referralShare', lang)}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setPanel('referralStats');
+                      }}
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-rose-700 hover:bg-rose-600 text-white text-sm font-bold touch-manipulation ref-pulse-ring"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      {t('referralStats', lang)}
+                    </button>
                   </>
                 ) : (
                   <p className="text-xs text-amber-400/90">{t('referralNeedTelegram', lang)}</p>
                 )}
               </div>
+            </div>
+          )}
+
+          {panel === 'referralStats' && (
+            <div className="flex flex-col gap-4 p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setPanel('referral');
+                }}
+                className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 uppercase tracking-wider hover:text-zinc-300 self-start"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                {t('referralTitle', lang)}
+              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center ref-pulse-ring">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <p className="text-sm font-display font-black uppercase tracking-wide text-white">
+                  {t('referralStatsTitle', lang)}
+                </p>
+              </div>
+
+              {refStatus === 'loading' && (
+                <p className="text-xs text-zinc-500 animate-pulse">{t('referralStatsLoading', lang)}</p>
+              )}
+              {refStatus === 'error' && (
+                <p className="text-xs text-rose-400">{t('referralStatsFailed', lang)}</p>
+              )}
+              {refStatus === 'ok' && refStats && (
+                <>
+                  <div className="grid grid-cols-1 gap-2.5">
+                    <StatCard
+                      delay="40ms"
+                      label={t('referralInvited', lang)}
+                      value={Math.round(invitedAnim).toLocaleString()}
+                      accent="border-emerald-500/40"
+                    />
+                    <StatCard
+                      delay="120ms"
+                      label={t('referralEarnedUsd', lang)}
+                      value={`$${usdAnim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      accent="border-rose-500/40"
+                    />
+                    <StatCard
+                      delay="200ms"
+                      label={t('referralEarnedStars', lang)}
+                      value={`⭐ ${starsAnim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      accent="border-amber-400/40"
+                    />
+                  </div>
+
+                  <div className="ref-stat-in" style={{ animationDelay: '280ms' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">
+                      {t('referralFriends', lang)}
+                    </p>
+                    {refStats.friends.length === 0 ? (
+                      <p className="text-xs text-zinc-500">{t('referralNoFriends', lang)}</p>
+                    ) : (
+                      <ul className="flex flex-col gap-1.5">
+                        {refStats.friends.map((f, i) => (
+                          <li
+                            key={`${f.name}-${i}`}
+                            className="flex items-center justify-between rounded-xl bg-[#0a0a0d] border border-zinc-800 px-3 py-2"
+                          >
+                            <span className="text-xs font-semibold text-zinc-200 truncate">{f.name}</span>
+                            <span className="text-[10px] font-mono text-zinc-500 shrink-0 ml-2">
+                              {f.joined_at ? new Date(f.joined_at).toLocaleDateString() : ''}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

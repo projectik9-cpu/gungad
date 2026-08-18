@@ -17,7 +17,7 @@ import {
   notifyLog,
 } from '../../services/telegramLog.js';
 import { runDailyBonusNotify } from '../../services/dailyBonusNotify.js';
-import { runUserBroadcast } from '../../services/broadcast.js';
+import { createMailSender, getAdminPost, runUserBroadcast } from '../../services/broadcast.js';
 
 const TG_LIMIT = 3900;
 
@@ -76,19 +76,19 @@ async function replyChunks(ctx, html) {
 }
 
 function getCommandText(ctx) {
-  return (
-    ctx.message?.text ||
-    ctx.channelPost?.text ||
-    ctx.update?.channel_post?.text ||
-    ''
-  );
+  const post = getAdminPost(ctx);
+  return post?.text || post?.caption || '';
+}
+
+function isEditedAdminPost(ctx) {
+  return Boolean(ctx.editedChannelPost || ctx.editedMessage || ctx.update?.edited_channel_post);
 }
 
 function parseCommand(text) {
   const raw = String(text || '').trim();
   if (!raw.startsWith('/')) return null;
-  // /help@BotName args...
-  const m = raw.match(/^\/([a-zA-Z0-9_]+)(?:@\w+)?(?:\s+([\s\S]*))?$/);
+  // /help@BotName args...  (args may start on the next line — photo captions)
+  const m = raw.match(/^\/([a-zA-Z0-9_]+)(?:@\w+)?(?:[\s\n]+([\s\S]*))?$/);
   if (!m) return null;
   return {
     command: m[1].toLowerCase(),
@@ -162,8 +162,10 @@ const HELP_TEXT = `
 /bigwins [n] — крупные выигрыши (профит ≥ $10)
 
 <b>Рассылка</b>
-/mail текст — отправить сообщение всем пользователям бота (кнопка «Открыть казино»)
-/announce текст — то же, что /mail
+/mail текст — всем игрокам (кнопка «Открыть казино»)
+Картинка: загрузи фото в этот чат и в подписи напиши <code>/mail</code> и текст — уйдёт фото как есть
+Или ответь <code>/mail</code> на готовый пост — уйдёт точная копия
+/announce — то же, что /mail
 /bonuspush — ежедневное уведомление про колесо (если ещё не уходило сегодня)
 /bonuspush force — отправить ещё раз сегодня
 
@@ -191,21 +193,27 @@ async function cmdPing(ctx) {
 }
 
 async function cmdMail(ctx) {
-  const parsed = parseCommand(getCommandText(ctx));
-  const text = (parsed?.args || '').trim();
-  if (!text) {
+  if (isEditedAdminPost(ctx)) return;
+
+  const mail = createMailSender(ctx.telegram, ctx);
+  if (!mail.ok) {
     await replyChunks(
       ctx,
-      'Использование: <code>/mail Текст анонса</code>\nПример: <code>/mail Сегодня x2 к депозиту до 00:00</code>',
+      [
+        'Использование:',
+        '• <code>/mail Текст анонса</code>',
+        '• фото/видео с подписью <code>/mail …</code> (цитата, жирный, эмодзи — как в посте)',
+        '• ответь <code>/mail</code> на готовое сообщение — разошлём копию',
+      ].join('\n'),
     );
     return;
   }
-  const html = escapeHtml(text).slice(0, 3500);
-  await replyChunks(ctx, '📣 Рассылка запущена…');
+
+  await replyChunks(ctx, `📣 Рассылка запущена (${escapeHtml(mail.summary)})…`);
   const result = await runUserBroadcast(
     { telegram: ctx.telegram },
     {
-      html,
+      sendOne: mail.sendOne,
       kind: `mail_${Date.now()}`,
       logTitle: '📣 <b>Рассылка /mail</b>',
     },
@@ -214,9 +222,12 @@ async function cmdMail(ctx) {
     await replyChunks(ctx, `Не вышло: ${escapeHtml(result?.reason || 'unknown')}`);
     return;
   }
+  const errLine = result.firstError
+    ? `\nПервая ошибка: <code>${escapeHtml(String(result.firstError).slice(0, 180))}</code>`
+    : '';
   await replyChunks(
     ctx,
-    `Готово · sent=<b>${result.sent ?? 0}</b> · fail=<b>${result.fail ?? 0}</b>`,
+    `Готово · sent=<b>${result.sent ?? 0}</b> · fail=<b>${result.fail ?? 0}</b>${errLine}`,
   );
 }
 

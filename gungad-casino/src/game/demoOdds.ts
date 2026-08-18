@@ -1,4 +1,7 @@
-/** Demo play bias — target ~103% effective RTP vs real house edge. */
+/**
+ * Real-money odds (Stars wallet and crypto/USD use the same formulas).
+ * Demo is slightly looser so practice feels better — never used for live Stars or USD.
+ */
 
 export const DEMO_PAYOUT_FACTOR = 103 / 99; // ≈1.0404 over 1% house-edge formulas
 

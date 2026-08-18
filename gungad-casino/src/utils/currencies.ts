@@ -12,13 +12,6 @@ export const CURRENCIES: Record<Currency, CurrencyConfig> = {
     flag: '🇺🇸',
     rateToUSD: 1.0,
   },
-  EUR: {
-    code: 'EUR',
-    symbol: '€',
-    name: 'Euro',
-    flag: '🇪🇺',
-    rateToUSD: 0.92,
-  },
   RUB: {
     code: 'RUB',
     symbol: '₽',
@@ -32,13 +25,6 @@ export const CURRENCIES: Record<Currency, CurrencyConfig> = {
     name: 'Українська гривня',
     flag: '🇺🇦',
     rateToUSD: 41.5,
-  },
-  KZT: {
-    code: 'KZT',
-    symbol: '₸',
-    name: 'Қазақстан теңгесі',
-    flag: '🇰🇿',
-    rateToUSD: 510,
   },
   STARS: {
     code: 'STARS',
@@ -84,13 +70,11 @@ export async function fetchLiveRates(): Promise<Partial<Record<Currency, number>
     );
     const json = await res.json();
     const u = json?.usd;
-    if (u?.eur && u?.rub && u?.uah && u?.kzt) {
+    if (u?.rub && u?.uah) {
       const rates = {
         USD: 1,
-        EUR: Number(u.eur),
         RUB: Number(u.rub),
         UAH: Number(u.uah),
-        KZT: Number(u.kzt),
       };
       setLiveRates(rates);
       return rates;
@@ -130,7 +114,7 @@ export function formatCurrency(amountUSD: number, currency: Currency, showSymbol
   const config = CURRENCIES[currency];
 
   let decimals = 2;
-  if (currency === 'RUB' || currency === 'KZT') {
+  if (currency === 'RUB') {
     decimals = 0;
   }
 

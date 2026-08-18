@@ -190,20 +190,27 @@ export function useGgBalance(
     }
 
     const seq = beginWalletMutation();
+    const body = {
+      profile_id: session!.profile_id,
+      initData,
+      game_id: params.game_id,
+      bet_cents: usdToCents(params.betUSD),
+      idempotency_key: newIdempotencyKey(`${params.game_id}_place`),
+      wallet,
+    };
     try {
-      const res = await fetch(`${API_BASE}/api/bet/place`, {
+      const post = () => fetch(`${API_BASE}/api/bet/place`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profile_id: session!.profile_id,
-          initData,
-          game_id: params.game_id,
-          bet_cents: usdToCents(params.betUSD),
-          idempotency_key: newIdempotencyKey(`${params.game_id}_place`),
-          wallet,
-        }),
+        body: JSON.stringify(body),
       });
-      const json = await res.json().catch(() => ({}));
+      let res = await post();
+      let json = await res.json().catch(() => ({}));
+      if (!res.ok && (res.status >= 500 || res.status === 409)) {
+        await new Promise((r) => setTimeout(r, 180));
+        res = await post();
+        json = await res.json().catch(() => ({}));
+      }
       if (!res.ok || !json.ok) {
         console.warn('[ggBalance] placeBet failed:', json.error, res.status);
         return {

@@ -149,30 +149,60 @@ router.post('/place', async (req, res) => {
       p_wallet:          walletAsset,
     });
 
-    if (error) {
-      logger.warn('[bet/place] error: %s', error.message);
-      if (error.message?.includes('Insufficient balance')) {
-        return res.status(402).json({ error: 'Insufficient balance', code: 'insufficient' });
+    let placeData = data;
+    let placeError = error;
+
+    if (placeError?.message?.includes('Open bet already exists')) {
+      const { data: pending } = await sb
+        .from('gg_bets')
+        .select('id')
+        .eq('profile_id', profile_id)
+        .eq('game_id', game_id)
+        .eq('status', 'pending');
+      for (const row of pending || []) {
+        await sb.rpc('gg_resolve_bet', {
+          p_profile_id: profile_id,
+          p_bet_id: row.id,
+          p_status: 'cancelled',
+          p_multiplier: 0,
+          p_result: { phase: 'stale_place' },
+        });
       }
-      if (error.message?.includes('Open bet already exists')) {
-        return res.status(409).json({ error: 'Open bet already exists', code: 'open_bet_exists' });
-      }
-      return res.status(500).json({ error: 'Failed to place bet', detail: error.message });
+      const retry = await sb.rpc('gg_place_bet', {
+        p_profile_id:      profile_id,
+        p_game_id:         game_id,
+        p_bet_cents:       bet_cents,
+        p_idempotency_key: idempotency_key ?? null,
+        p_wallet:          walletAsset,
+      });
+      placeData = retry.data;
+      placeError = retry.error;
     }
 
-    logger.info('[bet/place] profile=%s game=%s bet=%d id=%s', profile_id, game_id, bet_cents, data?.bet_id);
+    if (placeError) {
+      logger.warn('[bet/place] error: %s', placeError.message);
+      if (placeError.message?.includes('Insufficient balance')) {
+        return res.status(402).json({ error: 'Insufficient balance', code: 'insufficient' });
+      }
+      if (placeError.message?.includes('Open bet already exists')) {
+        return res.status(409).json({ error: 'Open bet already exists', code: 'open_bet_exists' });
+      }
+      return res.status(500).json({ error: 'Failed to place bet', detail: placeError.message });
+    }
+
+    logger.info('[bet/place] profile=%s game=%s bet=%d id=%s', profile_id, game_id, bet_cents, placeData?.bet_id);
 
     void logBetPlaced({
       profileId: profile_id,
       gameId: game_id,
       betCents: bet_cents,
-      betId: data?.bet_id,
-      balanceCents: data?.balance_cents,
-      lockedCents: data?.locked_cents,
-      idempotent: Boolean(data?.idempotent),
+      betId: placeData?.bet_id,
+      balanceCents: placeData?.balance_cents,
+      lockedCents: placeData?.locked_cents,
+      idempotent: Boolean(placeData?.idempotent),
     });
 
-    return res.json({ ok: true, ...data });
+    return res.json({ ok: true, ...placeData });
   } catch (err) {
     logger.error('[bet/place] Unexpected error', err);
     res.status(500).json({ error: 'Internal server error' });

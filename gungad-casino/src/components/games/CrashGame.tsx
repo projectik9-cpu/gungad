@@ -92,6 +92,8 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const [countdown, setCountdown] = useState<number>(5);
   const [hasBet, setHasBet] = useState<boolean>(false);
   const [placing, setPlacing] = useState(false);
+  const placingRef = useRef(false);
+  const placeWaitRef = useRef<Promise<string | null> | null>(null);
 
   const playModeRef = useRef(playMode);
   useEffect(() => { playModeRef.current = playMode; }, [playMode]);
@@ -421,7 +423,7 @@ export const CrashGame: React.FC<CrashGameProps> = ({
 
   const doWin = async (winMult: number) => {
     if (!mountedRef.current) return;
-    if (!hasBetRef.current || !openBetIdRef.current) return;
+    if (!hasBetRef.current) return;
     if (cashedOutRef.current || resolvingRef.current) return;
 
     cashedOutRef.current = true;
@@ -437,7 +439,12 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     }
 
     const stake = lockedStakeRef.current;
-    const betId = openBetIdRef.current!;
+    const betId = openBetIdRef.current || (placeWaitRef.current ? await placeWaitRef.current : null);
+    if (!betId) {
+      resolvingRef.current = false;
+      await onRefreshWallet?.();
+      return;
+    }
     clearOpenBet();
     soundFx.playWin();
     if (winMult >= 5) confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 }, colors: ['#f43f5e', '#fb7185', '#fbbf24'] });
@@ -480,12 +487,18 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   };
 
   const settleLoss = async () => {
-    if (!hasBetRef.current || !openBetIdRef.current) return;
+    if (!hasBetRef.current) return;
     if (cashedOutRef.current || resolvingRef.current) return;
 
     resolvingRef.current = true;
     const stake = lockedStakeRef.current;
-    const betId = openBetIdRef.current!;
+    const betId = openBetIdRef.current || (placeWaitRef.current ? await placeWaitRef.current : null);
+    if (!betId) {
+      resolvingRef.current = false;
+      clearOpenBet();
+      await onRefreshWallet?.();
+      return;
+    }
     clearOpenBet();
 
     soundFx.playExplosion();
@@ -635,37 +648,69 @@ export const CrashGame: React.FC<CrashGameProps> = ({
   const startCountdown = () => {
     if (!mountedRef.current) return;
 
-    if (animRef.current) cancelAnimationFrame(animRef.current);
-    animRef.current = null;
-    roundIdRef.current += 1;
+    const begin = () => {
+      if (!mountedRef.current) return;
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+      roundIdRef.current += 1;
 
-    setGameState('waiting');
-    setMultiplier(1.0);
-    multiplierRef.current = 1.0;
-    cashedOutRef.current = false;
-    setCashedMultiplier(0);
-    cashedMultRef.current = 0;
-    cashoutPointRef.current = null;
-    pathPointsRef.current = [];
-    crashPointRef.current = 2;
-    setCountdown(5);
-    setHasBet(false);
+      if (!resolvingRef.current && openBetIdRef.current) {
+        const leftover = openBetIdRef.current;
+        void resolveBet({
+          bet_id: leftover,
+          status: 'cancelled',
+          multiplier: 0,
+          result: { phase: 'next_round' },
+        });
+      }
+      if (!resolvingRef.current) {
+        clearOpenBet();
+        setHasBet(false);
+      }
 
-    let c = 5;
-    if (countdownRef.current) clearInterval(countdownRef.current);
-    countdownRef.current = setInterval(() => {
-      if (!mountedRef.current) {
-        if (countdownRef.current) clearInterval(countdownRef.current);
-        return;
-      }
-      c--;
-      setCountdown(c);
-      if (c <= 0) {
-        if (countdownRef.current) clearInterval(countdownRef.current);
-        countdownRef.current = null;
-        runRound();
-      }
-    }, 1000);
+      setGameState('waiting');
+      setMultiplier(1.0);
+      multiplierRef.current = 1.0;
+      cashedOutRef.current = false;
+      setCashedMultiplier(0);
+      cashedMultRef.current = 0;
+      cashoutPointRef.current = null;
+      pathPointsRef.current = [];
+      crashPointRef.current = 2;
+      setCountdown(5);
+
+      let c = 5;
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      countdownRef.current = setInterval(() => {
+        if (!mountedRef.current) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          return;
+        }
+        c--;
+        setCountdown(c);
+        if (c <= 0) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          countdownRef.current = null;
+          runRound();
+        }
+      }, 1000);
+    };
+
+    if (placeWaitRef.current || resolvingRef.current) {
+      void Promise.resolve(placeWaitRef.current)
+        .then(async () => {
+          let n = 0;
+          while (resolvingRef.current && n < 40) {
+            await new Promise((r) => setTimeout(r, 50));
+            n += 1;
+          }
+        })
+        .finally(() => {
+          if (mountedRef.current) begin();
+        });
+      return;
+    }
+    begin();
   };
 
   useEffect(() => {
@@ -689,32 +734,53 @@ export const CrashGame: React.FC<CrashGameProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePlaceBet = async () => {
-    if (gameState !== 'waiting') return;
-    if (hasBet || placing) return;
+  const handlePlaceBet = () => {
+    const gs = gameStateRef.current;
+    const lateJoin = gs === 'running' && Date.now() - roundStartRef.current < 280;
+    if (gs !== 'waiting' && !lateJoin) return;
+    if (hasBetRef.current || placingRef.current) return;
     if (betAmountUSD <= 0 || betAmountUSD > user.balanceUSD) return;
 
+    placingRef.current = true;
     setPlacing(true);
     const stake = betAmountUSD;
     const before = user.balanceUSD;
-    onUpdateBalance(before - stake);
-    const res = await placeBet({ game_id: 'crash', betUSD: stake });
-    if (!mountedRef.current) return;
-
-    if (!res.ok || !res.bet_id) {
-      console.warn('[crash] place failed', res.error);
-      onUpdateBalance(before);
-      setPlacing(false);
-      return;
-    }
-
-    lockedStakeRef.current = stake;
-    openBetIdRef.current = res.bet_id;
     hasBetRef.current = true;
+    lockedStakeRef.current = stake;
     setLastBetUSD(stake);
     setHasBet(true);
-    setPlacing(false);
+    onUpdateBalance(before - stake);
     soundFx.playClick();
+    setPlacing(false);
+    placingRef.current = false;
+
+    let settlePlace: (id: string | null) => void = () => {};
+    placeWaitRef.current = new Promise((resolve) => {
+      settlePlace = resolve;
+    });
+
+    void placeBet({ game_id: 'crash', betUSD: stake }).then((res) => {
+      if (!mountedRef.current) {
+        settlePlace(null);
+        placeWaitRef.current = null;
+        return;
+      }
+      if (!res.ok || !res.bet_id) {
+        console.warn('[crash] place failed', res.error);
+        onUpdateBalance(before);
+        if (!openBetIdRef.current) {
+          hasBetRef.current = false;
+          lockedStakeRef.current = 0;
+          setHasBet(false);
+        }
+        settlePlace(null);
+        placeWaitRef.current = null;
+        return;
+      }
+      openBetIdRef.current = res.bet_id;
+      settlePlace(res.bet_id);
+      placeWaitRef.current = null;
+    });
   };
 
   const handleCashout = () => {

@@ -1,4 +1,4 @@
-export type Currency = 'USD' | 'EUR' | 'RUB' | 'UAH' | 'KZT' | 'STARS';
+export type Currency = 'USD' | 'RUB' | 'UAH' | 'STARS';
 
 export interface CurrencyConfig {
   code: Currency;

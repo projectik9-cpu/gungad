@@ -142,6 +142,7 @@ export default function App() {
 
   const [currency, setCurrency] = useState<Currency>(() => {
     const saved = localStorage.getItem('gungad_currency');
+    if (saved === 'EUR' || saved === 'KZT') return 'USD';
     return saved && saved in CURRENCIES ? (saved as Currency) : 'USD';
   });
   const [lang, setLang] = useState<Language>(() =>

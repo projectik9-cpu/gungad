@@ -17,6 +17,7 @@ import {
   notifyLog,
 } from '../../services/telegramLog.js';
 import { runDailyBonusNotify } from '../../services/dailyBonusNotify.js';
+import { runUserBroadcast } from '../../services/broadcast.js';
 
 const TG_LIMIT = 3900;
 
@@ -161,6 +162,8 @@ const HELP_TEXT = `
 /bigwins [n] — крупные выигрыши (профит ≥ $10)
 
 <b>Рассылка</b>
+/mail текст — отправить сообщение всем пользователям бота (кнопка «Открыть казино»)
+/announce текст — то же, что /mail
 /bonuspush — ежедневное уведомление про колесо (если ещё не уходило сегодня)
 /bonuspush force — отправить ещё раз сегодня
 
@@ -184,6 +187,36 @@ async function cmdPing(ctx) {
   await replyChunks(
     ctx,
     `pong · chat=<code>${ctx.chat?.id}</code> · you=<code>${ctx.from?.id ?? 'channel'}</code>`,
+  );
+}
+
+async function cmdMail(ctx) {
+  const parsed = parseCommand(getCommandText(ctx));
+  const text = (parsed?.args || '').trim();
+  if (!text) {
+    await replyChunks(
+      ctx,
+      'Использование: <code>/mail Текст анонса</code>\nПример: <code>/mail Сегодня x2 к депозиту до 00:00</code>',
+    );
+    return;
+  }
+  const html = escapeHtml(text).slice(0, 3500);
+  await replyChunks(ctx, '📣 Рассылка запущена…');
+  const result = await runUserBroadcast(
+    { telegram: ctx.telegram },
+    {
+      html,
+      kind: `mail_${Date.now()}`,
+      logTitle: '📣 <b>Рассылка /mail</b>',
+    },
+  );
+  if (!result?.ok) {
+    await replyChunks(ctx, `Не вышло: ${escapeHtml(result?.reason || 'unknown')}`);
+    return;
+  }
+  await replyChunks(
+    ctx,
+    `Готово · sent=<b>${result.sent ?? 0}</b> · fail=<b>${result.fail ?? 0}</b>`,
   );
 }
 
@@ -850,6 +883,9 @@ const COMMAND_MAP = {
   stats: cmdStats,
   bigwins: cmdBigWins,
   bonuspush: cmdBonusPush,
+  mail: cmdMail,
+  announce: cmdMail,
+  broadcast: cmdMail,
   wdok: cmdWdOk,
   wdno: cmdWdNo,
 };

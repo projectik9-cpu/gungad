@@ -1,4 +1,4 @@
--- Bind referrer + one-time signup bonus for invitee and referrer.
+-- Referrer signup bounty: $0.05 (invitee stays $1.00). Deposit share stays 25%.
 
 CREATE OR REPLACE FUNCTION public.gg_apply_referral_signup(
   p_profile_id uuid,

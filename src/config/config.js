@@ -104,7 +104,7 @@ const config = {
 
 // Валидация критических настроек
 if (!config.telegram.botToken) {
-  throw new Error('BOT_TOKEN is required in .env file');
+  console.warn('WARNING: BOT_TOKEN is empty. HTTP API will start, Telegram bot will not.');
 }
 
 export default config;

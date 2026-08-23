@@ -3,7 +3,7 @@ import config from '../config/config.js';
 import logger from '../utils/logger.js';
 
 // Создаём экземпляр бота
-const bot = new Telegraf(config.telegram.botToken);
+const bot = new Telegraf(config.telegram.botToken || '0:missing');
 
 // Middleware для логирования
 bot.use(async (ctx, next) => {

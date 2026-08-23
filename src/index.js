@@ -19,7 +19,10 @@ async function startApplication() {
   try {
     logger.info('🚀 Запуск GunGad Casino Bot...');
 
-    // 1. Проверка подключения к БД
+    // HTTP first — Railway healthcheck (/api/health) must bind before DB/Telegram.
+    logger.info('🌐 Запуск веб-сервера...');
+    await startWebServer();
+
     logger.info('📊 Подключение к базе данных...');
     const dbConnected = await testConnection();
 
@@ -35,10 +38,6 @@ async function startApplication() {
     // 3. Регистрация обработчиков команд бота
     logger.info('🤖 Регистрация обработчиков команд...');
     registerHandlers(bot);
-
-    // 4. Запуск веб-сервера
-    logger.info('🌐 Запуск веб-сервера...');
-    await startWebServer();
 
     // 5. Инжектируем бота в API (Stars, выводы, поддержка)
     setStarsBot(bot);

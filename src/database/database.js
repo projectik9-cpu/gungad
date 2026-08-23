@@ -13,6 +13,9 @@ const sequelize = new Sequelize(
     dialect: config.database.dialect,
     logging: config.database.logging,
     pool: config.database.pool,
+    dialectOptions: {
+      connectTimeout: 5000,
+    },
     define: {
       timestamps: true,
       underscored: true,
@@ -24,7 +27,10 @@ const sequelize = new Sequelize(
 // Проверка подключения
 export async function testConnection() {
   try {
-    await sequelize.authenticate();
+    await Promise.race([
+      sequelize.authenticate(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DB connect timeout')), 5000)),
+    ]);
     logger.info('✅ Подключение к базе данных установлено успешно');
     return true;
   } catch (error) {

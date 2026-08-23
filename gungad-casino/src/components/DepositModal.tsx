@@ -516,46 +516,47 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => { soundFx.playClick(); setMethod('cryptobot'); resetDepositFlow(); }}
-                  className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
+                  className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
                     method === 'cryptobot'
                       ? 'bg-rose-950/50 border-rose-600 shadow-[0_0_10px_rgba(225,29,72,0.25)]'
                       : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
                   }`}
                 >
-                  <span className="flex items-center gap-1.5 text-sm font-bold text-white">
-                    <Bot className="w-4 h-4 text-sky-400" />
-                    {t('payCryptoBot', lang)}
-                  </span>
-                  <span className="text-[10px] text-zinc-400 leading-tight">{t('payCryptoBotSub', lang)}</span>
+                  <img
+                    src="/pay/cryptobot.png"
+                    alt=""
+                    className="h-8 w-8 rounded-full object-cover shrink-0"
+                  />
+                  <span className="text-sm font-bold text-white leading-tight">{t('payCryptoBot', lang)}</span>
                 </button>
                 <button
                   onClick={() => { soundFx.playClick(); setMethod('tonkeeper'); resetDepositFlow(); }}
-                  className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
+                  className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
                     method === 'tonkeeper'
                       ? 'bg-rose-950/50 border-rose-600 shadow-[0_0_10px_rgba(225,29,72,0.25)]'
                       : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
                   }`}
                 >
-                  <span className="flex items-center gap-1.5 text-sm font-bold text-white">
-                    <Gem className="w-4 h-4 text-cyan-400" />
-                    {t('payTonkeeper', lang)}
-                  </span>
-                  <span className="text-[10px] text-zinc-400 leading-tight">{t('payTonkeeperSub', lang)}</span>
+                  <img
+                    src="/pay/tonkeeper.png"
+                    alt=""
+                    className="h-8 w-8 rounded-full object-contain bg-white p-0.5 shrink-0"
+                  />
+                  <span className="text-sm font-bold text-white leading-tight">{t('payTonkeeper', lang)}</span>
                 </button>
               </div>
               <button
                 onClick={() => { soundFx.playClick(); setMethod('stars'); resetDepositFlow(); }}
-                className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
+                className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
                   method === 'stars'
                     ? 'bg-amber-950/40 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
                     : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
                 }`}
               >
-                <span className="flex items-center gap-1.5 text-sm font-bold text-white">
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  {t('payStars', lang)}
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20 shrink-0">
+                  <Star className="h-[18px] w-[18px] text-amber-400 fill-amber-400" />
                 </span>
-                <span className="text-[10px] text-zinc-400 leading-tight">{t('payStarsSub', lang)}</span>
+                <span className="text-sm font-bold text-white leading-tight">{t('payStars', lang)}</span>
               </button>
 
               {/* Amount */}

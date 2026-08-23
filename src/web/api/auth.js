@@ -89,6 +89,7 @@ router.post('/', async (req, res) => {
       username: data?.username ?? tgUser.username ?? null,
       first_name: data?.first_name ?? tgUser.first_name ?? null,
       total_wagered_cents: data?.total_wagered_cents ?? 0,
+      total_wagered_stars: data?.total_wagered_stars ?? 0,
       total_won_cents: data?.total_won_cents ?? 0,
       total_lost_cents: data?.total_lost_cents ?? 0,
       telegram_id: data?.telegram_id ?? tgUser.id,

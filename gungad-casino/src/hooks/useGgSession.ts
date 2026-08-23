@@ -18,6 +18,7 @@ export interface GgSessionData {
   username: string | null;
   first_name: string | null;
   total_wagered_cents: number;
+  total_wagered_stars: number;
   total_won_cents: number;
   total_lost_cents: number;
   telegram_id?: number | null;

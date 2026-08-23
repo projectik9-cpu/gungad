@@ -41,9 +41,8 @@ export interface UserProfile {
   vipXp: number;
   vipMaxXp: number;
   totalWageredUSD: number;
-  totalProfitUSD: number;
+  totalWageredStars: number;
   totalBetsCount: number;
-  totalWinsCount: number;
 }
 
 export interface BetHistoryItem {

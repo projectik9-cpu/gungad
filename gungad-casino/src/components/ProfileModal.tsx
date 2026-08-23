@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../types';
 import { t } from '../translations';
-import { formatCurrency } from '../utils/currencies';
+import { formatCurrency, formatStars } from '../utils/currencies';
 import { soundFx } from '../utils/sound';
 import { X, Crown, Crosshair, History, Loader2 } from 'lucide-react';
 
@@ -139,26 +139,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <div className="bg-[#121217] border border-zinc-800 p-3 rounded-xl flex flex-col min-w-0">
               <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('totalWagered', lang)}</span>
               <span className="font-mono font-bold text-sm text-white mt-1 truncate">
-                {formatCurrency(user.totalWageredUSD, currency)}
+                {formatCurrency(user.totalWageredUSD, currency === 'STARS' ? 'USD' : currency)}
               </span>
             </div>
             <div className="bg-[#121217] border border-zinc-800 p-3 rounded-xl flex flex-col min-w-0">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('profit', lang)}</span>
-              <span className={`font-mono font-bold text-sm mt-1 truncate ${user.totalProfitUSD >= 0 ? 'text-emerald-400' : 'text-rose-500'}`}>
-                {formatCurrency(user.totalProfitUSD, currency)}
+              <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('totalWageredStars', lang)}</span>
+              <span className="font-mono font-bold text-sm text-white mt-1 truncate">
+                {formatStars((user.totalWageredStars ?? 0) / 100)}
               </span>
             </div>
-            <div className="bg-[#121217] border border-zinc-800 p-3 rounded-xl flex flex-col min-w-0">
+            <div className="bg-[#121217] border border-zinc-800 p-3 rounded-xl flex flex-col min-w-0 col-span-2">
               <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('totalOperativeBets', lang)}</span>
               <span className="font-mono font-bold text-sm text-white mt-1">{user.totalBetsCount}</span>
-            </div>
-            <div className="bg-[#121217] border border-zinc-800 p-3 rounded-xl flex flex-col min-w-0">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('winRate', lang)}</span>
-              <span className="font-mono font-bold text-sm text-emerald-400 mt-1">
-                {user.totalBetsCount > 0
-                  ? `${Math.round((user.totalWinsCount / user.totalBetsCount) * 100)}%`
-                  : '0%'}
-              </span>
             </div>
           </div>
 

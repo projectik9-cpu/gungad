@@ -83,9 +83,8 @@ function buildUserProfile(
       vipXp:           xpInLevel,
       vipMaxXp:        maxXpInLevel,
       totalWageredUSD: centsToUsd(session.total_wagered_cents),
-      totalProfitUSD:  centsToUsd(session.total_won_cents - session.total_wagered_cents),
+      totalWageredStars: session.total_wagered_stars ?? 0,
       totalBetsCount:  0,
-      totalWinsCount:  0,
     };
   }
   return {
@@ -97,9 +96,8 @@ function buildUserProfile(
     vipXp:           session?.vip_xp ?? 0,
     vipMaxXp:        1000,
     totalWageredUSD: 0,
-    totalProfitUSD:  0,
+    totalWageredStars: 0,
     totalBetsCount:  0,
-    totalWinsCount:  0,
   };
 }
 
@@ -241,7 +239,6 @@ export default function App() {
       ...profile,
       starsBalance: playMode === 'real' ? Math.max(0, starsCents + pendingDeltaStars) : profile.starsBalance,
       totalBetsCount: extraStats.betsCount,
-      totalWinsCount: extraStats.winsCount,
     };
   }, [session, useLiveProfile, availableCents, extraStats, playMode, starsCents, pendingDeltaStars]);
 

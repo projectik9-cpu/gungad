@@ -135,7 +135,7 @@ export function useGgSession(): UseGgSessionResult {
     (async () => {
       // Diagnose API reachability first
       try {
-        const ping = await fetch(`${API_BASE}/api/auth/ping`);
+        const ping = await fetch(`${API_BASE}/api/auth/ping`, { signal: AbortSignal.timeout(8000) });
         const pingJson = await ping.json().catch(() => ({}));
         console.info('[ggSession] api ping', API_BASE, pingJson);
         if (!pingJson.has_bot_token) {
@@ -165,6 +165,7 @@ export function useGgSession(): UseGgSessionResult {
         const res = await fetch(`${API_BASE}/api/auth`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(15000),
           body: JSON.stringify({
             initData,
             ref: (window as any).__GG_REF || new URLSearchParams(window.location.search).get('ref') || localStorage.getItem('gg_ref') || undefined,

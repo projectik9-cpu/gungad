@@ -10,7 +10,7 @@ export function openCasinoKeyboard(referrerTelegramId = null) {
     ? `${base}/?ref=ref${referrerTelegramId}`
     : (config.web.webAppUrl || base);
   return Markup.inlineKeyboard([
-    [Markup.button.webApp('🎰 Открыть казино', url)],
+    [Markup.button.webApp('🎰 Open', url)],
   ]);
 }
 

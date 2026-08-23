@@ -52,62 +52,91 @@ async function startApplication() {
     startCryptoBotReconcile();
     startStarsReconcile(bot);
 
-    // 5. Запуск Telegram бота
-    logger.info('🤖 Запуск Telegram бота...');
+    // Telegram bot must not take down the Mini App API if TG is banned/rate-limited.
+    await startTelegramBotSafe();
 
-    // Меню: кнопка WebApp «Казино» (даёт initData в Mini App)
-    await bot.telegram.deleteMyCommands();
-    try {
-      await bot.telegram.setMyCommands(
-        [
-          { command: 'help', description: 'Список admin-команд' },
-          { command: 'user', description: 'Досье игрока' },
-          { command: 'stats', description: 'Сводка казино' },
-          { command: 'online', description: 'Онлайн сейчас' },
-          { command: 'search', description: 'Поиск игрока' },
-          { command: 'top', description: 'Топы' },
-          { command: 'bigwins', description: 'Крупные выигрыши' },
-          { command: 'start', description: 'Открыть казино' },
-        ],
-        { scope: { type: 'all_private_chats' } },
-      );
-    } catch (e) {
-      logger.warn(`[bot] setMyCommands failed: ${e?.message || e}`);
-    }
-
-    await bot.telegram.setChatMenuButton({
-      menuButton: {
-        type: 'web_app',
-        text: 'Казино',
-        web_app: { url: config.web.webAppUrl },
-      },
-    });
-
-    // Запускаем бота
-    await bot.launch({
-      dropPendingUpdates: true, // Игнорируем старые обновления
-    });
-
-    logger.logBotStart();
-    void maybeAnnounceCommandsOnline();
-    startDailyBonusNotify(bot);
-    startPokerTimerWorker();
-
-    // Обработка завершения приложения
     process.once('SIGINT', () => gracefulShutdown('SIGINT'));
     process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.once('uncaughtException', (error) => {
+    process.on('uncaughtException', (error) => {
       logger.error('❌ Uncaught Exception:', error);
-      gracefulShutdown('uncaughtException');
     });
-    process.once('unhandledRejection', (reason, promise) => {
+    process.on('unhandledRejection', (reason) => {
       logger.error('❌ Unhandled Rejection:', reason);
-      gracefulShutdown('unhandledRejection');
     });
 
   } catch (error) {
     logger.error('❌ Критическая ошибка при запуске приложения:', error);
     process.exit(1);
+  }
+}
+
+async function startTelegramBotSafe() {
+  logger.info('🤖 Запуск Telegram бота...');
+  const token = config.telegram.botToken || '';
+  logger.info(`[bot] token_len=${token.length} suffix=${token.slice(-6)}`);
+
+  try {
+    const me = await bot.telegram.getMe();
+    logger.info(`[bot] getMe ok @${me.username} id=${me.id}`);
+  } catch (e) {
+    logger.error(
+      `[bot] getMe failed — BOT_TOKEN invalid or still revoked. Update Railway BOT_TOKEN from @BotFather. ${e?.message || e}`,
+    );
+    return;
+  }
+
+  try {
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+    logger.info('[bot] webhook cleared, using long polling');
+  } catch (e) {
+    logger.warn(`[bot] deleteWebhook failed: ${e?.message || e}`);
+  }
+
+  try {
+    await bot.telegram.deleteMyCommands();
+  } catch (e) {
+    logger.warn(`[bot] deleteMyCommands failed: ${e?.message || e}`);
+  }
+
+  try {
+    await bot.telegram.setMyCommands(
+      [
+        { command: 'help', description: 'Admin commands' },
+        { command: 'user', description: 'Player lookup' },
+        { command: 'stats', description: 'Stats' },
+        { command: 'online', description: 'Online now' },
+        { command: 'search', description: 'Search player' },
+        { command: 'top', description: 'Leaderboards' },
+        { command: 'bigwins', description: 'Big wins' },
+        { command: 'start', description: 'Open app' },
+      ],
+      { scope: { type: 'all_private_chats' } },
+    );
+  } catch (e) {
+    logger.warn(`[bot] setMyCommands failed: ${e?.message || e}`);
+  }
+
+  try {
+    await bot.telegram.setChatMenuButton({
+      menuButton: {
+        type: 'web_app',
+        text: 'Open',
+        web_app: { url: config.web.webAppUrl },
+      },
+    });
+  } catch (e) {
+    logger.warn(`[bot] setChatMenuButton failed: ${e?.message || e}`);
+  }
+
+  startPokerTimerWorker();
+
+  try {
+    await bot.launch({ dropPendingUpdates: true });
+    logger.logBotStart();
+    void maybeAnnounceCommandsOnline();
+    startDailyBonusNotify(bot);
+  } catch (e) {
+    logger.error(`[bot] launch failed (API stays up): ${e?.message || e}`);
   }
 }
 

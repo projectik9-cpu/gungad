@@ -18,13 +18,29 @@ import { validateInitData } from './telegramAuth.js';
 const router = express.Router();
 
 /** Quick health for debugging from WebApp */
-router.get('/ping', (req, res) => {
+router.get('/ping', async (req, res) => {
   const token = config.telegram.botToken || '';
+  let telegram = { ok: false, error: 'no_token' };
+  if (token) {
+    try {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), 6000);
+      const r = await fetch(`https://api.telegram.org/bot${token}/getMe`, { signal: ac.signal });
+      clearTimeout(t);
+      const j = await r.json();
+      telegram = j.ok
+        ? { ok: true, username: j.result?.username, id: j.result?.id }
+        : { ok: false, error: j.description || 'getMe_failed' };
+    } catch (e) {
+      telegram = { ok: false, error: String(e?.message || e).slice(0, 120) };
+    }
+  }
   res.json({
     ok: true,
     has_bot_token: Boolean(token),
     token_len: token.length,
     token_suffix: token ? token.slice(-6) : null,
+    telegram,
     supabase: getSupabaseDiag(),
   });
 });

@@ -28,7 +28,7 @@ function welcomeCaption(firstName, signupCents = 0) {
     `Привет, <b>${name}</b>.`,
     '',
     'Добро пожаловать в <b>GunGad</b>.',
-    'Открой казино кнопкой ниже.',
+    'Нажми Play, чтобы открыть игры.',
   ];
   if (signupCents > 0) {
     lines.push('', `🎁 Бонус за приглашение: <b>+$${(signupCents / 100).toFixed(2)}</b> на баланс.`);

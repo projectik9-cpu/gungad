@@ -52,9 +52,9 @@ export function registerHandlers(bot) {
     try {
       await ctx.answerCbQuery();
       const text = `
-🎰 <b>GunGad Casino</b>
+🎮 <b>GunGad</b>
 
-Нажми на кнопку ниже, чтобы открыть казино!
+Нажми Play, чтобы открыть игры.
       `.trim();
 
       await ctx.editMessageText(text, {
@@ -76,7 +76,7 @@ export function registerHandlers(bot) {
     if (ctx.message?.text?.startsWith('/')) return;
     if (isLogChat(ctx)) return;
     if (ctx.chat?.type !== 'private') return;
-    await ctx.reply('🎰 Нажми кнопку ниже, чтобы открыть казино:', {
+    await ctx.reply('🎮 Нажми Play, чтобы открыть игры:', {
       reply_markup: openCasinoKeyboard().reply_markup,
     });
   });

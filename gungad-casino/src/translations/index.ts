@@ -27,7 +27,7 @@ export const translations = {
     referralTitle: 'Referral system',
     referralDesc: 'Share your link. Friend gets $1, you get $0.05 when they join — plus 25% of their deposits (crypto and Stars).',
     referralShare: 'Share link',
-    referralShareText: 'Play GunGad Casino with me!',
+    referralShareText: 'Play GunGad with me!',
     referralNeedTelegram: 'Open the Mini App in Telegram to get your link.',
     referralStats: 'Statistics',
     referralStatsTitle: 'Your referrals',
@@ -48,7 +48,7 @@ export const translations = {
     bonusNeedTelegram: 'Open in Telegram to claim the bonus.',
     bonusClaimFailed: 'Could not claim bonus. Try again.',
     bonusAlreadyClaimed: 'Bonus already claimed.',
-    navCasino: 'Casino',
+    navCasino: 'Games',
     demoBalance: 'Demo Balance',
     refillDemo: 'Refill Demo (+ $1,000)',
     soundOn: 'Sound On',
@@ -350,7 +350,7 @@ export const translations = {
 
     // Age / legal gate
     ageGateTitle: 'Are you 21 or older?',
-    ageGateSubtitle: 'Access to GunGad Casino is only for adults 21+. Confirm your age and accept the legal terms.',
+    ageGateSubtitle: 'Access to GunGad is only for adults 21+. Confirm your age and accept the legal terms.',
     ageGateAddictionWarn: 'Gambling may cause addiction. Follow responsible gambling principles. Play only with money you can afford to lose.',
     ageGateCheckAge: 'Yes — I am 21 years of age or older, fully legally capable, and not barred from gambling.',
     ageGateCheckTerms: 'I have read and accept the Terms of Use and Privacy Policy, and I understand I play at my own risk.',
@@ -358,7 +358,7 @@ export const translations = {
     ageGateReadPrivacy: 'Privacy Policy',
     ageGateOpenDoc: 'Read',
     ageGateCloseDoc: 'Close',
-    ageGateEnter: 'Enter casino',
+    ageGateEnter: 'Enter',
     ageGateTelegramNote: 'Telegram is not the operator of this casino and is not responsible for games, balances, or payouts. You must also follow Telegram rules.',
   },
   ru: {
@@ -380,7 +380,7 @@ export const translations = {
     referralTitle: 'Реферальная система',
     referralDesc: 'Поделись ссылкой. Друг получит $1, ты — $0.05 за вход, плюс 25% с его пополнений (крипта и Stars).',
     referralShare: 'Поделиться ссылкой',
-    referralShareText: 'Играй со мной в GunGad Casino!',
+    referralShareText: 'Играй со мной в GunGad!',
     referralNeedTelegram: 'Открой Mini App в Telegram, чтобы получить ссылку.',
     referralStats: 'Статистика',
     referralStatsTitle: 'Твои рефералы',
@@ -401,7 +401,7 @@ export const translations = {
     bonusNeedTelegram: 'Открой в Telegram, чтобы забрать бонус.',
     bonusClaimFailed: 'Не удалось забрать бонус. Попробуй ещё раз.',
     bonusAlreadyClaimed: 'Бонус уже получен.',
-    navCasino: 'Казино',
+    navCasino: 'Игры',
     demoBalance: 'Демо баланс',
     refillDemo: 'Пополнить демо (+ $1 000)',
     soundOn: 'Звук включен',
@@ -701,7 +701,7 @@ export const translations = {
 
     // Возрастной / правовой гейт
     ageGateTitle: 'Вам есть 21 год?',
-    ageGateSubtitle: 'Доступ в GunGad Casino только для лиц старше 21 года. Подтвердите возраст и согласие с правилами.',
+    ageGateSubtitle: 'Доступ в GunGad только для лиц старше 21 года. Подтвердите возраст и согласие с правилами.',
     ageGateAddictionWarn: 'Участие в азартных играх может вызвать игровую зависимость. Соблюдайте правила ответственной игры. Играйте только на те деньги, которые можете позволить себе потерять.',
     ageGateCheckAge: 'Да — мне исполнился 21 год, я полностью дееспособен(на) и мне не запрещено участвовать в азартных играх.',
     ageGateCheckTerms: 'Я ознакомился(ась) и принимаю Пользовательское соглашение и Политику конфиденциальности, понимаю риски и играю на свой страх и риск.',
@@ -709,7 +709,7 @@ export const translations = {
     ageGateReadPrivacy: 'Политика конфиденциальности',
     ageGateOpenDoc: 'Ознакомиться',
     ageGateCloseDoc: 'Закрыть',
-    ageGateEnter: 'Войти в казино',
+    ageGateEnter: 'Войти',
     ageGateTelegramNote: 'Telegram не является оператором этого казино и не отвечает за игры, балансы и выплаты. Вы также обязаны соблюдать правила Telegram.',
   },
   uk: {
@@ -731,7 +731,7 @@ export const translations = {
     referralTitle: 'Реферальна система',
     referralDesc: 'Поділись посиланням. Друг отримає $1, ти — $0.05 за вхід, плюс 25% з його поповнень (крипта і Stars).',
     referralShare: 'Поділитися посиланням',
-    referralShareText: 'Грай зі мною в GunGad Casino!',
+    referralShareText: 'Грай зі мною в GunGad!',
     referralNeedTelegram: 'Відкрий Mini App у Telegram, щоб отримати посилання.',
     referralStats: 'Статистика',
     referralStatsTitle: 'Твої реферали',
@@ -752,7 +752,7 @@ export const translations = {
     bonusNeedTelegram: 'Відкрий у Telegram, щоб забрати бонус.',
     bonusClaimFailed: 'Не вдалося забрати бонус. Спробуй ще раз.',
     bonusAlreadyClaimed: 'Бонус уже отримано.',
-    navCasino: 'Казино',
+    navCasino: 'Игры',
     demoBalance: 'Демо баланс',
     refillDemo: 'Поповнити демо (+ $1 000)',
     soundOn: 'Звук увімкнено',
@@ -1052,7 +1052,7 @@ export const translations = {
 
     // Віковий / правовий гейт
     ageGateTitle: 'Вам є 21 рік?',
-    ageGateSubtitle: 'Доступ до GunGad Casino лише для осіб старше 21 року. Підтвердіть вік і згоду з правилами.',
+    ageGateSubtitle: 'Доступ до GunGad лише для осіб старше 21 року. Підтвердіть вік і згоду з правилами.',
     ageGateAddictionWarn: 'Участь в азартних іграх може викликати ігрову залежність. Дотримуйтеся правил (принципів) відповідальної гри. Грайте лише на ті гроші, які можете дозволити собі втратити.',
     ageGateCheckAge: 'Так — мені виповнився 21 рік, я повністю дієздатний(а) і мені не заборонено брати участь в азартних іграх.',
     ageGateCheckTerms: 'Я ознайомився(лась) і приймаю Угоду користувача та Політику конфіденційності, розумію ризики і граю на власний страх і ризик.',
@@ -1060,7 +1060,7 @@ export const translations = {
     ageGateReadPrivacy: 'Політика конфіденційності',
     ageGateOpenDoc: 'Ознайомитися',
     ageGateCloseDoc: 'Закрити',
-    ageGateEnter: 'Увійти в казино',
+    ageGateEnter: 'Увійти',
     ageGateTelegramNote: 'Telegram не є оператором цього казино і не відповідає за ігри, баланси та виплати. Ви також зобов’язані дотримуватися правил Telegram.',
   },
   kk: {
@@ -1082,7 +1082,7 @@ export const translations = {
     referralTitle: 'Рефералдық жүйе',
     referralDesc: 'Сілтемеңді бөліс. Дос $1 алады, сен кіргені үшін $0.05, әрі оның толтыруының 25%-ы (крипто және Stars).',
     referralShare: 'Сілтемені бөлісу',
-    referralShareText: 'Менімен GunGad Casino-да ойнау!',
+    referralShareText: 'Менімен GunGad-та ойнау!',
     referralNeedTelegram: 'Сілтемені алу үшін Telegram Mini App аш.',
     referralStats: 'Статистика',
     referralStatsTitle: 'Сенің рефералдарың',
@@ -1103,7 +1103,7 @@ export const translations = {
     bonusNeedTelegram: 'Бонусты алу үшін Telegram-да аш.',
     bonusClaimFailed: 'Бонусты алу мүмкін болмады. Қайта көр.',
     bonusAlreadyClaimed: 'Бонус әлдеқашан алынған.',
-    navCasino: 'Казино',
+    navCasino: 'Игры',
     demoBalance: 'Демо баланс',
     refillDemo: 'Демоны толтыру (+ $1 000)',
     soundOn: 'Дыбыс қосулы',
@@ -1403,7 +1403,7 @@ export const translations = {
 
     // Жас / құқықтық қақпа
     ageGateTitle: 'Сізге 21 жас толды ма?',
-    ageGateSubtitle: 'GunGad Casino-ға кіру тек 21 жастан асқандарға. Жасыңызды және ережелерге келісіміңізді растаңыз.',
+    ageGateSubtitle: 'GunGad-қа кіру тек 21 жастан асқандарға. Жасыңызды және ережелерге келісіміңізді растаңыз.',
     ageGateAddictionWarn: 'Құмар ойындарға қатысу ойынға тәуелділікті тудыруы мүмкін. Жауапты ойын қағидаларын сақтаңыз. Тек жоғалтуға болатын ақшаға ойнаңыз.',
     ageGateCheckAge: 'Иә — маған 21 жас толды, мен толық әрекетке қабілеттімін және құмар ойындарға қатысу маған тыйым салынбаған.',
     ageGateCheckTerms: 'Мен Пайдаланушы келісімі мен Құпиялылық саясатын оқып, қабылдаймын, тәуекелдерді түсінемін және өз жауапкершілігімде ойнаймын.',
@@ -1411,7 +1411,7 @@ export const translations = {
     ageGateReadPrivacy: 'Құпиялылық саясаты',
     ageGateOpenDoc: 'Танысу',
     ageGateCloseDoc: 'Жабу',
-    ageGateEnter: 'Казиноға кіру',
+    ageGateEnter: 'Кіру',
     ageGateTelegramNote: 'Telegram бұл казиноның операторы емес және ойындар, баланс пен төлемдер үшін жауап бермейді. Telegram ережелерін де сақтауыңыз керек.',
   },
 };

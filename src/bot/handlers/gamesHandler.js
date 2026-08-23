@@ -31,7 +31,7 @@ export async function gameCallbackHandler(ctx) {
     await ctx.answerCbQuery();
 
     const gameMessages = {
-      slots: '🎰 Однорукий бандит — классический 3-барабанный слот уже в веб-приложении!',
+      slots: '🎮 Bandit уже в приложении — нажми Play.',
       dice: '🎲 Кости уже в веб-приложении!',
       roulette: '🎡 Рулетка уже в веб-приложении!',
       blackjack: '🃏 Блэкджек уже в веб-приложении!',
@@ -45,7 +45,7 @@ export async function gameCallbackHandler(ctx) {
       gameMessages[gameType] || '🎮 Эта игра скоро будет доступна в веб-приложении!';
 
     await ctx.editMessageText(
-      `${message}\n\n<b>Откройте веб-приложение GunGad Casino для доступа ко всем играм!</b>`,
+      `${message}\n\n<b>Открой приложение GunGad кнопкой Play, чтобы зайти во все игры.</b>`,
       {
         parse_mode: 'HTML',
         reply_markup: miniGamesKeyboard().reply_markup,

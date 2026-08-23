@@ -16,7 +16,7 @@ const MESSAGE = `
 🎁 <b>Колесо бонуса снова активно!</b>
 
 Приветствуем вас в GunGad.
-Ежедневный бонус за вход снова можно забрать — крутите колесо в казино.
+Daily login bonus is available again — spin the wheel in the app.
 
 Нажмите кнопку ниже ⬇️
 `.trim();

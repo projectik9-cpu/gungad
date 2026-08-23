@@ -78,7 +78,7 @@ const config = {
 
   // Application
   app: {
-    name: 'GunGad Casino',
+    name: 'GunGad',
     environment: process.env.NODE_ENV || 'development',
     logLevel: process.env.LOG_LEVEL || 'info',
     logFilePath: process.env.LOG_FILE_PATH || './logs/bot.log',

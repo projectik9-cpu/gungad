@@ -119,7 +119,7 @@ async function startTelegramBotSafe() {
     await bot.telegram.setChatMenuButton({
       menuButton: {
         type: 'web_app',
-        text: 'Open',
+        text: 'Play',
         web_app: { url: config.web.webAppUrl },
       },
     });

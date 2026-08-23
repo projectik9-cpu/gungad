@@ -139,9 +139,9 @@ app.get('/', (req, res) => {
     </head>
     <body>
       <div class="container">
-        <div class="logo">🎰</div>
-        <h1>GunGad Casino</h1>
-        <p>Веб-приложение готовится к запуску</p>
+        <div class="logo">🎮</div>
+        <h1>GunGad</h1>
+        <p>Games app</p>
         
         <div class="features">
           <div class="feature">🎮 Множество игр</div>

@@ -35,6 +35,7 @@ export interface UseGgSessionResult {
   refreshWallet: () => Promise<void>;
   updateBalance: (newCents: number, lockedCents?: number) => void;
   updateStars: (stars: number) => void;
+  bumpWagered: (cents: number, wallet: 'USD' | 'STARS') => void;
   setWelcomeBonusClaimed: () => void;
 }
 
@@ -97,7 +98,23 @@ export function useGgSession(): UseGgSessionResult {
       if (!res.ok) return;
       const json = await res.json();
       if (json.ok && json.wallet) {
-        setSession((prev) => (prev ? { ...prev, ...json.wallet } : null));
+        setSession((prev) => {
+          if (!prev) return null;
+          const w = json.wallet;
+          return {
+            ...prev,
+            ...w,
+            // Keep optimistic stake totals if a settle is still in flight
+            total_wagered_cents: Math.max(
+              Number(prev.total_wagered_cents) || 0,
+              Number(w.total_wagered_cents) || 0,
+            ),
+            total_wagered_stars: Math.max(
+              Number(prev.total_wagered_stars) || 0,
+              Number(w.total_wagered_stars) || 0,
+            ),
+          };
+        });
       }
     } catch {
       // keep last known state
@@ -123,6 +140,17 @@ export function useGgSession(): UseGgSessionResult {
 
   const updateStars = useCallback((stars: number) => {
     setSession((prev) => (prev ? { ...prev, stars_balance: Math.max(0, stars) } : null));
+  }, []);
+
+  const bumpWagered = useCallback((cents: number, wallet: 'USD' | 'STARS') => {
+    if (!Number.isFinite(cents) || cents <= 0) return;
+    setSession((prev) => {
+      if (!prev) return prev;
+      if (wallet === 'STARS') {
+        return { ...prev, total_wagered_stars: (prev.total_wagered_stars ?? 0) + cents };
+      }
+      return { ...prev, total_wagered_cents: (prev.total_wagered_cents ?? 0) + cents };
+    });
   }, []);
 
   const setWelcomeBonusClaimed = useCallback(() => {
@@ -201,5 +229,5 @@ export function useGgSession(): UseGgSessionResult {
     };
   }, []);
 
-  return { session, status, statusDetail, refreshWallet, updateBalance, updateStars, setWelcomeBonusClaimed };
+  return { session, status, statusDetail, refreshWallet, updateBalance, updateStars, bumpWagered, setWelcomeBonusClaimed };
 }

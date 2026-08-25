@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Currency, UserProfile, BetHistoryItem } from '../types';
 import { t } from '../translations';
-import { formatCurrency, formatStars } from '../utils/currencies';
+import { CURRENCIES, formatCurrency, formatStars } from '../utils/currencies';
 import { soundFx } from '../utils/sound';
 import { X, Crown, Crosshair, History, Loader2 } from 'lucide-react';
 
@@ -71,6 +71,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const progressPercent = user.vipMaxXp > 0
     ? Math.min(100, Math.round((user.vipXp / user.vipMaxXp) * 100))
     : 0;
+  const fiatSymbol = currency === 'STARS' ? CURRENCIES.USD.symbol : CURRENCIES[currency].symbol;
 
   return (
     <div
@@ -137,7 +138,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           {/* Stats */}
           <div className="grid grid-cols-2 gap-2.5">
             <div className="bg-[#121217] border border-zinc-800 p-3 rounded-xl flex flex-col min-w-0">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase">{t('totalWagered', lang)}</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase">
+                {t('totalWagered', lang, { symbol: fiatSymbol })}
+              </span>
               <span className="font-mono font-bold text-sm text-white mt-1 truncate">
                 {formatCurrency(user.totalWageredUSD, currency === 'STARS' ? 'USD' : currency)}
               </span>

@@ -102,7 +102,7 @@ function buildUserProfile(
 }
 
 export default function App() {
-  const { session, status, updateBalance, updateStars, setWelcomeBonusClaimed, refreshWallet } = useGgSession();
+  const { session, status, updateBalance, updateStars, bumpWagered, setWelcomeBonusClaimed, refreshWallet } = useGgSession();
   const { version: ratesVersion } = useLiveRates();
   const isLive = status === 'live';
 
@@ -265,7 +265,7 @@ export default function App() {
     setPokerLockedOpen(false);
   };
   const openDeposit = () => { closeAllModals(); setDepositOpen(true); };
-  const openProfile = () => { closeAllModals(); setProfileOpen(true); };
+  const openProfile = () => { closeAllModals(); setProfileOpen(true); void refreshWallet(); };
   const openProvablyFair = () => { closeAllModals(); setProvablyFairOpen(true); };
   const openSupport = () => { closeAllModals(); setSupportOpen(true); };
   const openBonus = () => { closeAllModals(); setBonusOpen(true); };
@@ -300,6 +300,11 @@ export default function App() {
       winsCount: item.win ? prev.winsCount + 1 : prev.winsCount,
     }));
 
+    if (playMode === 'real' && isLive) {
+      const stakeCents = usdToCents(item.betAmountUSD);
+      bumpWagered(stakeCents, item.currency === 'STARS' ? 'STARS' : 'USD');
+    }
+
     // Crash (and any serverSettled flow) already moved money via place/resolve
     if (item.serverSettled || item.gameId === 'crash') return;
 
@@ -322,7 +327,7 @@ export default function App() {
         }
       });
     }
-  }, [playMode, isLive, session?.profile_id, settleBet, refreshWallet]);
+  }, [playMode, isLive, session?.profile_id, settleBet, refreshWallet, bumpWagered]);
 
   const handleRefillDemo = useCallback(async () => {
     if (playMode !== 'demo') return;
@@ -579,10 +584,16 @@ export default function App() {
         onClose={() => setBonusOpen(false)}
         onClaimed={(amountCents, grantedBalanceCents) => {
           setWelcomeBonusClaimed();
-          // Only sync balance on a real grant — already_claimed must not restore UI balance
-          if (amountCents > 0) {
-            applyAuthoritativeCents(grantedBalanceCents);
-          }
+          if (amountCents <= 0) return;
+          // Do not use applyAuthoritativeCents: that keeps the old on-screen total
+          // via a negative pending overlay until the Mini App is reopened.
+          const snap = walletSnapRef.current;
+          const next = grantedBalanceCents > 0
+            ? grantedBalanceCents
+            : Math.max(0, snap.balanceCents + amountCents);
+          setBalanceCents(next);
+          setPendingDeltaCents(0);
+          updateBalance(next);
         }}
       />
     </div>

@@ -8,6 +8,7 @@ import {
 } from '../../game/slots/banditConfig';
 
 const STRIP_EXTRA = 36;
+const FILLER_SYMBOLS: BanditSymbol[] = SYMBOLS.filter((s) => s !== 'jackpot');
 
 interface ReelGridProps {
   /** Final 3×3 grid (col-major). Must be set BEFORE spinId increments. */
@@ -22,7 +23,7 @@ interface ReelGridProps {
 }
 
 function randomSymbol(): BanditSymbol {
-  return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+  return FILLER_SYMBOLS[Math.floor(Math.random() * FILLER_SYMBOLS.length)];
 }
 
 function easeOutCubic(t: number): number {
@@ -43,7 +44,9 @@ export const SymbolFace: React.FC<{
         'relative w-full h-full rounded-lg overflow-hidden flex items-center justify-center border transition-shadow',
         highlight
           ? 'border-rose-400 bg-gradient-to-b from-rose-950/70 to-[#12080c] shadow-[0_0_22px_rgba(244,63,94,0.55)]'
-          : 'border-zinc-700/80 bg-gradient-to-b from-[#16161c] to-[#0a0a0e]',
+          : symbol === 'jackpot'
+            ? 'border-sky-400/50 bg-gradient-to-b from-sky-950/50 to-[#0a0a0e] shadow-[0_0_14px_rgba(56,189,248,0.35)]'
+            : 'border-zinc-700/80 bg-gradient-to-b from-[#16161c] to-[#0a0a0e]',
         dim ? 'opacity-55' : 'opacity-100',
       ].join(' ')}
     >
@@ -106,6 +109,9 @@ export const SymbolFace: React.FC<{
             <path d="M50 22 C58 28, 60 34, 56 38" fill="none" stroke="#65a30d" strokeWidth="3" strokeLinecap="round" />
             <ellipse cx="56" cy="28" rx="7" ry="4" fill="#4d7c0f" transform="rotate(25 56 28)" />
           </>
+        )}
+        {symbol === 'jackpot' && (
+          <image href="/assets/jackpot-crystal.png" x="6" y="6" width="88" height="88" preserveAspectRatio="xMidYMid meet" />
         )}
       </svg>
       {highlight && (
@@ -211,7 +217,7 @@ const ReelCol: React.FC<ColProps> = ({
       className={[
         'relative overflow-hidden h-full rounded-xl border-2',
         'bg-gradient-to-b from-zinc-900 via-black to-zinc-900',
-        'border-zinc-600/80 shadow-[inset_0_0_24px_rgba(0,0,0,0.85)]',
+        'border-amber-700/50 shadow-[inset_0_0_24px_rgba(0,0,0,0.85)]',
         landing ? 'reel-landed' : '',
       ].join(' ')}
       style={{
@@ -266,11 +272,11 @@ const ReelCol: React.FC<ColProps> = ({
 
       {/* Payline window */}
       <div
-        className="pointer-events-none absolute inset-x-0 z-30 border-y-2 border-rose-500/70"
+        className="pointer-events-none absolute inset-x-0 z-30 border-y-[3px] border-amber-300/90"
         style={{
           top: PAYLINE_ROW * cellH,
           height: cellH,
-          boxShadow: 'inset 0 0 28px rgba(244,63,94,0.22), 0 0 12px rgba(244,63,94,0.25)',
+          boxShadow: 'inset 0 0 36px rgba(251,191,36,0.28), 0 0 18px rgba(251,191,36,0.45)',
         }}
       />
     </div>
@@ -317,38 +323,48 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
   }).current;
 
   return (
-    <div className="w-full mx-auto" style={{ maxWidth: 440 }}>
-      <div
-        ref={wrapRef}
-        className="grid gap-2 sm:gap-2.5 w-full rounded-2xl p-2 sm:p-2.5 border border-zinc-700/60"
-        style={{
-          gridTemplateColumns: `repeat(${REELS}, 1fr)`,
-          aspectRatio: `${REELS} / ${VISIBLE_ROWS}`,
-          background:
-            'linear-gradient(180deg, #2a1518 0%, #120a0c 40%, #0a0a0d 100%)',
-          boxShadow:
-            'inset 0 1px 0 rgba(255,255,255,0.06), 0 20px 50px rgba(0,0,0,0.55), 0 0 0 1px rgba(225,29,72,0.25)',
-        }}
-      >
-        {Array.from({ length: REELS }, (_, col) => {
-          const finalSymbols = Array.from(
-            { length: VISIBLE_ROWS },
-            (_, row) => grid[col * VISIBLE_ROWS + row],
-          );
-          return (
-            <ReelCol
-              key={col}
-              colIdx={col}
-              finalSymbols={finalSymbols}
-              spinId={spinId}
-              winLine={winLine}
-              spinDurationMs={spinDurationMs}
-              staggerMs={staggerMs}
-              cellH={cellH || 88}
-              onStopped={handleStopped}
-            />
-          );
-        })}
+    <div className="w-full mx-auto" style={{ maxWidth: 460 }}>
+      <div className="bandit-chrome rounded-[1.4rem] p-[3px]">
+        <div className="rounded-[1.25rem] overflow-hidden bg-[#120a0c]">
+          <div className="flex justify-between px-3 pt-2 pb-1.5">
+            {Array.from({ length: 9 }, (_, i) => (
+              <span key={`top-${i}`} className="bandit-lamp" style={{ animationDelay: `${i * 0.11}s` }} />
+            ))}
+          </div>
+          <div
+            ref={wrapRef}
+            className="grid gap-2 sm:gap-2.5 w-full px-2 sm:px-2.5"
+            style={{
+              gridTemplateColumns: `repeat(${REELS}, 1fr)`,
+              aspectRatio: `${REELS} / ${VISIBLE_ROWS}`,
+            }}
+          >
+            {Array.from({ length: REELS }, (_, col) => {
+              const finalSymbols = Array.from(
+                { length: VISIBLE_ROWS },
+                (_, row) => grid[col * VISIBLE_ROWS + row],
+              );
+              return (
+                <ReelCol
+                  key={col}
+                  colIdx={col}
+                  finalSymbols={finalSymbols}
+                  spinId={spinId}
+                  winLine={winLine}
+                  spinDurationMs={spinDurationMs}
+                  staggerMs={staggerMs}
+                  cellH={cellH || 88}
+                  onStopped={handleStopped}
+                />
+              );
+            })}
+          </div>
+          <div className="flex justify-between px-3 pb-2 pt-1.5">
+            {Array.from({ length: 9 }, (_, i) => (
+              <span key={`bot-${i}`} className="bandit-lamp" style={{ animationDelay: `${0.05 + i * 0.11}s` }} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import bot from './bot/bot.js';
 import { registerHandlers } from './bot/handlers/index.js';
-import { startWebServer, setStarsBot, setWithdrawBot, setSupportBot } from './web/server.js';
+import { startWebServer, setStarsBot, setWithdrawBot, setDepositTrc20Bot, setSupportBot } from './web/server.js';
 import { startTonMonitor } from './services/tonMonitor.js';
 import { startCryptoBotReconcile } from './services/cryptoBotReconcile.js';
 import { startStarsReconcile } from './services/starsReconcile.js';
@@ -42,6 +42,7 @@ async function startApplication() {
     // 5. Инжектируем бота в API (Stars, выводы, поддержка)
     setStarsBot(bot);
     setWithdrawBot(bot);
+    setDepositTrc20Bot(bot);
     setSupportBot(bot);
     setLogBot(bot);
 

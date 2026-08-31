@@ -5,7 +5,8 @@ import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
-import { pickRouletteWinner, roulettePayoutMult } from '../../game/demoOdds';
+import { keepLiveWin, pickRouletteWinner, roulettePayoutMult } from '../../game/demoOdds';
+import { consumeWarmupBet } from '../../game/playerHeat';
 
 interface RouletteGameProps {
   user: UserProfile;
@@ -63,6 +64,20 @@ function evalBet(bet: BetType, winner: number, isDemo = false): { win: boolean; 
   if (bet === 'col2')   return { win: winner !== 0 && winner % 3 === 2, multiplier: roulettePayoutMult(3, isDemo) };
   if (bet === 'col3')   return { win: winner !== 0 && winner % 3 === 0, multiplier: roulettePayoutMult(3, isDemo) };
   return { win: false, multiplier: 0 };
+}
+
+function numberWinsAnyBet(bets: PlacedBet[], winner: number, isDemo: boolean): boolean {
+  return bets.some((b) => evalBet(b.type, winner, isDemo).win);
+}
+
+function pickNumberMatchingBets(
+  bets: PlacedBet[],
+  wantWin: boolean,
+  isDemo: boolean,
+): number {
+  const matching = ROULETTE_NUMBERS.filter((n) => numberWinsAnyBet(bets, n, isDemo) === wantWin);
+  if (matching.length) return matching[Math.floor(Math.random() * matching.length)];
+  return pickRouletteWinner(ROULETTE_NUMBERS, isDemo);
 }
 
 export const RouletteGame: React.FC<RouletteGameProps> = ({
@@ -126,7 +141,13 @@ export const RouletteGame: React.FC<RouletteGameProps> = ({
     setWinningNumber(null);
     setShowNumbers(true);
 
-    const winnerNum = pickRouletteWinner(ROULETTE_NUMBERS, isDemo);
+    const warmup = consumeWarmupBet();
+    let winnerNum = pickRouletteWinner(ROULETTE_NUMBERS, isDemo);
+    const naturalWin = numberWinsAnyBet(betsSnapshot, winnerNum, isDemo);
+    const keepWin = warmup || keepLiveWin(naturalWin, isDemo);
+    if (keepWin !== naturalWin) {
+      winnerNum = pickNumberMatchingBets(betsSnapshot, keepWin, isDemo);
+    }
     const winnerIndex = ROULETTE_NUMBERS.indexOf(winnerNum);
 
     const anglePerSeg = 360 / 37;

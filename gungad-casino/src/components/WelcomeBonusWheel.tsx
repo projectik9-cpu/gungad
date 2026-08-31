@@ -101,6 +101,8 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
   const rotationRef = useRef(0);
   const rafRef = useRef<number | null>(null);
   const wheelRef = useRef<SVGGElement | null>(null);
+  const coastingRef = useRef(false);
+  const lastCoastTsRef = useRef(0);
 
   const setWheelRotation = (deg: number) => {
     rotationRef.current = deg;
@@ -116,6 +118,7 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
       setError(null);
       setSpinning(false);
       claimedRef.current = false;
+      coastingRef.current = false;
       const id = requestAnimationFrame(() => {
         requestAnimationFrame(() => setEntered(true));
       });
@@ -128,17 +131,18 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
 
   useEffect(() => {
     return () => {
+      coastingRef.current = false;
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
-  const animateTo = (target: number, onDone: () => void) => {
+  const animateTo = (target: number, onDone: () => void, durationMs = SPIN_MS) => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     const from = rotationRef.current;
     const start = performance.now();
 
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / SPIN_MS);
+      const t = Math.min(1, (now - start) / durationMs);
       const value = from + (target - from) * easeOutQuint(t);
       setWheelRotation(value);
       if (t < 1) {
@@ -152,16 +156,35 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
     rafRef.current = requestAnimationFrame(tick);
   };
 
+  const startCoast = () => {
+    coastingRef.current = true;
+    lastCoastTsRef.current = 0;
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    const COAST_DPS = 540;
+
+    const tick = (now: number) => {
+      if (!coastingRef.current) return;
+      if (!lastCoastTsRef.current) lastCoastTsRef.current = now;
+      const dt = Math.min(0.05, (now - lastCoastTsRef.current) / 1000);
+      lastCoastTsRef.current = now;
+      setWheelRotation(rotationRef.current + COAST_DPS * dt);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
   const spin = async () => {
     if (spinning || claimedRef.current || !profileId) return;
     soundFx.playClick();
     setError(null);
     setSpinning(true);
+    startCoast();
 
     const initData = getInitData();
     if (!initData) {
+      coastingRef.current = false;
+      animateTo(rotationRef.current + 120, () => setSpinning(false), 600);
       setError(t('bonusNeedTelegram', lang));
-      setSpinning(false);
       return;
     }
 
@@ -173,26 +196,29 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
+        coastingRef.current = false;
+        animateTo(rotationRef.current + 160, () => setSpinning(false), 700);
         setError(t('bonusClaimFailed', lang));
-        setSpinning(false);
         return;
       }
 
       if (data.already_claimed) {
         claimedRef.current = true;
         onClaimed(0, 0);
+        coastingRef.current = false;
+        animateTo(rotationRef.current + 160, () => setSpinning(false), 700);
         setError(t('bonusAlreadyClaimed', lang));
-        setSpinning(false);
         return;
       }
 
       const amount = Number(data.amount_cents) || 0;
       const idx = WELCOME_SLICES.findIndex((s) => s.cents === amount);
       const sliceIndex = idx >= 0 ? idx : 0;
+      coastingRef.current = false;
       const target = rotationForSlice(
         sliceIndex,
         rotationRef.current,
-        6 + Math.floor(Math.random() * 3),
+        5 + Math.floor(Math.random() * 3),
       );
 
       animateTo(target, () => {
@@ -203,8 +229,9 @@ export const WelcomeBonusWheel: React.FC<WelcomeBonusWheelProps> = ({
         onClaimed(amount, data.balance_cents ?? 0);
       });
     } catch {
+      coastingRef.current = false;
+      animateTo(rotationRef.current + 160, () => setSpinning(false), 700);
       setError(t('bonusClaimFailed', lang));
-      setSpinning(false);
     }
   };
 

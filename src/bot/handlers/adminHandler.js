@@ -174,6 +174,54 @@ async function resolvePendingAction(ctx, sb) {
 }
 
 export function registerAdminHandlers(bot) {
+  // ── Manual deposit approve/reject ───────────────────────────────────────
+  bot.action(/^dep_approve_(.+)$/, async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) return ctx.answerCbQuery('Нет прав', { show_alert: true });
+      const id = ctx.match[1];
+      const sb = getSupabaseAdmin();
+      if (!sb) return ctx.answerCbQuery('БД недоступна', { show_alert: true });
+      const { data: dep } = await sb.from('gg_deposit_requests')
+        .select('id, profile_id, amount_usd_cents, external_id, status')
+        .eq('id', id).maybeSingle();
+      if (!dep) return ctx.answerCbQuery('Заявка не найдена', { show_alert: true });
+      if (dep.status !== 'pending') return ctx.answerCbQuery(`Уже обработана (${dep.status})`, { show_alert: true });
+      const { data, error } = await sb.rpc('gg_complete_deposit', {
+        p_deposit_id: id,
+        p_amount_usd_cents: dep.amount_usd_cents,
+        p_external_id: dep.external_id,
+        p_crypto_amount: dep.amount_usd_cents / 100,
+      });
+      if (error) return ctx.answerCbQuery('Ошибка зачисления', { show_alert: true });
+      await ctx.answerCbQuery('Зачислено ✅');
+      await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ <b>ЗАЧИСЛЕНО</b> админом @${ctx.from.username ?? ctx.from.id}`, { parse_mode: 'HTML' }).catch(() => {});
+      await notifyUser(bot, sb, dep.profile_id, `✅ <b>Пополнение подтверждено</b>\n\nНа баланс зачислено $${(dep.amount_usd_cents / 100).toFixed(2)} USDT TRC20.`);
+      logger.info(`[admin] deposit ${id} approved idempotent=${data?.idempotent}`);
+    } catch (e) {
+      logger.error(`[admin] dep_approve: ${e?.message || e}`);
+      await ctx.answerCbQuery('Ошибка').catch(() => {});
+    }
+  });
+
+  bot.action(/^dep_reject_(.+)$/, async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) return ctx.answerCbQuery('Нет прав', { show_alert: true });
+      const id = ctx.match[1];
+      const sb = getSupabaseAdmin();
+      if (!sb) return ctx.answerCbQuery('БД недоступна', { show_alert: true });
+      const { data: dep } = await sb.from('gg_deposit_requests').select('profile_id, status').eq('id', id).maybeSingle();
+      if (!dep) return ctx.answerCbQuery('Заявка не найдена', { show_alert: true });
+      if (dep.status !== 'pending') return ctx.answerCbQuery(`Уже обработана (${dep.status})`, { show_alert: true });
+      await sb.from('gg_deposit_requests').update({ status: 'failed' }).eq('id', id).eq('status', 'pending');
+      await ctx.answerCbQuery('Отклонено');
+      await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ <b>ОТКЛОНЕНО</b> админом @${ctx.from.username ?? ctx.from.id}`, { parse_mode: 'HTML' }).catch(() => {});
+      await notifyUser(bot, sb, dep.profile_id, '❌ <b>Пополнение отклонено</b>\n\nПроверьте TXID и обратитесь в поддержку.');
+    } catch (e) {
+      logger.error(`[admin] dep_reject: ${e?.message || e}`);
+      await ctx.answerCbQuery('Ошибка').catch(() => {});
+    }
+  });
+
   // ── Withdraw approve ─────────────────────────────────────────────────────
   bot.action(/^wd_approve_(.+)$/, async (ctx) => {
     try {

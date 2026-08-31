@@ -6,7 +6,8 @@ import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
 import { Bomb, Diamond } from 'lucide-react';
-import { minesEdgeFactor } from '../../game/demoOdds';
+import { keepLiveWin, minesEdgeFactor } from '../../game/demoOdds';
+import { consumeWarmupBet } from '../../game/playerHeat';
 
 interface MinesGameProps {
   user: UserProfile;
@@ -38,6 +39,8 @@ export const MinesGame: React.FC<MinesGameProps> = ({
   const [currentMultiplier, setCurrentMultiplier] = useState<number>(1.0);
   const [lastBetUSD, setLastBetUSD] = useState<number>(10);
   const afterBetRef = useRef(0);
+  const warmupRoundRef = useRef(false);
+  const firstClickDoneRef = useRef(false);
 
   // Multiplier math formula per revealed gem
   const calculateNextMultiplier = (gems: number) => {
@@ -56,6 +59,8 @@ export const MinesGame: React.FC<MinesGameProps> = ({
     afterBetRef.current = afterBet;
     onUpdateBalance(afterBet);
     setLastBetUSD(betAmountUSD);
+    warmupRoundRef.current = consumeWarmupBet();
+    firstClickDoneRef.current = false;
 
     // Randomize mine positions
     const mineIndices = new Set<number>();
@@ -80,11 +85,23 @@ export const MinesGame: React.FC<MinesGameProps> = ({
     if (gameState !== 'playing' || grid[index].revealed) return;
 
     const tile = grid[index];
+    const isFirstClick = !firstClickDoneRef.current;
+    firstClickDoneRef.current = true;
+
+    let isMine = tile.isMine;
+    if (isFirstClick) {
+      if (warmupRoundRef.current) {
+        isMine = false;
+      } else if (!isMine && !keepLiveWin(true, playMode === 'demo')) {
+        isMine = true;
+      }
+    }
+
     const newGrid = [...grid];
-    newGrid[index] = { ...tile, revealed: true };
+    newGrid[index] = { ...tile, isMine, revealed: true };
     setGrid(newGrid);
 
-    if (tile.isMine) {
+    if (isMine) {
       soundFx.playExplosion();
       // Reveal all mines
       setGrid(newGrid.map((t) => (t.isMine ? { ...t, revealed: true } : t)));

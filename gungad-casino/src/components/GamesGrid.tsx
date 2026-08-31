@@ -66,11 +66,6 @@ const GameCard: React.FC<{
           </span>
         )}
 
-        {/* RTP Chip */}
-        <span className="absolute top-3 right-3 bg-black/80 border border-zinc-700 text-emerald-400 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-md">
-          {t('rtpLabel', lang, { rtp: game.rtp })}
-        </span>
-
         {locked ? (
           <div className="absolute inset-0 bg-black/55 flex flex-col items-center justify-center gap-2">
             <div className="w-16 h-16 rounded-2xl bg-rose-600/90 border-2 border-rose-300/80 text-white flex items-center justify-center animate-lock-glow shadow-[0_0_28px_rgba(225,29,72,0.85)]">

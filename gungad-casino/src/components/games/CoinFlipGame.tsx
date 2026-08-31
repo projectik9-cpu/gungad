@@ -5,7 +5,8 @@ import { BetControls } from '../BetControls';
 import { soundFx } from '../../utils/sound';
 import confetti from 'canvas-confetti';
 import { Target, Skull, AlertCircle } from 'lucide-react';
-import { coinFlipWinMult } from '../../game/demoOdds';
+import { coinFlipWinMult, keepLiveWin } from '../../game/demoOdds';
+import { consumeWarmupBet } from '../../game/playerHeat';
 
 interface CoinFlipGameProps {
   user: UserProfile;
@@ -66,7 +67,12 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
     setResult(null);
     setPlayedChoice(lockedChoice);
 
-    const outcome: 'heads' | 'tails' = Math.random() > 0.5 ? 'heads' : 'tails';
+    const warmup = consumeWarmupBet();
+    const isDemo = playMode === 'demo';
+    const fair: 'heads' | 'tails' = Math.random() > 0.5 ? 'heads' : 'tails';
+    const naturalWin = fair === lockedChoice;
+    const win = warmup || keepLiveWin(naturalWin, isDemo);
+    const outcome: 'heads' | 'tails' = win ? lockedChoice : lockedChoice === 'heads' ? 'tails' : 'heads';
 
     setRotation((prev) => {
       const currentMod = ((prev % 360) + 360) % 360;
@@ -93,7 +99,6 @@ export const CoinFlipGame: React.FC<CoinFlipGameProps> = ({
       setIsFlipping(false);
       setResult(outcome);
 
-      const win = outcome === lockedChoice;
       const multiplier = win ? winMult : 0;
       const payoutUSD = win ? betAmountUSD * multiplier : 0;
 

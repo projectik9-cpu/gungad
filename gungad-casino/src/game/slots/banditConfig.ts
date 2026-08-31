@@ -1,8 +1,8 @@
 /** Classic 3-reel one-armed bandit config */
 
-export type BanditSymbol = 'seven' | 'bar' | 'grape' | 'lemon';
+export type BanditSymbol = 'seven' | 'bar' | 'grape' | 'lemon' | 'jackpot';
 
-export const SYMBOLS: BanditSymbol[] = ['seven', 'bar', 'grape', 'lemon'];
+export const SYMBOLS: BanditSymbol[] = ['seven', 'bar', 'grape', 'lemon', 'jackpot'];
 
 export const REELS = 3;
 export const VISIBLE_ROWS = 3;
@@ -19,10 +19,12 @@ export const TRIPLE_PAY: Record<BanditSymbol, number> = {
   bar: 20,
   grape: 8,
   lemon: 4,
+  jackpot: 0,
 };
 
 /** 2-of-a-kind left-to-right (reel0===reel1, reel2 different) → stake return */
 export const PAIR_PAY = 1;
+export const JACKPOT_STARS = 20_000;
 
 /**
  * Reel weights — tuned for ~96–97% real RTP.
@@ -33,6 +35,7 @@ export const REAL_WEIGHTS: Record<BanditSymbol, number> = {
   grape: 28,
   bar: 15,
   seven: 7,
+  jackpot: 0.0000023,
 };
 
 /** Demo: hotter lemon hit-rate (~103–105% RTP) */
@@ -41,6 +44,7 @@ export const DEMO_WEIGHTS: Record<BanditSymbol, number> = {
   grape: 26,
   bar: 13,
   seven: 7,
+  jackpot: 0,
 };
 
 export const SYMBOL_LABEL: Record<BanditSymbol, string> = {
@@ -48,6 +52,7 @@ export const SYMBOL_LABEL: Record<BanditSymbol, string> = {
   bar: 'BAR',
   grape: 'Grape',
   lemon: 'Lemon',
+  jackpot: 'Jackpot',
 };
 
 export const SYMBOL_COLOR: Record<BanditSymbol, string> = {
@@ -55,4 +60,5 @@ export const SYMBOL_COLOR: Record<BanditSymbol, string> = {
   bar: '#fbbf24',
   grape: '#a78bfa',
   lemon: '#facc15',
+  jackpot: '#38bdf8',
 };

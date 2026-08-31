@@ -11,13 +11,15 @@ import walletRouter from './api/wallet.js';
 import starsRouter, { setBot as setStarsBot } from './api/stars.js';
 import depositCryptoBotRouter from './api/depositCryptoBot.js';
 import depositTonRouter from './api/depositTon.js';
+import depositTrc20Router, { setDepositTrc20Bot } from './api/depositTrc20.js';
+import jackpotRouter from './api/jackpot.js';
 import withdrawRouter, { setWithdrawBot } from './api/withdraw.js';
 import supportRouter, { setSupportBot } from './api/support.js';
 import bonusRouter from './api/bonus.js';
 import referralRouter from './api/referral.js';
 import pokerRouter from './api/poker.js';
 
-export { setStarsBot, setWithdrawBot, setSupportBot };
+export { setStarsBot, setWithdrawBot, setDepositTrc20Bot, setSupportBot };
 
 const app = express();
 
@@ -195,6 +197,8 @@ app.use('/api/stars',     starsRouter);
 app.use('/api/rates',     ratesRouter);
 app.use('/api/deposit/cryptobot', depositCryptoBotRouter);
 app.use('/api/deposit/ton',       depositTonRouter);
+app.use('/api/deposit/trc20',     depositTrc20Router);
+app.use('/api/jackpot',           jackpotRouter);
 app.use('/api/withdraw',  withdrawRouter);
 app.use('/api/support',   supportRouter);
 app.use('/api/bonus',     bonusRouter);

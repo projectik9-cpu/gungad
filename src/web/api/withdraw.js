@@ -21,7 +21,9 @@ const router = express.Router();
 let _bot = null;
 export function setWithdrawBot(bot) { _bot = bot; }
 
-const VALID_ASSETS = ['TON', 'USDT', 'STARS'];
+const VALID_ASSETS = ['TON', 'USDT', 'TRC20', 'STARS'];
+const ALLOWED_STARS_WITHDRAWALS = new Set([25, 50, 75, 100, 500, 1000, 5000]);
+const TRON_ADDRESS_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 const ERROR_MESSAGES = {
   MIN_WITHDRAW: 'Минимальный вывод — $7',
   BAD_ADDRESS: 'Некорректный адрес кошелька',
@@ -47,8 +49,8 @@ router.post('/request', async (req, res) => {
 
     if (upperAsset === 'STARS') {
       const stars = Math.round(Number(stars_amount ?? amount_usd));
-      if (!Number.isInteger(stars) || stars < 1) {
-        return res.status(400).json({ error: 'Минимальный вывод — 1 Star', code: 'MIN_WITHDRAW' });
+      if (!Number.isInteger(stars) || !ALLOWED_STARS_WITHDRAWALS.has(stars)) {
+        return res.status(400).json({ error: 'Выберите доступную сумму Stars: 25, 50, 75, 100, 500, 1000 или 5000', code: 'INVALID_STARS_AMOUNT' });
       }
 
       const { data: profile } = await sb
@@ -141,6 +143,10 @@ router.post('/request', async (req, res) => {
     }
     if (!address || String(address).trim().length < 10) {
       return res.status(400).json({ error: 'Некорректный адрес', code: 'BAD_ADDRESS' });
+    }
+
+    if (upperAsset === 'TRC20' && !TRON_ADDRESS_RE.test(String(address).trim())) {
+      return res.status(400).json({ error: 'Некорректный TRC20-адрес', code: 'BAD_ADDRESS' });
     }
 
     const amountCents = Math.round(amountUsd * 100);

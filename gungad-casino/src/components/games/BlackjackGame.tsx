@@ -6,6 +6,7 @@ import { soundFx } from '../../utils/sound';
 import confetti from 'canvas-confetti';
 import { Layers, Shield, ShieldCheck } from 'lucide-react';
 import { blackjackNaturalMult } from '../../game/demoOdds';
+import { consumeWarmupBet } from '../../game/playerHeat';
 import { formatCurrency } from '../../utils/currencies';
 
 interface BlackjackGameProps {
@@ -27,14 +28,24 @@ interface Card {
 
 const SUITS: ('♠' | '♥' | '♦' | '♣')[] = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const DEALER_LIVE_VALUES = ['10', '10', 'J', 'Q', 'K', 'A', 'A', '9', '8', '7', '10', 'K', '6', '5'];
+const PLAYER_LIVE_VALUES = ['2', '2', '3', '3', '4', '4', '5', '5', '6', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
-function getRandomCard(visible = true): Card {
+function makeCard(val: string, visible = true): Card {
   const suit = SUITS[Math.floor(Math.random() * SUITS.length)];
-  const val = VALUES[Math.floor(Math.random() * VALUES.length)];
   let weight = parseInt(val);
   if (['J', 'Q', 'K'].includes(val)) weight = 10;
   if (val === 'A') weight = 11;
   return { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, suit, value: val, weight, visible };
+}
+
+function getRandomCard(visible = true, opts?: { role?: 'player' | 'dealer'; isDemo?: boolean }): Card {
+  let pool = VALUES;
+  if (opts && !opts.isDemo) {
+    pool = opts.role === 'dealer' ? DEALER_LIVE_VALUES : PLAYER_LIVE_VALUES;
+  }
+  const val = pool[Math.floor(Math.random() * pool.length)];
+  return makeCard(val, visible);
 }
 
 function calculateHandScore(cards: Card[]): number {
@@ -124,7 +135,9 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
 
     const stakeUSD = betAmountUSD;
     const balanceAfterBet = user.balanceUSD - stakeUSD;
-    const naturalMult = blackjackNaturalMult(playMode === 'demo');
+    const isDemo = playMode === 'demo';
+    const naturalMult = blackjackNaturalMult(isDemo);
+    const warmup = consumeWarmupBet();
 
     soundFx.playCard();
     onUpdateBalance(balanceAfterBet);
@@ -132,10 +145,10 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
     setResultMessage('');
     setGameState('dealing');
 
-    const p1 = getRandomCard(true);
-    const d1 = getRandomCard(true);
-    const p2 = getRandomCard(true);
-    const d2 = getRandomCard(false);
+    const p1 = warmup ? makeCard('K', true) : getRandomCard(true, { role: 'player', isDemo });
+    const d1 = warmup ? makeCard('6', true) : getRandomCard(true, { role: 'dealer', isDemo });
+    const p2 = warmup ? makeCard('A', true) : getRandomCard(true, { role: 'player', isDemo });
+    const d2 = warmup ? makeCard('5', false) : getRandomCard(false, { role: 'dealer', isDemo });
     upcardRef.current = d1;
     holeRef.current = d2;
 
@@ -240,7 +253,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
   const handleHit = () => {
     if (gameState !== 'player_turn') return;
     soundFx.playCard();
-    const newCard = getRandomCard(true);
+    const newCard = getRandomCard(true, { role: 'player', isDemo: playMode === 'demo' });
     const updated = [...playerCards, newCard];
     setPlayerCards(updated);
     const score = calculateFullScore(updated);
@@ -316,7 +329,7 @@ export const BlackjackGame: React.FC<BlackjackGameProps> = ({
     const dealerPlay = () => {
       if (dScore < 17) {
         soundFx.playCard();
-        const next = getRandomCard(true);
+        const next = getRandomCard(true, { role: 'dealer', isDemo: playMode === 'demo' });
         currentDealer = [...currentDealer, next];
         dScore = calculateFullScore(currentDealer);
         setDealerCards([...currentDealer]);

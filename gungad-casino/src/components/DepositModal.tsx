@@ -23,6 +23,14 @@ const API_BASE = import.meta.env.VITE_API_URL || 'https://gungad-production.up.r
 
 const CRYPTOBOT_ASSETS = ['USDT', 'TON', 'BTC', 'ETH', 'SOL'] as const;
 type CryptoBotAsset = (typeof CRYPTOBOT_ASSETS)[number];
+const TRC20_FALLBACK_ADDRESS = 'TLPse2NpkveCockTAwt9brFNdaz8EsxzyN';
+const STAR_WITHDRAW_AMOUNTS = [25, 50, 75, 100, 500, 1000, 5000] as const;
+const PAY_METHODS = [
+  { id: 'stars', img: null, labelKey: 'payStars' },
+  { id: 'cryptobot', img: '/pay/cryptobot.png', labelKey: 'payCryptoBot' },
+  { id: 'tonkeeper', img: '/pay/tonkeeper.png', labelKey: 'payTonkeeper' },
+  { id: 'trc20', img: '/assets/trc20.png', labelKey: 'payTrc20' },
+] as const;
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -40,12 +48,25 @@ interface DepositModalProps {
 
 interface TonInvoice {
   deposit_id: string;
+  asset: 'TON' | 'USDT_TON';
   address: string;
   memo: string;
-  ton_amount: number;
+  ton_amount: number | null;
+  token_amount: number | null;
   usd_amount: number;
   tonkeeper_url: string;
   tonkeeper_web_url: string;
+}
+
+function getInitData(): string | null {
+  try {
+    const early = (window as any).__GG_INIT_DATA;
+    if (early && String(early).length > 10) return String(early);
+    const value = (window as any).Telegram?.WebApp?.initData;
+    return value && String(value).length > 10 ? String(value) : null;
+  } catch {
+    return null;
+  }
 }
 
 function openTgLink(url: string) {
@@ -94,26 +115,30 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   onStarsBalance,
 }) => {
   const [tab, setTab] = useState<'deposit' | 'withdraw'>('deposit');
-  const [method, setMethod] = useState<'cryptobot' | 'tonkeeper' | 'stars'>('cryptobot');
+  const [method, setMethod] = useState<'cryptobot' | 'tonkeeper' | 'stars' | 'trc20'>('cryptobot');
 
   // Deposit state
   const [depositAmount, setDepositAmount] = useState<number>(10);
   const [creating, setCreating] = useState(false);
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const [cryptoDepositId, setCryptoDepositId] = useState<string | null>(null);
+  const [trc20Txid, setTrc20Txid] = useState('');
+  const [trc20DepositId, setTrc20DepositId] = useState<string | null>(null);
+  const [trc20Address, setTrc20Address] = useState(TRC20_FALLBACK_ADDRESS);
+  const [tonAsset, setTonAsset] = useState<'TON' | 'USDT'>('TON');
   const [tonInvoice, setTonInvoice] = useState<TonInvoice | null>(null);
   const [depositDone, setDepositDone] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCoin, setSelectedCoin] = useState<CryptoBotAsset>('USDT');
-  const [starsAmount, setStarsAmount] = useState<number>(100);
+  const [starsAmount, setStarsAmount] = useState<number>(25);
   const [starsInvoiceUrl, setStarsInvoiceUrl] = useState<string | null>(null);
   const [starsAwaitingCredit, setStarsAwaitingCredit] = useState(false);
   const starsBaselineRef = useRef<number>(0);
 
   // Withdraw state
-  const [withdrawAsset, setWithdrawAsset] = useState<'TON' | 'USDT' | 'STARS'>('TON');
-  const [withdrawStars, setWithdrawStars] = useState<number>(50);
+  const [withdrawAsset, setWithdrawAsset] = useState<'TON' | 'USDT' | 'TRC20' | 'STARS'>('TON');
+  const [withdrawStars, setWithdrawStars] = useState<number>(25);
   const [withdrawAddress, setWithdrawAddress] = useState<string>('');
   const [withdrawAmountUSD, setWithdrawAmountUSD] = useState<number>(10);
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
@@ -145,6 +170,16 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     if (!isOpen || tab !== 'withdraw' || !profileId) return;
     void loadPendingWds();
   }, [isOpen, tab, profileId]);
+
+  useEffect(() => {
+    if (!isOpen || method !== 'trc20') return;
+    fetch(`${API_BASE}/api/deposit/trc20/info`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json?.receiving_address) setTrc20Address(String(json.receiving_address));
+      })
+      .catch(() => { /* keep fallback */ });
+  }, [isOpen, method]);
 
   // Poll deposit status (TON or Crypto Bot) while modal open
   useEffect(() => {
@@ -219,6 +254,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const resetDepositFlow = () => {
     setInvoiceUrl(null);
     setCryptoDepositId(null);
+    setTrc20DepositId(null);
+    setTrc20Txid('');
     setTonInvoice(null);
     setStarsInvoiceUrl(null);
     setDepositDone(false);
@@ -253,6 +290,29 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     }
   };
 
+  const handleCreateTrc20 = async () => {
+    if (!isReal || creating) return;
+    soundFx.playClick();
+    setError(null);
+    if (!Number.isFinite(depositAmount) || depositAmount < 1 || !trc20Txid.trim()) {
+      setError(t('minDepositNote', lang));
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/deposit/trc20/create`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, initData: getInitData(), amount_usd: depositAmount, txid: trc20Txid.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || 'fail');
+      setTrc20DepositId(json.deposit_id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errorGeneric', lang));
+    } finally {
+      setCreating(false);
+    }
+  };
   const handleCreateTon = async () => {
     if (!isReal || creating) return;
     soundFx.playClick();
@@ -266,11 +326,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
       const res = await fetch(`${API_BASE}/api/deposit/ton/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile_id: profileId, amount_usd: depositAmount }),
+        body: JSON.stringify({ profile_id: profileId, initData: getInitData(), amount_usd: depositAmount, asset: tonAsset }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || 'fail');
       setTonInvoice(json as TonInvoice);
+      if (json.tonkeeper_web_url) openTgLink(json.tonkeeper_web_url);
     } catch {
       setError(t('errorGeneric', lang));
     } finally {
@@ -314,7 +375,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     setWithdrawError(null);
 
     if (withdrawAsset === 'STARS') {
-      if (!Number.isInteger(withdrawStars) || withdrawStars < 1) {
+      if (!STAR_WITHDRAW_AMOUNTS.includes(withdrawStars as typeof STAR_WITHDRAW_AMOUNTS[number])) {
         setWithdrawError(t('withdrawStarsMinNote', lang));
         return;
       }
@@ -512,52 +573,43 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
           {tab === 'deposit' ? (
             <div className="flex flex-col gap-4">
-              {/* Payment method selector */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { soundFx.playClick(); setMethod('cryptobot'); resetDepositFlow(); }}
-                  className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
-                    method === 'cryptobot'
-                      ? 'bg-rose-950/50 border-rose-600 shadow-[0_0_10px_rgba(225,29,72,0.25)]'
-                      : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                  }`}
-                >
-                  <img
-                    src="/pay/cryptobot.png"
-                    alt=""
-                    className="h-8 w-8 rounded-full object-cover shrink-0"
-                  />
-                  <span className="text-sm font-bold text-white leading-tight">{t('payCryptoBot', lang)}</span>
-                </button>
-                <button
-                  onClick={() => { soundFx.playClick(); setMethod('tonkeeper'); resetDepositFlow(); }}
-                  className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
-                    method === 'tonkeeper'
-                      ? 'bg-rose-950/50 border-rose-600 shadow-[0_0_10px_rgba(225,29,72,0.25)]'
-                      : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                  }`}
-                >
-                  <img
-                    src="/pay/tonkeeper.png"
-                    alt=""
-                    className="h-8 w-8 rounded-full object-contain bg-white p-0.5 shrink-0"
-                  />
-                  <span className="text-sm font-bold text-white leading-tight">{t('payTonkeeper', lang)}</span>
-                </button>
+              {/* Payment method selector — circular emblems */}
+              <div className="grid grid-cols-4 gap-2">
+                {PAY_METHODS.map((item) => {
+                  const active = method === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => { soundFx.playClick(); setMethod(item.id); resetDepositFlow(); }}
+                      className="flex flex-col items-center gap-1.5 group"
+                    >
+                      <span
+                        className={`relative h-14 w-14 rounded-full overflow-hidden border-2 transition-all ${
+                          active
+                            ? 'border-rose-500 shadow-[0_0_16px_rgba(225,29,72,0.45)] scale-105'
+                            : 'border-zinc-700 group-hover:border-zinc-500'
+                        }`}
+                      >
+                        {item.img ? (
+                          <img
+                            src={item.img}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center bg-amber-500/20">
+                            <Star className="h-7 w-7 text-amber-400 fill-amber-400" />
+                          </span>
+                        )}
+                      </span>
+                      <span className={`text-[10px] font-bold leading-tight text-center ${active ? 'text-white' : 'text-zinc-400'}`}>
+                        {t(item.labelKey as any, lang)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                onClick={() => { soundFx.playClick(); setMethod('stars'); resetDepositFlow(); }}
-                className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all ${
-                  method === 'stars'
-                    ? 'bg-amber-950/40 border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
-                    : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
-                }`}
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20 shrink-0">
-                  <Star className="h-[18px] w-[18px] text-amber-400 fill-amber-400" />
-                </span>
-                <span className="text-sm font-bold text-white leading-tight">{t('payStars', lang)}</span>
-              </button>
 
               {/* Amount */}
               {method !== 'stars' && (
@@ -585,7 +637,32 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 <span className="text-[10px] text-zinc-500">{t('minDepositNote', lang)}</span>
               </div>
 
-              {/* Crypto Bot flow */}
+              {method === 'trc20' && (
+                <div className="flex flex-col gap-3 p-3 rounded-xl bg-emerald-950/20 border border-emerald-800/60">
+                  {trc20DepositId ? (
+                    <div className="text-center text-sm font-bold text-emerald-300">{t('trc20Submitted', lang)}</div>
+                  ) : (
+                    <>
+                      <div className="text-xs text-zinc-400">{t('trc20SendNote', lang)}</div>
+                      <div className="flex items-center justify-between gap-2 bg-[#0a0a0d] border border-emerald-900/50 rounded-lg p-2.5">
+                        <div className="font-mono text-[11px] break-all text-emerald-300">{trc20Address}</div>
+                        <button
+                          type="button"
+                          onClick={() => copyText(trc20Address, 'trc20')}
+                          className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-md flex items-center gap-1 shrink-0"
+                        >
+                          {copiedField === 'trc20' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <input value={trc20Txid} onChange={(e) => setTrc20Txid(e.target.value)} placeholder={t('trc20TxidPlaceholder', lang)} className={inputCls} />
+                      <button onClick={handleCreateTrc20} disabled={!isReal || creating || !trc20Txid.trim()} className="w-full py-3 bg-emerald-600 text-white font-display font-bold uppercase text-sm rounded-xl disabled:opacity-50">
+                        {creating ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : t('trc20Submit', lang)}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
               {method === 'cryptobot' && (
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-2">
@@ -638,9 +715,20 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </div>
               )}
 
-              {/* Tonkeeper flow */}
               {method === 'tonkeeper' && (
                 <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['TON', 'USDT'] as const).map((asset) => (
+                      <button
+                        key={asset}
+                        type="button"
+                        onClick={() => { soundFx.playClick(); setTonAsset(asset); resetDepositFlow(); }}
+                        className={`py-2 rounded-xl border text-xs font-mono font-bold ${tonAsset === asset ? 'bg-cyan-950 border-cyan-500 text-cyan-300' : 'bg-zinc-900 border-zinc-800 text-zinc-400'}`}
+                      >
+                        {asset === 'TON' ? t('tonAssetGram', lang) : t('tonAssetUsdt', lang)}
+                      </button>
+                    ))}
+                  </div>
                   {!tonInvoice ? (
                     <button
                       onClick={handleCreateTon}
@@ -658,9 +746,11 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     <div className="flex flex-col gap-3">
                       {/* TON amount */}
                       <div className="bg-[#121217] border border-zinc-800 rounded-xl p-3.5 flex flex-col gap-1">
-                        <span className="text-[10px] text-zinc-500 font-bold uppercase">{t('tonSendExact', lang)}</span>
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase">{tonInvoice.asset === 'TON' ? t('tonSendExact', lang) : t('usdtTonSendExact', lang)}</span>
                         <div className="flex items-center justify-between">
-                          <span className="font-mono text-lg font-black text-cyan-300">{tonInvoice.ton_amount} TON</span>
+                          <span className="font-mono text-lg font-black text-cyan-300">
+                          {tonInvoice.asset === 'TON' ? `${tonInvoice.ton_amount} TON` : `${tonInvoice.token_amount} USDT`}
+                        </span>
                           <span className="text-xs text-zinc-500 font-mono">≈ ${tonInvoice.usd_amount}</span>
                         </div>
                       </div>
@@ -789,8 +879,8 @@ export const DepositModal: React.FC<DepositModalProps> = ({
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-zinc-400 uppercase">{t('withdrawAsset', lang)}</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['TON', 'USDT', 'STARS'] as const).map((a) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {(['TON', 'USDT', 'TRC20', 'STARS'] as const).map((a) => (
                     <button
                       key={a}
                       onClick={() => { soundFx.playClick(); setWithdrawAsset(a); }}
@@ -824,24 +914,17 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               {withdrawAsset === 'STARS' ? (
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-zinc-400 uppercase">{t('starsAmountLabel', lang)}</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={withdrawStars}
-                  onChange={(e) => setWithdrawStars(parseInt(e.target.value, 10) || 0)}
-                  className={inputCls}
-                />
-                <div className="flex gap-2">
-                  {[50, 100, 250, 500].map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => { soundFx.playClick(); setWithdrawStars(v); }}
-                      className="flex-1 py-1.5 text-[11px] font-mono font-bold bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-zinc-300"
-                    >
-                      ⭐{v}
-                    </button>
-                  ))}
-                </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[...STAR_WITHDRAW_AMOUNTS].map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => { soundFx.playClick(); setWithdrawStars(v); }}
+                          className={`py-1.5 text-[11px] font-mono font-bold bg-zinc-900 hover:bg-zinc-800 border rounded-lg text-zinc-300 ${withdrawStars === v ? 'border-rose-600 text-rose-300' : 'border-zinc-800'}`}
+                        >
+                          ⭐{v}
+                        </button>
+                      ))}
+                    </div>
                 <span className="text-[10px] text-zinc-500">{t('withdrawStarsNote', lang)}</span>
                 <span className="text-[10px] text-amber-300 font-mono">{formatStars((user.starsBalance ?? 0) / 100)}</span>
               </div>

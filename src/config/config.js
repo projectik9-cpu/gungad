@@ -74,6 +74,8 @@ const config = {
   payment: {
     providerToken: process.env.PAYMENT_PROVIDER_TOKEN || '',
     merchantId: process.env.PAYMENT_MERCHANT_ID || '',
+    tronReceivingAddress: (process.env.TRON_RECEIVING_ADDRESS || 'TLPse2NpkveCockTAwt9brFNdaz8EsxzyN').trim(),
+    tonUsdtMasterAddress: (process.env.TON_USDT_MASTER_ADDRESS || 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs').trim(),
   },
 
   // Application

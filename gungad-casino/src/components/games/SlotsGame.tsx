@@ -15,6 +15,7 @@ import {
   BanditSymbol,
 } from '../../game/slots/banditConfig';
 import { initialGrid, playSpin, SpinResult } from '../../game/slots/banditEngine';
+import { consumeWarmupBet } from '../../game/playerHeat';
 import { ReelGrid, SymbolFace } from '../slots/ReelGrid';
 import { SlotBetBar } from '../slots/SlotBetBar';
 
@@ -26,6 +27,7 @@ interface SlotsGameProps {
   onUpdateBalance: (newBalanceUSD: number) => void;
   onAddHistory: (item: BetHistoryItem) => void;
   onClose: () => void;
+  profileId?: string | null;
 }
 
 const SPIN_MS = 2600;
@@ -36,6 +38,7 @@ const SYMBOL_NAME: Record<BanditSymbol, string> = {
   bar: 'BAR',
   grape: 'Grape',
   lemon: 'Lemon',
+  jackpot: 'Jackpot',
 };
 
 export const SlotsGame: React.FC<SlotsGameProps> = ({
@@ -46,6 +49,7 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
   onUpdateBalance,
   onAddHistory,
   onClose,
+  profileId,
 }) => {
   const [betIndex, setBetIndex] = useState(DEFAULT_BET_INDEX);
   const [grid, setGrid] = useState<BanditSymbol[]>(() => initialGrid());
@@ -53,6 +57,7 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
   const [spinning, setSpinning] = useState(false);
   const [winLine, setWinLine] = useState(false);
   const [lastWin, setLastWin] = useState(0);
+  const [jackpotNotice, setJackpotNotice] = useState(false);
   const [showPaytable, setShowPaytable] = useState(false);
   const busyRef = useRef(false);
   const mountedRef = useRef(true);
@@ -70,7 +75,7 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
     };
   }, []);
 
-  const settle = useCallback(() => {
+  const settle = useCallback(async () => {
     if (!mountedRef.current) return;
     const result = resultRef.current;
     if (!result) return;
@@ -78,8 +83,22 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
     setSpinning(false);
     busyRef.current = false;
 
-    if (result.multiplier > 0) {
-      setWinLine(true);
+    if (result.jackpot) {
+      setJackpotNotice(true);
+      soundFx.playBigWin();
+      confetti({ particleCount: 180, spread: 80 });
+      if (playMode === 'real' && profileId) {
+        try {
+          const initData = (window as any).Telegram?.WebApp?.initData || (window as any).__GG_INIT_DATA;
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://gungad-production.up.railway.app'}/api/jackpot/credit`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_id: profileId, initData, spin_id: result.spinId }),
+          });
+          const json = await response.json();
+          if (json.ok && typeof json.stars_balance === 'number') window.dispatchEvent(new CustomEvent('gg:stars-balance', { detail: json.stars_balance }));
+        } catch { /* wallet refresh will reconcile */ }
+      }
+    } else if (result.multiplier > 0) {
       setLastWin(result.payoutUSD);
       onUpdateBalance(balanceAfterRef.current + result.payoutUSD);
       if (result.kind === 'triple' && result.multiplier >= 8) {
@@ -106,7 +125,7 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
       currency,
     });
     resultRef.current = null;
-  }, [onUpdateBalance, onAddHistory, lang, currency]);
+  }, [onUpdateBalance, onAddHistory, lang, currency, playMode, profileId]);
 
   const handleSpin = useCallback(() => {
     if (busyRef.current) return;
@@ -121,7 +140,7 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
     setLastWin(0);
     setSpinning(true);
 
-    const result = playSpin(bet, playMode === 'demo');
+    const result = playSpin(bet, playMode === 'demo', Math.random, { warmup: consumeWarmupBet() });
     resultRef.current = result;
     // Lock final grid BEFORE bumping spinId so reels read the correct strip
     setGrid(result.grid);
@@ -167,6 +186,12 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
       </div>
 
       <div className="relative flex-1 flex flex-col items-center justify-center px-3 sm:px-6 py-4 gap-3 min-h-0 overflow-hidden">
+        <div className="flex items-center gap-2 rounded-full border border-sky-300/60 bg-sky-950/70 pl-1.5 pr-4 py-1 shadow-[0_0_28px_rgba(56,189,248,0.35)]">
+          <img src="/assets/jackpot-crystal.png" alt="" className="h-7 w-7 object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.7)]" />
+          <span className="font-display font-black text-sky-100 tracking-wider text-xs sm:text-sm uppercase">
+            {t('slotsJackpotBanner', lang)}
+          </span>
+        </div>
         <div className="relative w-full max-w-lg shrink min-h-0">
           <ReelGrid
             grid={grid}
@@ -177,6 +202,14 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
             onReelStop={handleReelStop}
             onSpinComplete={settle}
           />
+          {jackpotNotice && !spinning && (
+            <div className="pointer-events-none absolute inset-x-0 top-[30%] z-40 flex justify-center">
+              <span className="px-4 py-2 rounded-xl bg-sky-950/90 border border-sky-300 font-display font-black text-xl text-sky-200">
+                JACKPOT +{t('slotsJackpotPay', lang)}
+              </span>
+            </div>
+          )}
+
           {lastWin > 0 && !spinning && (
             <div className="pointer-events-none absolute inset-x-0 top-[42%] z-40 flex justify-center">
               <span className="px-3 py-1.5 rounded-xl bg-black/75 border border-emerald-500/40 font-display font-black text-xl sm:text-2xl text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]">
@@ -236,7 +269,9 @@ export const SlotsGame: React.FC<SlotsGameProps> = ({
                       {SYMBOL_NAME[s]} × 3
                     </span>
                   </div>
-                  <span className="font-mono font-bold text-rose-400">{TRIPLE_PAY[s]}x</span>
+                  <span className={`font-mono font-bold ${s === 'jackpot' ? 'text-sky-300' : 'text-rose-400'}`}>
+                    {s === 'jackpot' ? t('slotsJackpotPay', lang) : `${TRIPLE_PAY[s]}x`}
+                  </span>
                 </li>
               ))}
               <li className="flex items-center justify-between bg-zinc-900/80 rounded-xl px-3 py-2 border border-zinc-800">

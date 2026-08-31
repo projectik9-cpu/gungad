@@ -6,7 +6,8 @@ import { soundFx } from '../../utils/sound';
 import { formatCurrency } from '../../utils/currencies';
 import confetti from 'canvas-confetti';
 import { RefreshCw } from 'lucide-react';
-import { housePayoutFactor } from '../../game/demoOdds';
+import { forceDiceRoll, housePayoutFactor, keepLiveWin } from '../../game/demoOdds';
+import { consumeWarmupBet } from '../../game/playerHeat';
 
 interface DiceGameProps {
   user: UserProfile;
@@ -57,6 +58,8 @@ export const DiceGame: React.FC<DiceGameProps> = ({
     onUpdateBalance(afterBet);
     setLastBetUSD(betAmountUSD);
     setIsRolling(true);
+    const warmup = consumeWarmupBet();
+    const isDemo = playMode === 'demo';
 
     let count = 0;
     const interval = setInterval(() => {
@@ -74,11 +77,14 @@ export const DiceGame: React.FC<DiceGameProps> = ({
     const done = setTimeout(() => {
       clearInterval(interval);
       if (!mountedRef.current) return;
-      const finalRoll = parseFloat((Math.random() * 99.99).toFixed(2));
+      let finalRoll = parseFloat((Math.random() * 99.99).toFixed(2));
+      const naturalWin = mode === 'over' ? finalRoll > targetValue : finalRoll < targetValue;
+      const win = warmup || keepLiveWin(naturalWin, isDemo);
+      if (win !== naturalWin) {
+        finalRoll = forceDiceRoll(mode, targetValue, win);
+      }
       setLastRoll(finalRoll);
       setIsRolling(false);
-
-      const win = mode === 'over' ? finalRoll > targetValue : finalRoll < targetValue;
       const payoutUSD = win ? betAmountUSD * multiplier : 0;
 
       if (win) {
